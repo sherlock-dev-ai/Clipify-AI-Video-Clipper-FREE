@@ -1,10 +1,10 @@
 <div align="center">
 
-# Clipify AI
+# Clipify AI: AI Video Clipper & Shorts Maker
 
-### Turn long videos into vertical clips. Build narration videos from a script.
+### Turn long videos into vertical, captioned clips. Create narration videos from a script.
 
-**A Windows desktop studio for clipping, captions, and narrated video.**
+**A Windows AI video clipping and narration studio.**
 
 <p>
   <a href="https://ai.projectclipzy.workers.dev/">Project website</a>

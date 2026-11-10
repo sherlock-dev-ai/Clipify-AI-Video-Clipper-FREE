@@ -1,0 +1,547 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; img-src 'self' data:; style-src 'self'; script-src 'self'; media-src 'self' clipifymusic:; font-src 'self';" />
+  <title>Clipify AI Setup</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="forest-theme.css" />
+</head>
+<body data-theme="forest">
+
+  <div class="forest-backdrop" aria-hidden="true">
+    <img id="forest-art" class="forest-art" src="forest-art.svg" alt="" draggable="false" />
+    <svg class="forest-orb" viewBox="0 0 40 40" aria-hidden="true">
+      <circle class="forest-orb-sun" cx="20" cy="20" r="13" />
+      <path class="forest-orb-moon" d="M25 4A16 16 0 1 0 36 28 12 12 0 0 1 25 4Z" />
+    </svg>
+    <canvas id="forest-world" class="forest-world" width="1440" height="900"></canvas>
+    <div class="forest-vignette"></div>
+  </div>
+
+  <svg class="mascot-definitions" aria-hidden="true" focusable="false">
+    <symbol id="clipify-firefly" viewBox="0 0 64 64">
+      <path d="M25 28C16 17 18 12 24 13c6 1 8 8 8 16M39 28c9-11 7-16 1-15-6 1-8 8-8 16" fill="#9bb39a" fill-opacity=".48" stroke="#d0dcc9" stroke-opacity=".76" stroke-width="1.5" />
+      <path d="M25 35c-5 2-7 8-6 13m20-13c5 2 7 8 6 13M28 41c-1 5-1 8 0 11m8-11c1 5 1 8 0 11" fill="none" stroke="#d8d7bd" stroke-width="2" stroke-linecap="round" />
+      <ellipse cx="32" cy="34" rx="11" ry="15" fill="#405d45" stroke="#b4c7ac" stroke-width="1.5" />
+      <path d="M24 30c0-7 3-11 8-11s8 4 8 11" fill="#7e9c77" />
+      <circle cx="28.5" cy="30" r="1.25" fill="#f4f1e8" />
+      <circle cx="35.5" cy="30" r="1.25" fill="#f4f1e8" />
+      <path d="M29 35q3 2 6 0" fill="none" stroke="#e4ddc8" stroke-width="1.4" stroke-linecap="round" />
+      <ellipse class="firefly-glow" cx="32" cy="43" rx="7" ry="5" fill="#e8bf78" />
+      <circle cx="32" cy="43" r="2.6" fill="#f6d99b" />
+      <path d="M26 24 22 21m16 3 4-3" fill="none" stroke="#b7c9b1" stroke-width="1.5" stroke-linecap="round" />
+    </symbol>
+  </svg>
+
+  <!-- Quiet illustrated world. Decorative, except the sun / moon toggles. -->
+  <template id="legacy-weather">
+  <div class="world">
+    <div class="sky" aria-hidden="true"></div>
+    <div class="stars" id="stars" aria-hidden="true"></div>
+    <div class="clouds" aria-hidden="true">
+      <div class="cloud c1"><i></i><i></i><i></i></div>
+      <div class="cloud c2"><i></i><i></i><i></i></div>
+      <div class="cloud c3"><i></i><i></i><i></i></div>
+    </div>
+    <div class="hills" aria-hidden="true">
+      <div class="mountains">
+        <svg viewBox="0 0 1200 320" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="mFar" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" class="mf-a" /><stop offset="100%" class="mf-b" />
+            </linearGradient>
+            <linearGradient id="mNear" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" class="mn-a" /><stop offset="100%" class="mn-b" />
+            </linearGradient>
+          </defs>
+          <path class="mt-far" fill="url(#mFar)" d="M0 320 L0 196 L118 128 L196 176 L286 96 L372 158 L470 74 L560 150 L664 108 L762 172 L860 118 L966 178 L1074 132 L1200 190 L1200 320 Z"/>
+          <path class="mt-snow" d="M470 74 L508 100 L470 112 L438 98 Z" opacity="0.5"/>
+          <path class="mt-snow" d="M286 96 L316 118 L286 128 L262 114 Z" opacity="0.45"/>
+          <path class="mt-near" fill="url(#mNear)" d="M0 320 L0 254 L140 190 L246 236 L340 168 L452 230 L560 186 L672 244 L790 200 L900 252 L1010 214 L1130 258 L1200 232 L1200 320 Z"/>
+        </svg>
+      </div>
+      <!-- Rolling meadow drawn as real curves rather than border-radius blobs. -->
+      <div class="meadow" aria-hidden="true">
+        <svg viewBox="0 0 1200 350" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="hfA" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" class="hf-a" /><stop offset="100%" class="hf-b" />
+            </linearGradient>
+            <linearGradient id="hfB" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" class="hg-a" /><stop offset="100%" class="hg-b" />
+            </linearGradient>
+            <linearGradient id="hfC" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" class="hh-a" /><stop offset="100%" class="hh-b" />
+            </linearGradient>
+          </defs>
+          <!-- Far ridge -->
+          <path class="h-far" fill="url(#hfA)"
+                d="M0 350 L0 214 C 90 196, 150 168, 232 180 C 318 192, 372 152, 452 140 C 536 128, 596 160, 678 146 C 764 132, 828 164, 908 152 C 990 140, 1058 168, 1130 158 C 1170 152, 1188 160, 1200 156 L1200 350 Z" />
+          <!-- Middle ridge -->
+          <path class="h-mid" fill="url(#hfB)"
+                d="M0 350 L0 262 C 84 244, 156 216, 246 232 C 330 247, 398 210, 486 206 C 578 202, 646 232, 736 216 C 828 200, 892 232, 986 220 C 1080 208, 1146 234, 1200 224 L1200 350 Z" />
+          <!-- Near ridge, brightest -->
+          <path class="h-near" fill="url(#hfC)"
+                d="M0 350 L0 308 C 96 292, 176 268, 268 280 C 356 291, 430 258, 522 256 C 616 254, 690 282, 782 268 C 874 254, 946 282, 1040 272 C 1130 262, 1170 282, 1200 278 L1200 350 Z" />
+        </svg>
+      </div>
+      <div class="trees" id="trees"></div>
+    </div>
+    <canvas class="drift" id="drift" width="1200" height="400" aria-hidden="true"></canvas>
+    <div class="bats" id="bats" aria-hidden="true"></div>
+    <div class="grass">
+      <div class="grass-blades" id="grass"></div>
+      <div class="flowerbeds" id="flowers"></div>
+    </div>
+    <div class="rain" id="rain" aria-hidden="true"></div>
+    <div class="fireflies" id="fireflies" aria-hidden="true"></div>
+  </div>
+
+  <!-- The sun and moon ARE the day / night switch, so they sit in their own
+       layer above the screens instead of being painted into the sky behind
+       them. Inside .world they were unreachable: the hero panels covered them
+       and the whole scene is pointer-events:none, which is why the day/night
+       control used to have to live in the titlebar as two separate buttons. -->
+  <div class="celestial">
+    <button class="sun sun-decor" id="sky-sun" data-test="sky-sun" type="button"
+            title="Click the sun to bring on night" aria-label="Switch to night">
+      <span class="sun-core" aria-hidden="true"></span>
+      <span class="sky-hint" aria-hidden="true">Click for night</span>
+    </button>
+    <button class="moon moon-decor" id="sky-moon" data-test="sky-moon" type="button"
+            title="Click the moon to bring back daylight" aria-label="Switch to day">
+      <span class="moon-crater c1" aria-hidden="true"></span>
+      <span class="moon-crater c2" aria-hidden="true"></span>
+      <span class="sky-hint" aria-hidden="true">Click for day</span>
+    </button>
+  </div>
+  </template>
+
+  <div class="titlebar" id="titlebar">
+    <div class="titlebar-brand">
+      <img src="logo-round.png" alt="" class="titlebar-logo" />
+      <span>Clipify AI Setup</span>
+    </div>
+    <div class="titlebar-actions">
+      <button id="btn-theme-toggle" class="theme-toggle" type="button" title="Switch to night" aria-label="Switch to night" aria-pressed="false">
+        <svg class="theme-icon theme-icon-day" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+        <svg class="theme-icon theme-icon-night" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 15.5A8.8 8.8 0 0 1 8.5 3.2a9 9 0 1 0 12.3 12.3Z"/><path d="m16.7 4.5.4 1.2 1.2.4-1.2.4-.4 1.2-.4-1.2-1.2-.4 1.2-.4.4-1.2Z"/></svg>
+      </button>
+      <span class="titlebar-sep" aria-hidden="true"></span>
+      <button id="btn-minimize" class="titlebar-btn" title="Minimise" aria-label="Minimise">&#8211;</button>
+      <button id="btn-close" class="titlebar-btn titlebar-close" title="Close" aria-label="Close">&times;</button>
+    </div>
+  </div>
+
+  <!-- Step indicator ------------------------------------------------- -->
+  <nav class="steps" id="steps" aria-label="Setup progress">
+    <ol>
+      <li class="step" data-step="1"><span class="step-dot">1</span><span class="step-name">Get Started</span></li>
+      <li class="step" data-step="2"><span class="step-dot">2</span><span class="step-name">AI Model</span></li>
+      <li class="step" data-step="3"><span class="step-dot">3</span><span class="step-name">Install Location</span></li>
+      <li class="step" data-step="4"><span class="step-dot">4</span><span class="step-name">Installing</span></li>
+      <li class="step" data-step="5"><span class="step-dot">5</span><span class="step-name">Installed</span></li>
+    </ol>
+  </nav>
+
+  <main id="screens">
+
+    <!-- STEP 1 : welcome ------------------------------------------- -->
+    <section class="screen" id="screen-welcome" data-screen="welcome" hidden>
+      <div class="hero">
+        <div class="hero-logo-wrap welcome-mascot-wrap">
+          <svg class="welcome-mascot" aria-hidden="true"><use href="#clipify-firefly"></use></svg>
+        </div>
+        <h1 class="hero-title">Your next great Short starts here.</h1>
+        <p class="hero-sub">Meet your local AI video workspace</p>
+        <p class="hero-desc">
+          Install Clipify AI for AI-assisted video clipping and narration on your Windows desktop.
+          Your selected videos and projects stay on this computer.
+        </p>
+        <div class="hero-meta">
+          <span class="pill" id="welcome-version">v2.0.0</span>
+          <span class="pill">Runs on your PC</span>
+          <span class="pill" id="welcome-os">Windows</span>
+        </div>
+        <button class="btn btn-primary btn-hero" id="btn-get-started" data-test="get-started">
+          Get started <span class="btn-arrow">&rarr;</span>
+        </button>
+        <p class="hero-foot" id="welcome-detect">Checking your system&hellip;</p>
+      </div>
+    </section>
+
+    <!-- STEP 2 : models -------------------------------------------- -->
+    <section class="screen" id="screen-models" data-screen="models" hidden>
+      <header class="screen-head">
+        <h2>Choose your AI models</h2>
+        <p>Pick what you want downloaded now. Everything runs on this computer.</p>
+      </header>
+
+      <div class="models-layout">
+        <div class="models-main">
+          <div class="notice notice-soft">
+            <strong id="model-reco">Qwen3 8B is recommended for most users.</strong>
+            <span>You can select any model, or none at all.</span>
+          </div>
+
+          <div class="model-grid" id="model-grid" data-test="model-grid"></div>
+
+          <p class="later-note">
+            You can always add more AI models later from inside Clipify AI.
+            Selecting more models means more disk space and a longer installation.
+          </p>
+        </div>
+
+        <aside class="models-side">
+          <div class="card card-detail" id="model-detail" data-test="model-detail">
+            <h3 class="detail-head">Model information</h3>
+            <div class="detail-body" id="detail-body">
+              <p class="muted">Select a model to see its details.</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <div class="screen-foot">
+        <div class="foot-summary" id="model-summary" data-test="model-summary">0 models selected</div>
+        <div class="foot-actions">
+          <button class="btn btn-ghost" data-test="models-back" id="btn-models-back">Back</button>
+          <button class="btn btn-primary" data-test="models-continue" id="btn-models-continue">Continue</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 2 : location ------------------------------------------ -->
+    <section class="screen" id="screen-location" data-screen="location" hidden>
+      <header class="screen-head">
+        <h2>Installation location</h2>
+        <p>Choose where Clipify AI should live. Your projects and media always stay in your user profile.</p>
+      </header>
+
+      <div class="card">
+        <label class="field-label" for="input-path">Installation path</label>
+        <div class="field-row">
+          <input class="field-input" id="input-path" type="text" spellcheck="false" data-test="path-input" />
+          <button class="btn btn-ghost" id="btn-browse" data-test="browse">Browse&hellip;</button>
+        </div>
+
+        <div class="space-grid">
+          <div class="space-cell">
+            <span class="space-label">Estimated space needed</span>
+            <strong class="space-value" id="space-required" data-test="space-required">&mdash;</strong>
+          </div>
+          <div class="space-cell">
+            <span class="space-label">Available</span>
+            <strong class="space-value" id="space-available" data-test="space-available">&mdash;</strong>
+          </div>
+          <div class="space-cell">
+            <span class="space-label">Free after install</span>
+            <strong class="space-value" id="space-after" data-test="space-after">&mdash;</strong>
+          </div>
+        </div>
+
+        <div class="space-meta" id="space-meta"></div>
+        <div class="bar"><div class="bar-fill" id="space-bar"></div></div>
+        <p class="notice notice-good" id="space-good" hidden>
+          <span class="notice-icon">&#10003;</span>
+          <span>You have enough space to install Clipify AI.</span>
+        </p>
+        <p class="notice notice-warn" id="space-warning" data-test="space-warning" hidden>
+          <span class="notice-icon">&#9888;</span>
+          <span id="space-warning-text"></span>
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>Options</h3>
+        <label class="switch-row">
+          <input type="checkbox" id="chk-desktop" data-test="desktop-toggle" checked />
+          <span class="switch-box" aria-hidden="true"></span>
+          <span>Create a desktop shortcut</span>
+        </label>
+        <label class="switch-row">
+          <input type="checkbox" id="chk-runtime" data-test="runtime-toggle" checked />
+          <span class="switch-box" aria-hidden="true"></span>
+          <span>Install the local AI runtime <span class="muted">(Torch, WhisperX, ClipsAI &mdash; about 2.7 GB)</span></span>
+        </label>
+        <label class="switch-row">
+          <input type="checkbox" id="chk-ollama" data-test="ollama-toggle" checked />
+          <span class="switch-box" aria-hidden="true"></span>
+          <span>Install Ollama if it is missing</span>
+        </label>
+      </div>
+
+      <!-- Model Storage Location -->
+      <div class="card">
+        <h3>Ollama model storage</h3>
+        <p class="muted" id="models-dir-desc">AI models (several GB each) are stored separately from the application. Choose where Ollama should keep them.</p>
+
+        <div class="models-dir-detected" id="models-dir-detected" hidden>
+          <span class="notice-icon" aria-hidden="true">&#9432;</span>
+          <span>Existing models detected at <code id="models-dir-current"></code></span>
+        </div>
+
+        <label class="field-label" for="input-models-dir" style="margin-top:0.75rem;">Model storage path</label>
+        <div class="field-row">
+          <input class="field-input" id="input-models-dir" type="text" spellcheck="false"
+                 data-test="models-dir-input"
+                 placeholder="Leave blank to use the default location" />
+          <button class="btn btn-ghost" id="btn-browse-models" data-test="browse-models" type="button">Browse&hellip;</button>
+        </div>
+        <p class="notice notice-warn" id="models-dir-warning" hidden>
+          <span class="notice-icon">&#9888;</span>
+          <span id="models-dir-warning-text"></span>
+        </p>
+        <p class="muted" id="models-dir-hint" style="margin-top:0.5rem;font-size:0.82rem;">
+          Existing models at the old location are <strong>not</strong> moved automatically. After install you can migrate them manually or via the Clipify AI settings.
+        </p>
+      </div>
+
+      <div class="screen-foot">
+        <div class="foot-summary" id="loc-summary"></div>
+        <div class="foot-actions">
+          <button class="btn btn-ghost" data-test="loc-back" id="btn-loc-back">Back</button>
+          <button class="btn btn-primary" data-test="install" id="btn-install">Install</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 3 : installing ---------------------------------------- -->
+    <section class="screen" id="screen-install" data-screen="install" hidden>
+      <header class="screen-head screen-head-row">
+        <div>
+          <h2 id="install-title">Installing Clipify AI</h2>
+          <p id="install-subtask">Preparing&hellip;</p>
+        </div>
+        <div class="overall">
+          <span class="overall-value" id="overall-percent" data-test="overall-percent">0%</span>
+        </div>
+      </header>
+
+      <div class="bar bar-lg bar-track" role="progressbar" aria-label="Installation progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="overall-progress">
+        <div class="bar-fill" id="overall-bar"></div>
+        <div class="bar-indeterminate" id="overall-indeterminate" hidden></div>
+        <!-- Tiny worker that walks the track as real progress advances. -->
+        <div class="builder" id="builder" data-test="builder" aria-hidden="true">
+          <svg class="runner-mascot" viewBox="0 0 48 52" role="presentation">
+            <ellipse class="runner-shadow" cx="24" cy="49" rx="15" ry="2.5" />
+            <g class="runner-wings">
+              <path class="runner-wing runner-wing-left" d="M21 19C10 10 12 4 18 7c4 2 6 6 6 12Z" />
+              <path class="runner-wing runner-wing-right" d="M27 19c11-9 9-15 3-12-4 2-6 6-6 12Z" />
+            </g>
+            <g class="runner-back-legs"><path d="M19 36 13 43l-4 1m8-2 4 2" /></g>
+            <g class="runner-front-legs"><path d="M29 36 34 42l5 1m-5-1 1 4" /></g>
+            <ellipse class="runner-abdomen" cx="24" cy="35" rx="9" ry="12" />
+            <path class="runner-shell" d="M16 29c0-7 3-12 8-12s8 5 8 12v8c0 4-3 7-8 7s-8-3-8-7Z" />
+            <path class="runner-face" d="M18 28c0-6 2-9 6-9s6 3 6 9v3H18Z" />
+            <circle class="runner-eye" cx="21" cy="28" r="1" /><circle class="runner-eye" cx="27" cy="28" r="1" />
+            <path class="runner-smile" d="M22 32q2 1.8 4 0" />
+            <circle class="runner-glow" cx="24" cy="37" r="4" />
+            <path class="runner-antennae" d="m21 19-3-5m9 5 3-5" />
+          </svg>
+        </div>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat" title="Live speed for the current file or model transfer"><span>Transfer speed</span><strong id="stat-speed">&mdash;</strong></div>
+        <div class="stat" title="Bytes received for the current transfer"><span>Received</span><strong id="stat-done" data-test="stat-done">0 B</strong></div>
+        <div class="stat" title="Size of the current transfer when known"><span>Transfer size</span><strong id="stat-total">0 B</strong></div>
+        <div class="stat" title="Estimate appears only while a measured transfer rate is available"><span>Transfer ETA</span><strong id="stat-eta">—</strong></div>
+      </div>
+
+      <!-- Live activity ----------------------------------------------------
+           Nearly all of an install is spent waiting on other programs, so a
+           bar on its own leaves long stretches where nothing appears to
+           happen. This is a running tail of the real work: every file copied,
+           every pip package, every model blob. -->
+      <div class="install-body" id="install-workspace">
+        <div class="install-details-view install-left" id="install-details-view">
+          <details class="card card-activity" id="activity-details" data-test="activity">
+            <summary><span>Installation details</span><span class="activity-count" id="activity-count" data-test="activity-count">0 steps</span></summary>
+            <div class="activity-head"><h3>Live activity</h3><span class="activity-pulse" id="activity-pulse" data-test="activity-pulse" aria-hidden="true"></span><button class="activity-latest" id="activity-latest" type="button" hidden>Latest &#8595;</button></div>
+            <ol class="activity-feed" id="activity-feed" data-test="activity-feed" role="log"></ol>
+          </details>
+
+          <div class="install-status-grid">
+            <div class="card card-tight">
+              <h3>Current task</h3>
+              <p class="mono" id="current-item">&mdash;</p>
+              <ul class="phase-list" id="phase-list"></ul>
+            </div>
+            <div class="card card-tight">
+              <h3>Models</h3>
+              <ul class="model-status" id="model-status"></ul>
+            </div>
+            <div class="error-box" id="error-box" hidden>
+              <strong id="error-text"></strong>
+              <div class="foot-actions">
+                <button class="btn btn-ghost btn-sm" id="btn-retry" data-test="retry">Retry</button>
+                <button class="btn btn-ghost btn-sm" id="btn-cancel" data-test="cancel">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="install-right runner-workspace" id="game-workspace">
+          <section class="card card-game runner-card" aria-labelledby="runner-title">
+            <div class="runner-stage">
+              <canvas id="forest-game" width="880" height="270" tabindex="0" aria-label="Forest runner. Press Space or Up arrow to jump over forest hazards."></canvas>
+              <!-- Score HUD — visible overlay inside the game stage -->
+              <div class="runner-hud" aria-hidden="true">
+                <span class="runner-hud-label">Score</span>
+                <strong class="runner-hud-score" id="game-score-vis">0</strong>
+                <span class="runner-hud-sep">|</span>
+                <span class="runner-hud-label">Best</span>
+                <strong class="runner-hud-best" id="game-best-vis">0</strong>
+              </div>
+            </div>
+            <div class="runner-controls">
+              <button class="runner-toggle" id="btn-game-toggle" data-test="game-toggle" type="button" aria-label="Pause game">Pause</button>
+            </div>
+            <!-- Screen-reader score mirrors (updated by forest_game.js, forwarded to visible HUD by game init) -->
+            <span class="sr-only" id="game-score" aria-label="Current score">0</span>
+            <span class="sr-only" id="game-best" aria-label="Best score">0</span>
+            <span class="sr-only" id="game-state" role="status" aria-live="polite">Running. Press Space or Up arrow to jump.</span>
+          </section>
+        </div>
+      </div>
+      <section class="failure-panel" id="failure-panel" hidden aria-live="assertive">
+        <svg class="failure-mascot firefly-mark" aria-hidden="true"><use href="#clipify-firefly"></use></svg>
+        <div>
+          <h2 id="failure-title">Setup needs another try</h2>
+          <p id="failure-message">Clipify AI could not finish installing.</p>
+          <p class="failure-help">Your files remain safe. Retry will check completed work and continue where possible.</p>
+          <div class="foot-actions failure-actions">
+            <button class="btn btn-primary" id="btn-failure-retry" type="button">Retry setup</button>
+            <button class="btn btn-ghost" id="btn-view-log" type="button">View setup log</button>
+            <button class="btn btn-ghost" id="btn-failure-close" type="button">Close installer</button>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- STEP 4 : done ---------------------------------------------- -->
+    <section class="screen" id="screen-done" data-screen="done" hidden>
+      <div class="hero">
+        <div class="hero-logo-wrap">
+          <img src="logo-round.png" alt="Clipify AI" class="hero-logo" id="done-logo" />
+          <svg class="success-ring" viewBox="0 0 120 120" aria-hidden="true">
+            <circle cx="60" cy="60" r="54" />
+            <path d="M34 62 L52 80 L88 40" />
+          </svg>
+        </div>
+        <h1 class="hero-title">Your forest is ready.</h1>
+        <p class="hero-sub">Clipify AI is installed and passed its final component checks.</p>
+        <p class="hero-sub" id="done-location"></p>
+        <div class="done-models" id="done-models"></div>
+        <div class="hero-meta" id="done-meta"></div>
+        <div class="done-actions">
+          <button class="btn btn-primary btn-hero" id="btn-launch" data-test="launch">Launch Clipify AI</button>
+          <button class="btn btn-ghost btn-hero" id="btn-open-folder" data-test="open-folder">Open installation folder</button>
+          <button class="btn btn-ghost btn-hero" id="btn-close-installer" type="button">Close installer</button>
+        </div>
+        <p class="launch-error" id="launch-error" role="alert" hidden></p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Music -------------------------------------------------------- -->
+  <div class="music" id="music" data-test="music">
+    <span class="music-disc" id="music-disc" aria-hidden="true">
+      <span class="disc-groove"></span>
+      <span class="disc-label"></span>
+      <span class="disc-arm"></span>
+    </span>
+    <div class="music-panel">
+      <div class="music-head">
+        <span class="music-meta">
+          <span class="music-track" id="music-title" data-test="music-title">No music</span>
+          <span class="music-artist" id="music-artist" data-test="music-artist"></span>
+        </span>
+      </div>
+      <div class="music-row">
+        <button class="music-btn" id="btn-music-prev" data-test="music-prev" title="Previous track" aria-label="Previous track">&#9198;</button>
+        <button class="music-btn music-play" id="btn-music-play" data-test="music-play" title="Play" aria-label="Play or pause">&#9654;</button>
+        <button class="music-btn" id="btn-music-next" data-test="music-next" title="Skip to next track" aria-label="Skip to next track">&#9197;</button>
+        <input class="music-seek" id="music-seek" data-test="music-seek" type="range" min="0" max="1000" value="0" aria-label="Seek" />
+        <span class="music-time" id="music-time" data-test="music-time">00:00 / 00:00</span>
+        <button class="music-btn" id="btn-music-mute" data-test="music-mute" title="Mute" aria-label="Mute or unmute">&#128266;</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="statusbar">
+    <span id="status-text">Ready</span>
+    <span class="statusbar-spacer"></span>
+    <button class="github-link" id="btn-github" data-test="github" title="Open the Clipify AI project on GitHub">
+      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+        <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>
+      </svg>
+      <span>github.com/sherlock-dev-ai</span>
+    </button>
+    <span id="status-engine" class="muted"></span>
+  </footer>
+
+  <audio id="audio" preload="none"></audio>
+
+  <!-- First-run welcome popup ---------------------------------------- -->
+  <div class="popup" id="welcome-popup" data-test="welcome-popup" hidden>
+    <div class="popup-scrim" id="popup-scrim"></div>
+    <div class="popup-card" role="dialog" aria-modal="true" aria-labelledby="popup-title" aria-describedby="popup-body">
+      <div class="popup-glow" aria-hidden="true"></div>
+      <img src="logo-round.png" alt="" class="popup-logo" />
+      <h2 class="popup-title" id="popup-title">Welcome to Clipify AI</h2>
+      <p class="popup-body" id="popup-body">
+        This setup installs Clipify AI and the AI models that turn long videos into
+        vertical shorts. Everything runs on this computer &mdash; nothing is uploaded.
+      </p>
+      <ul class="popup-points">
+        <li><span class="popup-ico" aria-hidden="true">&#9881;</span><span>Pick your install folder and AI models.</span></li>
+        <li><span class="popup-ico" aria-hidden="true">&#128190;</span><span>Models can be added later, inside the app.</span></li>
+        <li><span class="popup-ico" aria-hidden="true">&#127968;</span><span>Your footage never leaves this machine.</span></li>
+      </ul>
+      <div class="popup-sky-demo" data-test="sky-demo">
+        <span class="demo-sun" aria-hidden="true"></span>
+        <span class="demo-arrow" aria-hidden="true">&#8594;</span>
+        <span class="demo-moon" aria-hidden="true"></span>
+        <p class="popup-sky-text">
+          Click the <strong>sun</strong> in the sky to bring on <strong>night</strong>,
+          and the <strong>moon</strong> to bring back <strong>day</strong>.
+        </p>
+      </div>
+      <div class="popup-actions">
+        <button class="btn btn-primary" id="btn-popup-ok" data-test="popup-ok" type="button">Got it, let's go</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pre-download warning ------------------------------------------------
+       Shown when the user commits to installing, before any bytes move. -->
+  <div class="popup" id="download-warning" data-test="download-warning" hidden>
+    <div class="popup-scrim" id="warn-scrim"></div>
+    <div class="popup-card popup-card-warn" role="dialog" aria-modal="true"
+         aria-labelledby="warn-title" aria-describedby="warn-body">
+      <div class="popup-glow popup-glow-warn" aria-hidden="true"></div>
+      <div class="popup-badge popup-badge-warn" aria-hidden="true">&#9888;</div>
+      <h2 class="popup-title" id="warn-title">Review installation</h2>
+      <p class="popup-body" id="warn-body">
+        The installer will show any selected component downloads before setup begins.
+      </p>
+      <ul class="popup-points popup-points-warn" id="warn-points"></ul>
+      <p class="popup-estimate" id="warn-estimate" data-test="warn-estimate"></p>
+      <div class="popup-actions">
+        <button class="btn btn-ghost" id="btn-warn-back" data-test="warn-back" type="button">Go back</button>
+        <button class="btn btn-primary" id="btn-warn-go" data-test="warn-go" type="button">Start installation</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="forest_world.js"></script>
+  <script src="forest_game.js"></script>
+  <script src="download_warning.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

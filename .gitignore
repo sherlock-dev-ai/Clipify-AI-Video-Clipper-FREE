@@ -1,0 +1,56 @@
+# Environment variables
+.env
+
+# Input directory - ignore all content except placeholder
+input/*
+!input/.gitkeep
+
+# Output directory - ignore all content except placeholder  
+output/*
+!output/.gitkeep
+
+# FFmpeg log
+ffmpeg.log
+
+# Virtual environment
+env/
+venv/
+.env/
+.venv/
+
+# Python
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache/
+.coverage
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+.aider*
+
+# Build artifacts
+build/dist/
+build/_app_build/
+build/_main_build/
+build/installer/
+build/*.log
+build/stdlib_flags.json
+build_test/dist_test/
+build_test/module_dist/
+build_test/standalone_dist/
+build_test/main_dist/
+
+# FFmpeg source archives and embeddable interpreter (downloaded, not shipped)
+tools/*.zip
+tools/python310/

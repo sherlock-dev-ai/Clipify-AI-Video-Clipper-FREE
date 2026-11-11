@@ -1731,6 +1731,23 @@ class Installer extends EventEmitter {
     for (const sub of ['input', 'output', 'jobs', 'projects', 'settings', 'assets', 'narrate clips']) {
       fs.mkdirSync(path.join(home, sub), { recursive: true });
     }
+    // Seed default narrate clips from installed application into user data library
+    const payloadClips = path.join(this.options.installDir, 'narrate clips');
+    const targetClips = path.join(home, 'narrate clips');
+    if (fs.existsSync(payloadClips) && fs.existsSync(targetClips)) {
+      try {
+        for (const file of fs.readdirSync(payloadClips)) {
+          const srcFile = path.join(payloadClips, file);
+          const dstFile = path.join(targetClips, file);
+          if (!fs.existsSync(dstFile) && fs.statSync(srcFile).isFile()) {
+            fs.copyFileSync(srcFile, dstFile);
+          }
+        }
+        this.log('seeded default narration clips');
+      } catch (err) {
+        this.log(`seed clips warning: ${err.message}`);
+      }
+    }
     // Never overwrite a file the user has already customised.
     if (!fs.existsSync(target) && fs.existsSync(envExample)) {
       fs.copyFileSync(envExample, target);

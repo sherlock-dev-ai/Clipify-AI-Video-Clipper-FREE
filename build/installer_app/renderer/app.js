@@ -1293,6 +1293,10 @@ const $ = (id) => {
     state.game.setVisible(true);
     state.game.start();
 
+    if (state.game && typeof state.game.syncHud === 'function') {
+      state.game.syncHud();
+    }
+
     // Mirror the sr-only score/best text into the visible HUD elements.
     // The Game constructor writes to #game-score and #game-best (sr-only spans).
     // A MutationObserver picks up each change and copies it to the HUD.

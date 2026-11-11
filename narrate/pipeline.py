@@ -162,6 +162,10 @@ class NarratePipeline:
         remembered = self._remembered_library()
         if remembered:
             return remembered
+        for base in (self.root, self.data_dir):
+            candidate = base / "narrate clips"
+            if candidate.is_dir() and any(candidate.glob("*.mp4")):
+                return candidate
         return self.data_dir / "narrate clips"
 
     def reset_library(self) -> Path:
@@ -186,6 +190,16 @@ class NarratePipeline:
         target = self.default_library()
         try:
             target.mkdir(parents=True, exist_ok=True)
+            if not any(target.glob("*.mp4")):
+                for base in (self.root, self.data_dir):
+                    source = base / "narrate clips"
+                    if source.is_dir() and source != target:
+                        for clip in source.glob("*.mp4"):
+                            try:
+                                shutil.copy2(clip, target / clip.name)
+                            except OSError:
+                                pass
+                        break
         except OSError:
             pass
         return target

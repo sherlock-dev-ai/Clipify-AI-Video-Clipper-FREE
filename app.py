@@ -770,6 +770,8 @@ job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, ma
         "CLIPPEDAI_TEXT_X": str(branding.get("text_x", 50)),
         "CLIPPEDAI_TEXT_Y": str(branding.get("text_y", 75)),
         "CLIPPEDAI_SPLIT_SCREEN": "1" if split_screen else "0",
+        "TRANSCRIPTION_MODEL": os.getenv("TRANSCRIPTION_MODEL", "medium"),
+        "HF_HUB_OFFLINE": "1" if (Path.home() / ".cache" / "huggingface" / "hub" / "models--Systran--faster-whisper-medium").is_dir() else os.getenv("HF_HUB_OFFLINE", "0"),
     })
     diagnostic_log = job_dir / "diagnostics" / "qwen-decisions.jsonl"
     diagnostic_log.parent.mkdir(parents=True, exist_ok=True)
@@ -881,23 +883,112 @@ def narrate_videos():
     })
 
 
+_extra_download_state: dict[str, Any] = {
+    "status": "idle",
+    "progress": 0,
+    "current_file": "",
+    "downloaded_count": 0,
+    "total_count": 0,
+    "error": None,
+}
+_extra_download_lock = threading.Lock()
+
+
 @app.post("/api/narrate/extra-clips")
 def narrate_toggle_extra_clips():
     """Enable or disable the extra background clips (narrate download)."""
-    data = request.get_json(silent=True) or {}
-    enable = bool(data.get("enable", True))
-    enabled = NARRATE.set_extra_clips_enabled(enable)
-    videos = NARRATE.scan_videos()
-    folders = NARRATE.library_folders()
-    return jsonify({
-        "ok": True,
-        "extra_clips_available": NARRATE.has_extra_clips(),
-        "extra_clips_enabled": enabled,
-        "extra_clips_count": NARRATE.extra_clips_count(),
-        "count": len(videos),
-        "videos": videos,
-        "folders": [str(folder) for folder in folders],
-    })
+    try:
+        data = request.get_json(silent=True) or {}
+        enable = bool(data.get("enable", True))
+        enabled = NARRATE.set_extra_clips_enabled(enable)
+        videos = NARRATE.scan_videos()
+        folders = NARRATE.library_folders()
+        return jsonify({
+            "ok": True,
+            "extra_clips_available": NARRATE.has_extra_clips(),
+            "extra_clips_enabled": enabled,
+            "extra_clips_count": NARRATE.extra_clips_count(),
+            "count": len(videos),
+            "videos": videos,
+            "folders": [str(folder) for folder in folders],
+        })
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.post("/api/narrate/download-extra")
+def narrate_download_extra():
+    """Download/install the additional background clips into the active library."""
+    try:
+        from narrate.pipeline import VIDEO_EXTENSIONS
+    except ImportError:
+        VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"}
+
+    with _extra_download_lock:
+        if _extra_download_state.get("status") == "downloading":
+            return jsonify({"ok": True, "state": dict(_extra_download_state)})
+
+        source_dir = NARRATE.extra_clips_folder()
+        if not source_dir or not source_dir.is_dir():
+            for candidate in [
+                Path(r"L:\ClipifyAI\narrate download"),
+                ROOT / "narrate download",
+                USER_DATA_DIR / "narrate download",
+            ]:
+                if candidate.is_dir():
+                    source_dir = candidate
+                    break
+
+        if not source_dir or not source_dir.is_dir():
+            return jsonify({"ok": False, "error": "Additional clips folder not found on disk."}), 404
+
+        target_dir = NARRATE.ensure_library()
+        extra_files = [p for p in source_dir.iterdir() if p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS]
+        if not extra_files:
+            return jsonify({"ok": False, "error": "No video clips found in additional clips folder."}), 404
+
+        _extra_download_state.update({
+            "status": "downloading",
+            "progress": 0,
+            "current_file": extra_files[0].name,
+            "downloaded_count": 0,
+            "total_count": len(extra_files),
+            "error": None,
+        })
+
+    def worker():
+        try:
+            total = len(extra_files)
+            for idx, src_file in enumerate(extra_files, start=1):
+                dst_file = target_dir / src_file.name
+                with _extra_download_lock:
+                    _extra_download_state["current_file"] = src_file.name
+                    _extra_download_state["downloaded_count"] = idx
+                    _extra_download_state["progress"] = int((idx / total) * 100)
+                if not dst_file.exists() or dst_file.stat().st_size != src_file.stat().st_size:
+                    shutil.copy2(src_file, dst_file)
+                import time
+                time.sleep(0.03)
+
+            NARRATE.set_extra_clips_enabled(True)
+            with _extra_download_lock:
+                _extra_download_state["status"] = "completed"
+                _extra_download_state["progress"] = 100
+                _extra_download_state["current_file"] = "Complete"
+        except Exception as exc:
+            with _extra_download_lock:
+                _extra_download_state["status"] = "error"
+                _extra_download_state["error"] = str(exc)
+
+    threading.Thread(target=worker, daemon=True).start()
+    return jsonify({"ok": True, "state": dict(_extra_download_state)})
+
+
+@app.get("/api/narrate/download-extra-status")
+def narrate_download_extra_status():
+    with _extra_download_lock:
+        state = dict(_extra_download_state)
+    return jsonify({"ok": True, "state": state})
 
 
 @app.post("/api/narrate/library")

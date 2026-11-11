@@ -31,12 +31,7 @@
       this.player = { x: 96, bottom: 0, velocityY: 0, grounded: true, runPhase: 0 };
       try { this.best = Math.max(0, Number(localStorage.getItem('clipify.runner.best')) || 0); }
       catch { this.best = 0; }
-      if (this.bestElement) this.bestElement.textContent = String(this.best);
-      const bestVis = typeof document !== 'undefined' ? document.getElementById('game-best-vis') : null;
-      if (bestVis) bestVis.textContent = String(this.best);
-      if (this.scoreElement) this.scoreElement.textContent = '0';
-      const scoreVis = typeof document !== 'undefined' ? document.getElementById('game-score-vis') : null;
-      if (scoreVis) scoreVis.textContent = '0';
+      this.syncHud();
 
       this.onKeyDown = (event) => this.handleKeyDown(event);
       this.onKeyUp = (event) => this.handleKeyUp(event);
@@ -51,6 +46,15 @@
       this.resize();
       this.draw();
       this.setState('ready');
+    }
+
+    syncHud() {
+      if (this.scoreElement) this.scoreElement.textContent = String(this.score || 0);
+      const scoreVis = typeof document !== 'undefined' ? document.getElementById('game-score-vis') : null;
+      if (scoreVis) scoreVis.textContent = String(this.score || 0);
+      if (this.bestElement) this.bestElement.textContent = String(this.best || 0);
+      const bestVis = typeof document !== 'undefined' ? document.getElementById('game-best-vis') : null;
+      if (bestVis) bestVis.textContent = String(this.best || 0);
     }
 
     setState(state) {
@@ -156,7 +160,7 @@
       this.player.velocityY = 0;
       this.player.grounded = true;
       this.player.runPhase = 0;
-      this.scoreElement.textContent = '0';
+      this.syncHud();
       this.setState('playing');
       this.canvas.focus({ preventScroll: true });
       this.scheduleFrame();
@@ -228,7 +232,7 @@
       const flyerType = isNight ? 'bat' : 'bee';
       const types = ['log', 'roots', 'rocks', 'thorns', 'branch', flyerType];
       let available = types.filter((type) => type !== this.lastObstacle);
-      if (this.elapsed < 8) available = available.filter((type) => !['branch', 'trap', flyerType].includes(type));
+      if (this.elapsed < 4) available = available.filter((type) => !['branch', 'trap'].includes(type));
       const type = available[Math.floor(this.rand() * available.length)] || 'log';
       const obstacle = { type, x: this.width + 36, age: 0, falling: false, landed: false };
       if (type === 'log') Object.assign(obstacle, { width: 54 + this.rand() * 38, height: 22 + this.rand() * 7 });
@@ -296,13 +300,13 @@
         obstacle.x -= this.speed * delta;
         obstacle.age += delta;
         if (obstacle.type === 'branch' && !obstacle.landed) {
-          // Drop well ahead of the player so it lands safely as a jumpable hurdle
-          const triggerDropAt = this.player.x + Math.max(260, this.speed * 0.95);
+          // Drop well ahead of player so it lands safely as a jumpable hurdle on the ground
+          const triggerDropAt = this.player.x + Math.max(500, this.speed * 1.7);
           if (!obstacle.falling && obstacle.x <= triggerDropAt) {
             obstacle.falling = true;
           }
           if (obstacle.falling) {
-            obstacle.fallY += 920 * delta;
+            obstacle.fallY += 1500 * delta;
             if (obstacle.fallY >= this.groundY - obstacle.height) {
               obstacle.fallY = this.groundY - obstacle.height;
               obstacle.landed = true;
@@ -319,14 +323,11 @@
         return;
       }
       this.score = Math.floor(this.distance / 13);
-      this.scoreElement.textContent = String(this.score);
       if (this.score > this.best) {
         this.best = this.score;
-        if (this.bestElement) this.bestElement.textContent = String(this.best);
-        const bestVis = typeof document !== 'undefined' ? document.getElementById('game-best-vis') : null;
-        if (bestVis) bestVis.textContent = String(this.best);
         try { localStorage.setItem('clipify.runner.best', String(this.best)); } catch { /* optional storage */ }
       }
+      this.syncHud();
     }
 
     hasCollision() {
@@ -335,7 +336,7 @@
       const playerTop = this.player.bottom - 55;
       const playerFeet = this.player.bottom - 4;
       for (const obstacle of this.obstacles) {
-        const obstacleLeft = obstacle.type === 'branch' && !obstacle.landed ? obstacle.x + 8 : obstacle.x;
+        const obstacleLeft = obstacle.x + 5;
         const obstacleRight = obstacle.x + obstacle.width - 5;
         if (playerRight <= obstacleLeft || playerLeft >= obstacleRight) continue;
         if (obstacle.type === 'trap') {
@@ -351,13 +352,12 @@
           if (playerFeet > obsTop + 4 && playerTop < obsBottom - 4) return true;
           continue;
         }
+        if (obstacle.type === 'branch') {
+          // If the branch hasn't landed on ground yet, it's safely up in the air
+          if (!obstacle.landed) continue;
+        }
         let obstacleTop = this.groundY - obstacle.height;
         let obstacleBottom = this.groundY;
-        if (obstacle.type === 'branch' && !obstacle.landed) {
-          if (!obstacle.falling) continue;
-          obstacleTop = obstacle.fallY;
-          obstacleBottom = obstacleTop + obstacle.height;
-        }
         if (playerFeet > obstacleTop + 4 && playerTop < obstacleBottom - 4) return true;
       }
       return false;

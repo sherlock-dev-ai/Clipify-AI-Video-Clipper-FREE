@@ -1095,11 +1095,55 @@ def create_transcriber(model_size: str) -> "Transcriber":
         if kwargs["device"] == "cpu":
             cpu_count = os.cpu_count() or 8
             kwargs.setdefault("threads", min(12, max(4, cpu_count - 2)))
+
+        # Check local HuggingFace cache to prevent ProtocolError/ConnectionResetError (10054)
+        hf_cache = Path.home() / ".cache" / "huggingface" / "hub"
+        arch_name = args[0] if args else kwargs.get("whisper_arch", model_size)
+        arch_clean = str(arch_name).replace(".", "-")
+        has_local = False
+        if hf_cache.is_dir():
+            for d in hf_cache.glob(f"models--*--faster-whisper-*{arch_clean}*"):
+                if d.is_dir() and any(d.rglob("model.bin")):
+                    has_local = True
+                    break
+            if not has_local and (hf_cache / "models--Systran--faster-whisper-medium").is_dir():
+                has_local = True
+
+        if has_local or os.getenv("HF_HUB_OFFLINE") == "1":
+            kwargs["local_files_only"] = True
+            os.environ["HF_HUB_OFFLINE"] = "1"
+
         print(
-            f"  [WhisperX] Loading model '{model_size}' on "
-            f"{kwargs['device']} with compute_type={kwargs['compute_type']} (threads={kwargs.get('threads', 'default')}) …"
+            f"  [WhisperX] Loading model '{arch_name}' on "
+            f"{kwargs['device']} with compute_type={kwargs['compute_type']} (threads={kwargs.get('threads', 'default')}, local_files_only={kwargs.get('local_files_only', False)}) …"
         )
-        return original_load_model(*args, **kwargs)
+        try:
+            return original_load_model(*args, **kwargs)
+        except Exception as exc:
+            if kwargs.get("local_files_only"):
+                print(f"  [WhisperX] Local load exception ({exc}), retrying without local_files_only...")
+                kwargs["local_files_only"] = False
+                os.environ.pop("HF_HUB_OFFLINE", None)
+                try:
+                    return original_load_model(*args, **kwargs)
+                except Exception as net_exc:
+                    print(f"  [WhisperX] Network load exception ({net_exc}), falling back to cached medium...")
+                    kwargs["local_files_only"] = True
+                    os.environ["HF_HUB_OFFLINE"] = "1"
+                    if args:
+                        args = ("medium",) + args[1:]
+                    else:
+                        kwargs["whisper_arch"] = "medium"
+                    return original_load_model(*args, **kwargs)
+            else:
+                print(f"  [WhisperX] Load exception ({exc}), falling back to cached medium...")
+                kwargs["local_files_only"] = True
+                os.environ["HF_HUB_OFFLINE"] = "1"
+                if args:
+                    args = ("medium",) + args[1:]
+                else:
+                    kwargs["whisper_arch"] = "medium"
+                return original_load_model(*args, **kwargs)
 
     whisperx.load_model = load_model_with_silero
     try:

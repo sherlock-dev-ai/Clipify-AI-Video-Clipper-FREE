@@ -31,7 +31,7 @@ APP_EXE_NAME = "Clipify AI.exe"
 
 EXCLUDE_DIRS = {
     "input", "output", "jobs", "__pycache__", ".git", ".venv", "venv",
-    "narrate clips", "big narrate clips", "sliced clips", "test-output",
+    "big narrate clips", "sliced clips", "test-output",
 }
 EXCLUDE_FILES = {
     "clippedai.vbs", "clippedai.bat", "clipifyai.vbs", "clipifyai.bat",
@@ -119,8 +119,8 @@ def verify_payload(root: Path) -> tuple[int, list[str]]:
         if not item.is_file():
             continue
         total += 1
-        if any(part.lower() == "narrate clips" for part in item.relative_to(root).parts[:-1]):
-            problems.append(f"user-provided narration footage must not ship: {item.relative_to(root)}")
+        if any(part.lower() == "big narrate clips" for part in item.relative_to(root).parts[:-1]):
+            problems.append(f"oversized narration footage must not ship: {item.relative_to(root)}")
         name = item.name.lower()
         if item.suffix.lower() in BANNED_SUFFIXES:
             problems.append(f"prohibited file type: {item.relative_to(root)}")

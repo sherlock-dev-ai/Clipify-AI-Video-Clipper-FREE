@@ -34,18 +34,18 @@ class NarratePayloadAssetTests(unittest.TestCase):
             standard.mkdir()
             optional.mkdir()
             output.mkdir()
-            self.assertFalse(wants(standard))
+            self.assertTrue(wants(standard))
             self.assertFalse(wants(optional))
             self.assertFalse(wants(output))
 
     def test_payload_verifier_rejects_narration_user_data(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            footage = root / "narrate clips" / "user.mp4"
+            footage = root / "big narrate clips" / "user.mp4"
             footage.parent.mkdir()
             footage.write_bytes(b"test")
             _count, problems = verify_payload(root)
-            self.assertTrue(any("user-provided narration footage must not ship" in p for p in problems))
+            self.assertTrue(any("oversized narration footage must not ship" in p for p in problems))
 
 
 if __name__ == "__main__":

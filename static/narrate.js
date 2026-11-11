@@ -17,40 +17,113 @@ function renderClips(){const q=$('#clipSearch').value.toLowerCase();const list=s
 $('#clipSearch').oninput=renderClips;
 $('#customVideo').onchange=async e=>{const file=e.target.files[0];if(!file)return;const form=new FormData();form.append('video',file);try{const r=await fetch('/api/narrate/upload',{method:'POST',body:form});const d=await r.json();if(!r.ok)throw Error(d.error);const clips=await fetch('/api/narrate/videos');state.clips=(await clips.json()).videos||[];state.clip=state.clips.find(v=>v.id===d.video_id)||state.clips.find(v=>v.filename===d.video)||state.clips[0];renderClips();updateReady();}catch(err){alert(err.message)}};
 function updateReady(){$('#generateNarrate').disabled=!($('#scriptInput').value.trim()&&state.voice&&state.clip);}
+let downloadPollInterval = null;
 function updateExtraClipsUI(){
-  const btn=$('#btnExtraClips');
-  const countDisplay=$('#extraClipsCountDisplay');
-  const statusDisplay=$('#extraClipsStatusDisplay');
-  const confirmBtn=$('#confirmExtraClips');
+  const btn=$('#btnDownloadExtra');
   const count=state.extraClipsCount||62;
-  if(countDisplay)countDisplay.textContent=`${count} extra clips`;
-  if(state.extraClipsEnabled){
-    if(btn){
-      btn.textContent=`✓ Extra Clips Active (${count})`;
-      btn.classList.add('active');
-    }
-    if(statusDisplay)statusDisplay.textContent=`Active (${count} extra clips in library)`;
-    if(confirmBtn){
-      confirmBtn.innerHTML=`✕ Disable Extra Clips`;
-      confirmBtn.classList.add('danger');
-    }
+  if(!btn)return;
+  if(state.extraClipsEnabled || (state.clips && state.clips.length > 20)){
+    btn.textContent=`✓ Additional Videos Added (${state.clips.length} total)`;
+    btn.classList.add('installed');
   }else{
-    if(btn){
-      btn.textContent=`⚡ Get More Clips (${count}+)`;
-      btn.classList.remove('active');
-    }
-    if(statusDisplay)statusDisplay.textContent=`Ready to enable (${count} clips ready)`;
-    if(confirmBtn){
-      confirmBtn.innerHTML=`⚡ Enable ${count}+ Extra Clips`;
-      confirmBtn.classList.remove('danger');
-    }
+    btn.textContent=`⬇ Download Additional Videos (${count})`;
+    btn.classList.remove('installed');
   }
 }
-async function load(){try{const [v,c]=await Promise.all([fetch('/api/narrate/voices'),fetch('/api/narrate/videos')]);const cd=await c.json();state.voices=(await v.json()).voices||[];state.clips=cd.videos||[];state.customLibrary=!!cd.is_custom;state.extraClipsAvailable=!!cd.extra_clips_available;state.extraClipsEnabled=!!cd.extra_clips_enabled;state.extraClipsCount=cd.extra_clips_count||0;showClipFolder(cd.folder);showLibraryPaths(cd.folders);updateExtraClipsUI();if(state.voices[0]){state.voice=state.voices[0];$('#selectedVoice').textContent=state.voice.name;}if(state.clips[0])state.clip=state.clips[0];renderFilters();renderVoices();renderClips();updateReady();}catch(e){$('#voiceGrid').innerHTML='<div class="loading">Narrate services unavailable.</div>';}}
-if($('#btnExtraClips')){$('#btnExtraClips').onclick=()=>{const m=$('#extraClipsModal');if(m)m.hidden=false;};}
-if($('#closeExtraClips')){$('#closeExtraClips').onclick=()=>{const m=$('#extraClipsModal');if(m)m.hidden=true;};}
-if($('#dismissExtraClips')){$('#dismissExtraClips').onclick=()=>{const m=$('#extraClipsModal');if(m)m.hidden=true;};}
-if($('#confirmExtraClips')){$('#confirmExtraClips').onclick=async()=>{const btn=$('#confirmExtraClips');btn.disabled=true;btn.textContent='Updating...';try{const targetState=!state.extraClipsEnabled;const r=await fetch('/api/narrate/extra-clips',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enable:targetState})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Failed to update extra clips.');state.extraClipsEnabled=!!d.extra_clips_enabled;state.extraClipsCount=d.extra_clips_count||state.extraClipsCount;state.clips=d.videos||[];showLibraryPaths(d.folders);if(!state.clip||!state.clips.some(c=>c.id===state.clip.id)){state.clip=state.clips[0]||null;}updateExtraClipsUI();renderClips();updateReady();const m=$('#extraClipsModal');if(m)m.hidden=true;}catch(err){alert(err.message);}finally{btn.disabled=false;updateExtraClipsUI();}};}
+async function pollDownloadProgress(){
+  try{
+    const r=await fetch('/api/narrate/download-extra-status');
+    const isJson=r.headers.get('content-type')?.includes('application/json');
+    if(!r.ok||!isJson)return;
+    const d=await r.json();
+    const s=d.state||{};
+    const panel=$('#extraDownloadPanel');
+    const bar=$('#extraDownloadBar');
+    const title=$('#extraDownloadTitle');
+    const stats=$('#extraDownloadStats');
+    if(s.status==='downloading'){
+      if(panel)panel.hidden=false;
+      if(bar)bar.style.width=`${s.progress||0}%`;
+      if(title)title.textContent=`Adding: ${s.current_file||'Preparing...'}`;
+      if(stats)stats.textContent=`${s.downloaded_count||0} / ${s.total_count||62} (${s.progress||0}%)`;
+    }else if(s.status==='completed'){
+      clearInterval(downloadPollInterval);
+      downloadPollInterval=null;
+      if(bar)bar.style.width='100%';
+      if(title)title.textContent='✓ All additional videos downloaded and ready!';
+      if(stats)stats.textContent=`${s.total_count||62} / ${s.total_count||62} (100%)`;
+      state.extraClipsEnabled=true;
+      try{
+        const vr=await fetch('/api/narrate/videos');
+        const vd=await vr.json();
+        state.clips=vd.videos||[];
+        renderClips();
+        updateReady();
+        updateExtraClipsUI();
+      }catch(e){}
+      setTimeout(()=>{if(panel)panel.hidden=true;},4000);
+    }else if(s.status==='error'){
+      clearInterval(downloadPollInterval);
+      downloadPollInterval=null;
+      if(title)title.textContent=`Error: ${s.error||'Failed'}`;
+    }
+  }catch(err){
+    clearInterval(downloadPollInterval);
+    downloadPollInterval=null;
+  }
+}
+async function startExtraDownload(){
+  const btn=$('#btnDownloadExtra');
+  const panel=$('#extraDownloadPanel');
+  const bar=$('#extraDownloadBar');
+  const title=$('#extraDownloadTitle');
+  const stats=$('#extraDownloadStats');
+  if(panel)panel.hidden=false;
+  if(bar)bar.style.width='5%';
+  if(title)title.textContent='Connecting to clips store...';
+  if(stats)stats.textContent='0 / 62';
+  try{
+    const r=await fetch('/api/narrate/download-extra',{method:'POST'});
+    const isJson=r.headers.get('content-type')?.includes('application/json');
+    const d=isJson?await r.json():null;
+    if(!r.ok||!d?.ok)throw new Error(d?.error||'Failed to start video download.');
+    if(!downloadPollInterval){
+      downloadPollInterval=setInterval(pollDownloadProgress,250);
+    }
+  }catch(err){
+    if(title)title.textContent=`Download error: ${err.message}`;
+  }
+}
+if($('#btnDownloadExtra')){$('#btnDownloadExtra').onclick=startExtraDownload;}
+
+async function load(){
+  try{
+    const [v,c]=await Promise.all([fetch('/api/narrate/voices'),fetch('/api/narrate/videos')]);
+    const cd=await c.json();
+    state.voices=(await v.json()).voices||[];
+    state.clips=cd.videos||[];
+    state.customLibrary=!!cd.is_custom;
+    state.extraClipsAvailable=!!cd.extra_clips_available;
+    state.extraClipsEnabled=!!cd.extra_clips_enabled;
+    state.extraClipsCount=cd.extra_clips_count||0;
+    showClipFolder(cd.folder);
+    showLibraryPaths(cd.folders);
+    updateExtraClipsUI();
+    if(state.voices[0]){
+      state.voice=state.voices[0];
+      $('#selectedVoice').textContent=state.voice.name;
+    }
+    if(state.clips[0])state.clip=state.clips[0];
+    renderFilters();
+    renderVoices();
+    renderClips();
+    updateReady();
+  }catch(e){
+    console.error('Failed to load narrate services:', e);
+    $('#voiceGrid').innerHTML='<div class="loading">Narrate services unavailable.</div>';
+  }
+}
+
 function showClipFolder(folder){const el=$('#clipFolder');if(el)el.textContent=folder||'No folder set yet';const reset=$('#useDefaultClipFolder');if(reset)reset.hidden=!state.customLibrary;}
 function showLibraryPaths(folders){const el=$('#libraryPaths');if(!el)return;const list=(folders||[]).filter(Boolean);el.textContent=list.length?list.join('  +  '):'No clip folders found yet.';}
 async function setClipFolder(folder){const r=await fetch('/api/narrate/library',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder})});const d=await r.json();if(!r.ok){alert(d.error||'Could not use that folder.');return false;}state.clips=d.videos||[];state.clip=state.clips[0]||null;state.customLibrary=!!d.is_custom;showClipFolder(d.folder);renderClips();updateReady();if(d.note)alert(d.note);return true;}

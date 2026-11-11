@@ -337,7 +337,7 @@ OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "600"))
 # --- Transcription ---
 TRANSCRIPTION_MODEL = os.getenv(
     "TRANSCRIPTION_MODEL",
-    "large-v1"
+    "medium"
 )
 
 # --- Resizing ---
@@ -1016,10 +1016,27 @@ class ResourceManager:
         (e.g. another model is already loaded) int8 on CUDA is a safe fallback.
         On CPU we always use int8.
         """
-        if self.cuda_available:
-            if self.vram_gb >= 6:
+        has_cuda = False
+        try:
+            import ctranslate2
+            import ctypes
+            if ctranslate2.get_cuda_device_count() > 0:
+                try:
+                    ctypes.CDLL("cublas64_12.dll")
+                    has_cuda = True
+                except OSError:
+                    has_cuda = False
+        except Exception:
+            has_cuda = False
+
+        if not has_cuda and self.cuda_available:
+            has_cuda = True
+
+        if has_cuda:
+            vram = self.vram_gb if self.vram_gb > 0 else 6.0
+            if vram >= 6:
                 return {"device": "cuda", "compute_type": "float16"}
-            elif self.vram_gb >= 3:
+            elif vram >= 3:
                 return {"device": "cuda", "compute_type": "int8"}
         return {"device": "cpu", "compute_type": "int8"}
 
@@ -1071,13 +1088,16 @@ def create_transcriber(model_size: str) -> "Transcriber":
     original_load_model = whisperx.load_model
 
     def load_model_with_silero(*args, **kwargs):
-        kwargs.setdefault("vad_method", os.getenv("WHISPERX_VAD_METHOD", "silero"))
+        kwargs["vad_method"] = os.getenv("WHISPERX_VAD_METHOD", "silero")
         # Apply hardware-aware compute settings; env vars can still override.
-        kwargs.setdefault("device", compute_params["device"])
-        kwargs.setdefault("compute_type", compute_params["compute_type"])
+        kwargs["device"] = os.getenv("WHISPERX_DEVICE", compute_params["device"])
+        kwargs["compute_type"] = os.getenv("WHISPERX_COMPUTE_TYPE", compute_params["compute_type"])
+        if kwargs["device"] == "cpu":
+            cpu_count = os.cpu_count() or 8
+            kwargs.setdefault("threads", min(12, max(4, cpu_count - 2)))
         print(
             f"  [WhisperX] Loading model '{model_size}' on "
-            f"{kwargs['device']} with compute_type={kwargs['compute_type']} …"
+            f"{kwargs['device']} with compute_type={kwargs['compute_type']} (threads={kwargs.get('threads', 'default')}) …"
         )
         return original_load_model(*args, **kwargs)
 
@@ -1801,9 +1821,9 @@ def build_clip_analysis_prompt(candidate_batch: List[Tuple[int, Clip, List[Dict]
     """Build a strict editorial-analysis prompt for Qwen3 8B."""
     sys_msg = """You are the final editorial brain for a YouTube Shorts generator.
 Evaluate each candidate as an editor for the selected mode, using only the supplied clip.
-Keep a candidate when it is a publishable, coherent moment with an identifiable hook and payoff; it need not be a perfect or exceptional viral hit.
+Keep a candidate when it is a publishable, coherent moment with an identifiable hook and payoff; it need not be a perfect or exceptional viral hit. In interviews, podcasts, presentations, or tech talks, a compelling insight, prediction, or clear explanation provides a valid hook and payoff.
 A podcast or roast can have a complete payoff through setup, punchline or reveal, and the hosts' reaction; it does not need a conventional story arc.
-Reject only when the clip is genuinely incoherent, needs essential missing context, has no meaningful moment or payoff, or ends before the thought resolves.
+Reject only when the clip is genuinely incoherent, needs essential missing context, has no meaningful moment or payoff, or ends before the thought resolves. If a candidate presents a self-contained, interesting thought or statement, choose 'keep'.
 Moderate scores (around 5–6) are not an automatic rejection; judge whether the excerpt is useful in its selected format.
 Penalize clips that jump between unrelated topics, need lots of missing context, start weakly, or end abruptly.
 Score every dimension from 0 to 10:
@@ -1823,9 +1843,9 @@ Do NOT reward generic phrases such as 'crazy', 'insane', or 'this is wild' by th
 The decision must agree with the scores and reason. The overall score must reflect the dimensions, not a random guess.
 Return ONLY valid JSON in this exact shape:
 {"candidates":[{"candidate_id":0,"decision":"keep","hook":8,"curiosity":7,"emotion":6,"surprise":8,"story":8,"payoff":9,"pacing":8,"standalone":8,"rewatch":7,"conflict":6,"coherence":9,"reason":"One focused discovery with a clear reveal and payoff."}]}
-Use decision 'reject' when the candidate is fundamentally unsuitable. Keep reason under 18 words."""
+Use decision 'keep' for candidates with an identifiable idea, story, or reaction. Use decision 'reject' only when the candidate is fundamentally unsuitable or fragmented. Keep reason under 18 words."""
     mode_guidance = {
-        "viral": "Prioritize scroll-stopping hooks, curiosity, surprise, stakes, and a satisfying payoff. For podcast comedy, a clear punchline and reaction can provide that payoff without a full story arc.",
+        "viral": "Prioritize scroll-stopping hooks, curiosity, surprise, stakes, and a satisfying payoff. For interviews, podcasts, and speeches, an intriguing insight, forward-looking claim, or bold perspective is a viral hook. For podcast comedy, a clear punchline and reaction can provide that payoff without a full story arc. Keep clear, engaging discussions rather than rejecting them as ordinary conversation.",
         "funny": "Prioritize genuine humor, punchlines, awkwardness, reactions, comedic timing, and unexpected moments. A setup, punchline, and reaction can be a complete moment without a conventional story arc. Do not call something funny merely because it says crazy or insane.",
         "dramatic": "Prioritize tension, danger, suspense, emotional escalation, reveals, and strong reactions.",
         "educational": "Prioritize useful explanations, surprising facts, clear teaching moments, and a self-contained takeaway.",

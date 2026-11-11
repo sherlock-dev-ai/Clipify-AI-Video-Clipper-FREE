@@ -31,8 +31,12 @@
       this.player = { x: 96, bottom: 0, velocityY: 0, grounded: true, runPhase: 0 };
       try { this.best = Math.max(0, Number(localStorage.getItem('clipify.runner.best')) || 0); }
       catch { this.best = 0; }
-      this.bestElement.textContent = String(this.best);
-      this.scoreElement.textContent = '0';
+      if (this.bestElement) this.bestElement.textContent = String(this.best);
+      const bestVis = typeof document !== 'undefined' ? document.getElementById('game-best-vis') : null;
+      if (bestVis) bestVis.textContent = String(this.best);
+      if (this.scoreElement) this.scoreElement.textContent = '0';
+      const scoreVis = typeof document !== 'undefined' ? document.getElementById('game-score-vis') : null;
+      if (scoreVis) scoreVis.textContent = '0';
 
       this.onKeyDown = (event) => this.handleKeyDown(event);
       this.onKeyUp = (event) => this.handleKeyUp(event);
@@ -220,18 +224,40 @@
     }
 
     spawnObstacle() {
-      const types = ['log', 'roots', 'rocks', 'thorns', 'branch', 'trap'];
+      const isNight = typeof document !== 'undefined' && document.body && document.body.dataset.theme === 'night';
+      const flyerType = isNight ? 'bat' : 'bee';
+      const types = ['log', 'roots', 'rocks', 'thorns', 'branch', flyerType];
       let available = types.filter((type) => type !== this.lastObstacle);
-      if (this.elapsed < 8) available = available.filter((type) => !['branch', 'trap'].includes(type));
+      if (this.elapsed < 8) available = available.filter((type) => !['branch', 'trap', flyerType].includes(type));
       const type = available[Math.floor(this.rand() * available.length)] || 'log';
       const obstacle = { type, x: this.width + 36, age: 0, falling: false, landed: false };
       if (type === 'log') Object.assign(obstacle, { width: 54 + this.rand() * 38, height: 22 + this.rand() * 7 });
       if (type === 'roots') Object.assign(obstacle, { width: 58 + this.rand() * 26, height: 12 + this.rand() * 7 });
       if (type === 'rocks') Object.assign(obstacle, { width: 42 + this.rand() * 30, height: 25 + this.rand() * 19 });
       if (type === 'thorns') Object.assign(obstacle, { width: 58 + this.rand() * 26, height: 37 + this.rand() * 8 });
-      if (type === 'branch') Object.assign(obstacle, { width: 74 + this.rand() * 24, height: 28, fallY: -88, warning: false });
+      if (type === 'branch') Object.assign(obstacle, { width: 56 + this.rand() * 18, height: 20, fallY: -55, warning: true, warnTime: 0, falling: false, landed: false });
       if (type === 'trap') Object.assign(obstacle, { width: 72 + this.rand() * 26, height: 24 });
       if (type === 'trap' && this.elapsed < 14) obstacle.type = 'log';
+      if (type === 'bee') {
+        const isHigh = this.rand() > 0.45;
+        Object.assign(obstacle, {
+          width: 34,
+          height: 22,
+          isHigh,
+          baseY: isHigh ? this.groundY - 84 : this.groundY - 26,
+          bobPhase: this.rand() * Math.PI * 2
+        });
+      }
+      if (type === 'bat') {
+        const isHigh = this.rand() > 0.45;
+        Object.assign(obstacle, {
+          width: 38,
+          height: 24,
+          isHigh,
+          baseY: isHigh ? this.groundY - 86 : this.groundY - 28,
+          bobPhase: this.rand() * Math.PI * 2
+        });
+      }
       this.obstacles.push(obstacle);
       this.lastObstacle = obstacle.type;
       // Spacing is measured in pixels and scales with speed, so each hazard
@@ -270,22 +296,21 @@
         obstacle.x -= this.speed * delta;
         obstacle.age += delta;
         if (obstacle.type === 'branch' && !obstacle.landed) {
-          const warnAt = this.player.x + this.speed * 0.92;
-          if (!obstacle.warning && obstacle.x <= warnAt) {
-            obstacle.warning = true;
-            obstacle.warnTime = 0;
-          }
-          if (obstacle.warning && !obstacle.falling) {
-            obstacle.warnTime += delta;
-            if (obstacle.warnTime >= 0.58) obstacle.falling = true;
+          // Drop well ahead of the player so it lands safely as a jumpable hurdle
+          const triggerDropAt = this.player.x + Math.max(260, this.speed * 0.95);
+          if (!obstacle.falling && obstacle.x <= triggerDropAt) {
+            obstacle.falling = true;
           }
           if (obstacle.falling) {
-            obstacle.fallY += 690 * delta;
-            if (obstacle.fallY >= this.groundY - 30) {
-              obstacle.fallY = this.groundY - 30;
+            obstacle.fallY += 920 * delta;
+            if (obstacle.fallY >= this.groundY - obstacle.height) {
+              obstacle.fallY = this.groundY - obstacle.height;
               obstacle.landed = true;
             }
           }
+        }
+        if (obstacle.type === 'bee' || obstacle.type === 'bat') {
+          obstacle.currentY = obstacle.baseY + Math.sin(obstacle.age * 6 + obstacle.bobPhase) * 6;
         }
       }
       this.obstacles = this.obstacles.filter((obstacle) => obstacle.x + obstacle.width > -40);
@@ -297,7 +322,9 @@
       this.scoreElement.textContent = String(this.score);
       if (this.score > this.best) {
         this.best = this.score;
-        this.bestElement.textContent = String(this.best);
+        if (this.bestElement) this.bestElement.textContent = String(this.best);
+        const bestVis = typeof document !== 'undefined' ? document.getElementById('game-best-vis') : null;
+        if (bestVis) bestVis.textContent = String(this.best);
         try { localStorage.setItem('clipify.runner.best', String(this.best)); } catch { /* optional storage */ }
       }
     }
@@ -313,6 +340,15 @@
         if (playerRight <= obstacleLeft || playerLeft >= obstacleRight) continue;
         if (obstacle.type === 'trap') {
           if (this.player.grounded || playerFeet >= this.groundY - 12) return true;
+          continue;
+        }
+        if (obstacle.type === 'bee' || obstacle.type === 'bat') {
+          const obsTop = obstacle.currentY || obstacle.baseY;
+          const obsBottom = obsTop + obstacle.height;
+          const obsLeft = obstacle.x + 5;
+          const obsRight = obstacle.x + obstacle.width - 5;
+          if (playerRight <= obsLeft || playerLeft >= obsRight) continue;
+          if (playerFeet > obsTop + 4 && playerTop < obsBottom - 4) return true;
           continue;
         }
         let obstacleTop = this.groundY - obstacle.height;
@@ -491,6 +527,74 @@
         ctx.beginPath(); ctx.ellipse(x + obstacle.width / 2, ground - 2, obstacle.width / 2, 11, 0, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = '#c3a56d'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.ellipse(x + obstacle.width / 2, ground - 2, obstacle.width / 2, 8, 0, Math.PI, Math.PI * 2); ctx.stroke();
+        return;
+      }
+      if (obstacle.type === 'bee') {
+        const by = obstacle.currentY || obstacle.baseY;
+        const bw = obstacle.width;
+        const bh = obstacle.height;
+        ctx.save();
+        const flap = Math.sin(obstacle.age * 28) * 0.45;
+        ctx.fillStyle = 'rgba(235, 245, 255, 0.75)';
+        ctx.beginPath();
+        ctx.ellipse(x + bw * 0.4, by - 4 + flap * 3, 7, 10, -0.3 + flap, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(x + bw * 0.6, by - 5 - flap * 3, 6, 9, 0.2 - flap, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#f5c542';
+        ctx.beginPath();
+        ctx.ellipse(x + bw / 2, by + bh / 2, bw / 2 - 2, bh / 2 - 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#221a10';
+        ctx.fillRect(x + bw * 0.35, by + 2, 4, bh - 4);
+        ctx.fillRect(x + bw * 0.55, by + 2, 4, bh - 4);
+        ctx.fillStyle = '#111';
+        ctx.beginPath();
+        ctx.arc(x + 7, by + bh / 2 - 1, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#332';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x + bw - 2, by + bh / 2);
+        ctx.lineTo(x + bw + 4, by + bh / 2);
+        ctx.stroke();
+        ctx.restore();
+        return;
+      }
+      if (obstacle.type === 'bat') {
+        const by = obstacle.currentY || obstacle.baseY;
+        const bw = obstacle.width;
+        const bh = obstacle.height;
+        ctx.save();
+        const wingFlap = Math.sin(obstacle.age * 16) * (bh * 0.55);
+        ctx.fillStyle = '#2c2236';
+        ctx.beginPath();
+        ctx.moveTo(x + bw / 2, by + bh / 2);
+        ctx.quadraticCurveTo(x + bw * 0.2, by + bh * 0.1 - wingFlap, x, by + bh * 0.4 - wingFlap);
+        ctx.quadraticCurveTo(x + bw * 0.25, by + bh * 0.7, x + bw / 2, by + bh / 2);
+        ctx.moveTo(x + bw / 2, by + bh / 2);
+        ctx.quadraticCurveTo(x + bw * 0.8, by + bh * 0.1 - wingFlap, x + bw, by + bh * 0.4 - wingFlap);
+        ctx.quadraticCurveTo(x + bw * 0.75, by + bh * 0.7, x + bw / 2, by + bh / 2);
+        ctx.fill();
+        ctx.fillStyle = '#1c1524';
+        ctx.beginPath();
+        ctx.ellipse(x + bw / 2, by + bh / 2, 6, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(x + bw / 2 - 5, by + bh / 2 - 4);
+        ctx.lineTo(x + bw / 2 - 4, by + bh / 2 - 10);
+        ctx.lineTo(x + bw / 2 - 1, by + bh / 2 - 5);
+        ctx.moveTo(x + bw / 2 + 1, by + bh / 2 - 5);
+        ctx.lineTo(x + bw / 2 + 4, by + bh / 2 - 10);
+        ctx.lineTo(x + bw / 2 + 5, by + bh / 2 - 4);
+        ctx.fill();
+        ctx.fillStyle = '#ffdd55';
+        ctx.beginPath();
+        ctx.arc(x + bw / 2 - 2.5, by + bh / 2 - 2, 1.2, 0, Math.PI * 2);
+        ctx.arc(x + bw / 2 + 2.5, by + bh / 2 - 2, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
         return;
       }
       if (obstacle.type === 'log' || obstacle.type === 'branch') {

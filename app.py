@@ -693,19 +693,30 @@ def apply_branding_to_file(input_video: str, output_video: str, branding: dict[s
 
 
 def _pipeline_command(input_dir: Path) -> list[str]:
-    """Build the command that runs the compiled pipeline for one job.
+    """Build the command that runs the pipeline for one job.
 
-    A compiled install has no main.py and no virtualenv, so the sibling
-    main.exe is executed directly. A development checkout keeps using the
-    project virtualenv against the source file.
+    Prefers running main.py with the local AI runtime python environment if available,
+    falling back to compiled main.exe if main.py is absent.
     """
-    compiled_main = ROOT / "main.exe"
-    if FROZEN or compiled_main.is_file():
-        return [str(compiled_main)]
     python_bin = sys.executable
     venv_python = ROOT / ".venv" / "Scripts" / "python.exe"
-    if venv_python.is_file():
+    runtime_env = os.environ.get("CLIPPEDAI_RUNTIME")
+    if runtime_env and (Path(runtime_env) / "Scripts" / "python.exe").is_file():
+        python_bin = str(Path(runtime_env) / "Scripts" / "python.exe")
+    elif (ROOT / "runtime" / "Scripts" / "python.exe").is_file():
+        python_bin = str(ROOT / "runtime" / "Scripts" / "python.exe")
+    elif venv_python.is_file():
         python_bin = str(venv_python)
+    elif Path(r"L:\tester\runtime\Scripts\python.exe").is_file():
+        python_bin = str(Path(r"L:\tester\runtime\Scripts\python.exe"))
+
+    main_py = ROOT / "main.py"
+    if main_py.is_file():
+        return [python_bin, "-u", str(main_py)]
+
+    compiled_main = ROOT / "main.exe"
+    if compiled_main.is_file():
+        return [str(compiled_main)]
     return [python_bin, "-u", "main.py"]
 
 
@@ -2215,19 +2226,7 @@ def _app_window_shortcut(browser: str, url: str, profile: str, extra: str = "") 
 
 
 def _open_app_window(host: str, port: int, timeout: float = 40.0) -> None:
-    """Open the app in its own window once the server is actually up.
-
-    The executable is a GUI-subsystem binary, so there is no console for the
-    user to read a URL out of, and something has to open the window for them.
-    It has to wait for the port too: opening immediately just produces a
-    connection refused page.
-
-    The window is a real application window, not a browser tab. Handing the
-    URL to the default browser left the user staring at "localhost:5000" in
-    Chrome with an address bar and a tab strip, which does not read as a
-    desktop product at all. Edge's ``--app`` mode gives a chromeless window
-    with its own taskbar entry and no way to wander off into other pages.
-    """
+    """Open the app in its own window once the server is actually up."""
     import subprocess
     import threading
     import time
@@ -2244,50 +2243,30 @@ def _open_app_window(host: str, port: int, timeout: float = 40.0) -> None:
                     if response.status < 500:
                         break
             except urllib.error.HTTPError:
-                # The server answered, even if unhappy. It is listening.
                 break
             except Exception:
                 time.sleep(0.4)
 
         profile = None
         try:
-            # A dedicated profile keeps the app window's state (window size,
-            # zoom) separate from the user's everyday browsing.
             from clippedai_runtime import data_dir
-
             profile = str(data_dir("settings", "app-window-profile"))
             os.makedirs(profile, exist_ok=True)
         except Exception:
             profile = None
 
         browser = _find_app_browser()
+        opened = False
         if browser:
-            # Test hook: lets the automation suite attach to the real window and
-            # drive the actual UI. Never set in normal use.
-            debug_port = os.getenv("CLIPPEDAI_WINDOW_DEBUG_PORT", "").strip()
-            extra = f"--remote-debugging-port={debug_port} " if debug_port.isdigit() else ""
-
-            link = _app_window_shortcut(browser, url, profile, extra) if profile else ""
-            if link:
-                # Launch through the shortcut so the window adopts its icon.
-                try:
-                    os.startfile(link)  # noqa: S606 - fixed, generated path
-                    return
-                except Exception:
-                    pass
-
             args = [
                 browser,
                 f"--app={url}",
                 "--window-size=1440,900",
                 "--no-default-browser-check",
                 "--no-first-run",
-                "--disable-features=Translate,EdgeShoppingAssistant",
             ]
             if profile:
                 args.append(f"--user-data-dir={profile}")
-            if extra:
-                args.append(extra.strip())
             try:
                 subprocess.Popen(
                     args,
@@ -2297,24 +2276,38 @@ def _open_app_window(host: str, port: int, timeout: float = 40.0) -> None:
                     creationflags=getattr(subprocess, "DETACHED_PROCESS", 0)
                     | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
                 )
-                return
+                opened = True
+            except Exception:
+                opened = False
+
+        if not opened:
+            try:
+                import webbrowser
+                webbrowser.open(url)
             except Exception:
                 pass
-
-        # No usable Chromium build: a normal browser tab still beats nothing.
-        try:
-            import webbrowser
-
-            webbrowser.open(url)
-        except Exception:
-            pass
 
     threading.Thread(target=wait_then_open, name="clipify-open-window", daemon=True).start()
 
 
+def _is_port_in_use(host: str, port: int) -> bool:
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        return s.connect_ex((host, port)) == 0
+
+
 if __name__ == "__main__":
     _host, _port = APP_HOST, APP_PORT
-    # A double launch should surface the running app, not fight it for the port.
+    if _is_port_in_use(_host, _port):
+        # Already running: surface the app in the browser rather than failing on bind
+        try:
+            import webbrowser
+            webbrowser.open(f"http://{_host}:{_port}/")
+        except Exception:
+            pass
+        sys.exit(0)
+
     if os.environ.get("CLIPPEDAI_NO_BROWSER", "").strip() not in {"1", "true", "yes"}:
         _open_app_window(_host, _port)
     app.run(host=_host, port=_port, debug=False, threaded=True)

@@ -23,10 +23,14 @@ venv/
 __pycache__/
 *.pyo
 *.pyd
+*.pkl
 .Python
 *.so
 .pytest_cache/
 .coverage
+
+# User & local settings
+settings/
 
 # IDE
 .vscode/

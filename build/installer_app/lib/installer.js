@@ -434,7 +434,14 @@ class Installer extends EventEmitter {
   }
 
   etaMs() {
-    if (this.bytesDone <= 0 || this.bytesTotal <= 0 || this.speedBytes <= 0) return null;
+    if (this.pipEtaMs && this.pipEtaMs > 0) return this.pipEtaMs;
+    if (this.bytesDone <= 0 || this.bytesTotal <= 0 || this.speedBytes <= 0) {
+      if (this.activePhaseId === 'runtime') {
+        const spent = this.taskStartedAt ? Date.now() - this.taskStartedAt : 0;
+        return Math.max(15000, 240000 - spent);
+      }
+      return null;
+    }
     return Math.max(0, (this.bytesTotal - this.bytesDone) / this.speedBytes * 1000);
   }
 
@@ -1046,29 +1053,53 @@ class Installer extends EventEmitter {
           this.emitProgress({ processRunning: processActive, quietForMs: silentForMs });
         },
         onLine: (line) => {
-          // pip prints "  45.2 MB / 250.0 MB" style progress on stderr.
-          const match = line.match(/([\d.]+)\s*(MB|GB|kB|KB)\s*\/\s*([\d.]+)\s*(MB|GB|kB|KB)/i);
+          const trimmed = line.trim();
+          // Matches: "45.2/250.0 MB", "45.2 MB / 250.0 MB", "12.3 kB / 500 kB", "1.2/3.4 GB", etc.
+          const match = trimmed.match(/([\d.]+)\s*(MB|GB|kB|KB|B)?\s*\/\s*([\d.]+)\s*(MB|GB|kB|KB|B)/i);
           if (match) {
-            const unit = { kB: 1024, kb: 1024, mb: 1024 ** 2, gb: 1024 ** 3 }[
-              match[2].toLowerCase()
-            ];
-            const done = parseFloat(match[1]) * unit;
+            const totalUnit = (match[4] || 'MB').toLowerCase();
+            const unit = { b: 1, kb: 1024, mb: 1024 ** 2, gb: 1024 ** 3 }[totalUnit] || (1024 ** 2);
+            const doneUnit = match[2] ? ({ b: 1, kb: 1024, mb: 1024 ** 2, gb: 1024 ** 3 }[match[2].toLowerCase()] || unit) : unit;
+            const done = parseFloat(match[1]) * doneUnit;
             const total = parseFloat(match[3]) * unit;
             this.updateByteProgress(done, total);
-            this.activeItem = `pip ${line.trim().slice(0, 60)}`;
-            // Live, but throttled: a wheel download redraws many times a second
-            // and every one of those is not worth a line of its own.
+
+            // Parse speed if pip outputs e.g. "38.4 MB/s"
+            const spdMatch = trimmed.match(/([\d.]+)\s*(kB|KB|MB|GB)\/s/i);
+            if (spdMatch) {
+              const sUnit = { kb: 1024, mb: 1024 ** 2, gb: 1024 ** 3 }[spdMatch[2].toLowerCase()] || (1024 ** 2);
+              this.speedBytes = Math.round(parseFloat(spdMatch[1]) * sUnit);
+            }
+            // Parse ETA if pip outputs e.g. "eta 0:00:15"
+            const etaMatch = trimmed.match(/eta\s+([\d:]+)/i);
+            if (etaMatch) {
+              const parts = etaMatch[1].split(':').map(Number);
+              let seconds = 0;
+              if (parts.length === 3) seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+              else if (parts.length === 2) seconds = parts[0] * 60 + parts[1];
+              else seconds = parts[0] || 0;
+              this.pipEtaMs = seconds * 1000;
+            }
+
+            this.activeItem = `pip ${trimmed.slice(0, 60)}`;
             this.throttledNote(
               'pip-dl',
-              `downloading ${match[1]} ${match[2]} of ${match[3]} ${match[4]}`,
+              `downloading ${match[1]} / ${match[3]} ${match[4] || ''}`,
               'download',
               1200
             );
             this.emitProgress();
-          } else if (/^(Collecting|Installing|Building|Using cached|Downloading)/.test(line.trim())) {
-            const clean = line.trim().replace(/\s+/g, ' ');
-            // Package names are the genuinely useful detail here, and there are
-            // only a bounded number of them, so these are not throttled.
+          } else if (/^Downloading\s+([^\s]+)\s*\(([\d.]+)\s*(MB|GB|kB|KB)\)/i.test(trimmed)) {
+            const dlMatch = trimmed.match(/^Downloading\s+([^\s]+)\s*\(([\d.]+)\s*(MB|GB|kB|KB)\)/i);
+            const unit = { kb: 1024, mb: 1024 ** 2, gb: 1024 ** 3 }[dlMatch[3].toLowerCase()] || (1024 ** 2);
+            const size = parseFloat(dlMatch[2]) * unit;
+            this.bytesTotal = size;
+            this.bytesDone = 0;
+            this.activeItem = `Downloading ${dlMatch[1]}`;
+            this.note(`Downloading ${dlMatch[1]} (${dlMatch[2]} ${dlMatch[3]})`, 'pkg');
+            this.emitProgress();
+          } else if (/^(Collecting|Installing|Building|Using cached|Downloading)/.test(trimmed)) {
+            const clean = trimmed.replace(/\s+/g, ' ');
             this.note(clean.slice(0, 150), 'pkg');
             this.activeItem = clean.slice(0, 70);
             this.emitProgress();

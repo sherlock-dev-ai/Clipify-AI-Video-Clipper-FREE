@@ -307,6 +307,22 @@ button { color: inherit; }
   line-height: 1.35;
   transition: color .18s, background .18s, border-color .18s;
 }
+.phase-eta {
+  float: right;
+  font-size: 11px;
+  opacity: 0.65;
+  font-family: inherit;
+  font-weight: 500;
+}
+.phase-list li.active .phase-eta {
+  opacity: 1;
+  color: var(--forest-amber, #e8bf78);
+  font-weight: 700;
+}
+.phase-list li.done .phase-eta {
+  color: var(--forest-success, #85d697);
+  opacity: 0.85;
+}
 .phase-list li::before, .model-status li::before {
   position: absolute;
   left: 8px;

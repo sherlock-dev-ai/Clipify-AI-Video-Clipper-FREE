@@ -684,14 +684,40 @@ const $ = (id) => {
   /** Mirrors the engine's phase list so we can show real per-step state. */
   // Must mirror PHASES in lib/installer.js - the engine emits these ids.
   const PHASE_LABELS = [
-    { id: 'files', label: 'Copying Clipify AI' },
-    { id: 'python', label: 'Preparing the Python engine' },
-    { id: 'runtime', label: 'Installing the AI runtime' },
-    { id: 'ollama', label: 'Setting up the local AI engine' },
-    { id: 'models', label: 'Downloading AI models' },
-    { id: 'shortcuts', label: 'Creating shortcuts' },
-    { id: 'verify', label: 'Checking installed components' },
+    { id: 'files', label: 'Copying Clipify AI', est: '~15s', estSeconds: 15 },
+    { id: 'python', label: 'Preparing the Python engine', est: '~25s', estSeconds: 25 },
+    { id: 'runtime', label: 'Installing the AI runtime', est: '~3-5m', estSeconds: 240 },
+    { id: 'ollama', label: 'Setting up the local AI engine', est: '~30s', estSeconds: 30 },
+    { id: 'models', label: 'Downloading AI models', est: '~2-4m', estSeconds: 180 },
+    { id: 'shortcuts', label: 'Creating shortcuts', est: '~5s', estSeconds: 5 },
+    { id: 'verify', label: 'Checking installed components', est: '~15s', estSeconds: 15 },
   ];
+
+  let installElapsedTimer = null;
+  let installStartTime = null;
+  let currentOperationName = 'Installing Clipify AI';
+  let activePhaseId = null;
+  let activePhaseStartedAt = null;
+
+  function startElapsedClock() {
+    if (!installStartTime) installStartTime = Date.now();
+    if (installElapsedTimer) clearInterval(installElapsedTimer);
+    installElapsedTimer = setInterval(() => {
+      if (!installStartTime || state.installTerminal) return;
+      const elapsedMs = Math.max(0, Date.now() - installStartTime);
+      const subtaskEl = $('install-subtask');
+      if (subtaskEl && !$('install-workspace').hidden) {
+        subtaskEl.textContent = `${currentOperationName} · ${formatDuration(elapsedMs)} elapsed`;
+      }
+    }, 1000);
+  }
+
+  function stopElapsedClock() {
+    if (installElapsedTimer) {
+      clearInterval(installElapsedTimer);
+      installElapsedTimer = null;
+    }
+  }
 
   function resetPhases() {
     state.phases = PHASE_LABELS.map((p) => ({ ...p, status: 'pending', percent: 0 }));
@@ -735,7 +761,11 @@ const $ = (id) => {
         li.classList.remove('just-completed');
       }
       li.dataset.status = phase.status;
-      li.textContent = phase.label;
+      const etaLabel = phase.status === 'done' ? '✓'
+        : phase.status === 'skipped' ? '–'
+        : phase.status === 'running' ? (phase.est || 'In progress')
+        : (phase.est || '');
+      li.innerHTML = `<span class="phase-name">${escapeHtml(phase.label)}</span><span class="phase-eta">${escapeHtml(etaLabel)}</span>`;
     }
     Array.from(list.children).forEach((item) => {
       if (!state.phases.some((phase) => phase.id === item.dataset.phaseId)) item.remove();
@@ -881,7 +911,14 @@ const $ = (id) => {
   function onProgress(data) {
     if (data.title) $('install-title').textContent = data.title;
     const operation = data.item || data.task || 'Waiting for the next installation update…';
+    currentOperationName = operation;
     const sessionElapsed = Number(data.elapsedMs);
+    if (Number.isFinite(sessionElapsed) && sessionElapsed > 0) {
+      const impliedStart = Date.now() - sessionElapsed;
+      if (!installStartTime || Math.abs(installStartTime - impliedStart) > 2000) {
+        installStartTime = impliedStart;
+      }
+    }
     const quietCandidates = [data.quietForMs, data.lastActivityAgoMs]
       .filter((value) => value !== null && value !== undefined && value !== '')
       .map(Number).filter(Number.isFinite);
@@ -896,22 +933,68 @@ const $ = (id) => {
     $('current-item').textContent = operation;
 
     const hasActiveTransfer = Boolean(data.bytesTotal && data.bytesTotal > 0);
-    $('stat-speed').textContent = hasActiveTransfer && data.speedBytes > 0
-      ? `${formatBytes(data.speedBytes)}/s`
-      : hasActiveTransfer ? 'Connecting…' : '—';
-    $('stat-done').textContent = hasActiveTransfer ? formatBytes(data.bytesDone) : '—';
-    $('stat-total').textContent = hasActiveTransfer ? formatBytes(data.bytesTotal) : '—';
+    const hasSpeed = Boolean(data.speedBytes && data.speedBytes > 0);
+    const curPhase = activePhaseId || (state.phases && (state.phases.find((p) => p.status === 'running') || {}).id);
 
-    // ETA must never read as "nothing left" while work is outstanding:
-    // a literal 00:00 mid-download looks like it already finished.
+    // 1. Transfer speed
+    if (hasActiveTransfer && hasSpeed) {
+      $('stat-speed').textContent = `${formatBytes(data.speedBytes)}/s`;
+    } else if (hasSpeed) {
+      $('stat-speed').textContent = `${formatBytes(data.speedBytes)}/s`;
+    } else if (hasActiveTransfer) {
+      $('stat-speed').textContent = 'Connecting…';
+    } else if (curPhase === 'runtime') {
+      $('stat-speed').textContent = 'Installing…';
+    } else if (curPhase === 'files' || curPhase === 'python' || curPhase === 'models') {
+      $('stat-speed').textContent = 'Processing…';
+    } else {
+      $('stat-speed').textContent = 'Active';
+    }
+
+    // 2. Received
+    if (hasActiveTransfer) {
+      $('stat-done').textContent = formatBytes(data.bytesDone);
+    } else if (data.bytesDone && data.bytesDone > 0) {
+      $('stat-done').textContent = formatBytes(data.bytesDone);
+    } else if (curPhase === 'runtime') {
+      $('stat-done').textContent = 'In progress';
+    } else {
+      $('stat-done').textContent = 'In progress';
+    }
+
+    // 3. Transfer size
+    if (hasActiveTransfer) {
+      $('stat-total').textContent = formatBytes(data.bytesTotal);
+    } else if (curPhase === 'runtime') {
+      $('stat-total').textContent = '~2.4 GB';
+    } else if (curPhase === 'python') {
+      $('stat-total').textContent = '~18 MB';
+    } else if (curPhase === 'files') {
+      $('stat-total').textContent = '~297 MB';
+    } else if (curPhase === 'models') {
+      $('stat-total').textContent = '~2.2 GB';
+    } else {
+      $('stat-total').textContent = '—';
+    }
+
+    // 4. Transfer ETA
     const pctForEta = Number(data.percent);
-    const etaShown =
-      Number.isFinite(pctForEta) && pctForEta >= 100
-        ? 'Done'
-        : Number.isFinite(data.etaMs) && data.etaMs > 0
-          ? formatDuration(data.etaMs)
-          : Number(data.speedBytes) > 0 ? 'Calculating…' : 'Waiting for transfer';
-    $('stat-eta').textContent = hasActiveTransfer ? etaShown : '—';
+    let etaShown = 'In progress';
+    if (Number.isFinite(pctForEta) && pctForEta >= 100) {
+      etaShown = 'Done';
+    } else if (Number.isFinite(data.etaMs) && data.etaMs > 0) {
+      etaShown = formatDuration(data.etaMs);
+    } else {
+      const phaseInfo = PHASE_LABELS.find((p) => p.id === curPhase);
+      if (phaseInfo && phaseInfo.estSeconds) {
+        const pElapsed = activePhaseStartedAt ? (Date.now() - activePhaseStartedAt) / 1000 : 0;
+        const remainingSec = Math.max(5, Math.round(phaseInfo.estSeconds - pElapsed));
+        etaShown = `~${formatDuration(remainingSec * 1000)}`;
+      } else {
+        etaShown = hasSpeed ? 'Calculating…' : 'In progress';
+      }
+    }
+    $('stat-eta').textContent = etaShown;
 
     // The engine reports the weighted overall figure as `overall`. It used to be
     // read as `data.percent`, which no progress event ever carried, so pct was
@@ -1000,6 +1083,10 @@ const $ = (id) => {
   function onPhase(data) {
     // The engine reports one phase at a time: { id, status, percent, message }.
     if (!state.phases) resetPhases();
+    if (data.status === 'running') {
+      activePhaseId = data.id;
+      activePhaseStartedAt = Date.now();
+    }
     const target = state.phases.find((p) => p.id === data.id);
     if (target) {
       target.status = data.status === 'running' ? 'running' : data.status;
@@ -1013,6 +1100,7 @@ const $ = (id) => {
   }
 
   function onFailed(data) {
+    stopElapsedClock();
     if (state.installTerminal) return;
     state.installTerminal = true;
     state.installBusy = false;
@@ -1030,6 +1118,7 @@ const $ = (id) => {
   }
 
   function onDone(data) {
+    stopElapsedClock();
     if (state.installTerminal) return;
     state.installTerminal = true;
     state.installBusy = false;
@@ -1182,6 +1271,8 @@ const $ = (id) => {
     // Move to the progress screen BEFORE starting work, so a fast failure is
     // still reported on the installing screen rather than on the form.
     show('install');
+    installStartTime = Date.now();
+    startElapsedClock();
     initGame();
     setStatus('Installing…');
 
@@ -1207,9 +1298,11 @@ const $ = (id) => {
     // A MutationObserver picks up each change and copies it to the HUD.
     const scoreVis = document.getElementById('game-score-vis');
     const bestVis  = document.getElementById('game-best-vis');
+    const scoreEl = document.getElementById('game-score');
+    const bestEl  = document.getElementById('game-best');
+    if (bestEl && bestVis) bestVis.textContent = bestEl.textContent || '0';
+    if (scoreEl && scoreVis) scoreVis.textContent = scoreEl.textContent || '0';
     if (scoreVis || bestVis) {
-      const scoreEl = document.getElementById('game-score');
-      const bestEl  = document.getElementById('game-best');
       const mo = new MutationObserver((mutations) => {
         for (const m of mutations) {
           if (m.target === scoreEl && scoreVis) scoreVis.textContent = scoreEl.textContent;

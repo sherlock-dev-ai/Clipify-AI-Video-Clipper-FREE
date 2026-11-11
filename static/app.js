@@ -215,6 +215,19 @@ async function waitForYouTubeDownload(jobId){
         sizeEl.textContent='Downloaded locally';
         chip.hidden=false;
 
+        // Immediately show the downloaded YouTube video in the main preview frame
+        const mediaUrl=`/project-media/${encodeURIComponent(jobId)}/input/${encodeURIComponent(d.filename)}`;
+        const preview=$('#sourcePreview');
+        if(preview){
+          preview.src=mediaUrl;
+          preview.load();
+          preview.hidden=false;
+        }
+        const placeholder=$('.preview-placeholder');
+        if(placeholder)placeholder.style.display='none';
+        const meta=$('#previewMeta');
+        if(meta)meta.textContent=`${d.filename} · Downloaded from YouTube`;
+
         youtubeStatus.textContent=
           '100% · Download complete. Video ready.';
 
@@ -277,6 +290,18 @@ youtubeUrl?.addEventListener(
       event.preventDefault();
       importYouTube();
     }
+  }
+);
+
+youtubeUrl?.addEventListener(
+  'paste',
+  event=>{
+    setTimeout(()=>{
+      const val = (youtubeUrl.value||'').trim();
+      if(val.includes('youtube.com/') || val.includes('youtu.be/')){
+        importYouTube();
+      }
+    }, 50);
   }
 );
 

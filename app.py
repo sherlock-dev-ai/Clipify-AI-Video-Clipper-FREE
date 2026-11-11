@@ -10,11 +10,18 @@ import subprocess
 import sys
 import threading
 import uuid
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit, urlunsplit
 from windows_process import clear_ffmpeg_report_environment, install_hidden_subprocess_defaults
+
+warnings.filterwarnings("ignore", message=".*libtorchcodec.*")
+warnings.filterwarnings("ignore", message=".*torchcodec.*")
+warnings.filterwarnings("ignore", module="torchcodec")
+warnings.filterwarnings("ignore", category=UserWarning, module="torchcodec")
+warnings.filterwarnings("ignore", category=UserWarning, module="pyannote.audio.core.io")
 
 PRODUCT_APP_USER_MODEL_ID = "dev.sherlock.clipifyai"
 if os.name == "nt":
@@ -411,10 +418,21 @@ def _try_start_ollama() -> None:
             binary = shutil.which("ollama") or shutil.which("ollama.exe")
             if binary:
                 creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-                subprocess.Popen([binary, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                env = os.environ.copy()
+                if not env.get("OLLAMA_MODELS"):
+                    # Check Windows User Environment in registry if not in current process
+                    try:
+                        import winreg
+                        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment", 0, winreg.KEY_READ) as rk:
+                            reg_models, _ = winreg.QueryValueEx(rk, "OLLAMA_MODELS")
+                            if reg_models:
+                                env["OLLAMA_MODELS"] = reg_models
+                    except Exception:
+                        pass
+                subprocess.Popen([binary, "serve"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                  stdin=subprocess.DEVNULL, creationflags=creationflags,
                                  start_new_session=True)
-                print("[Ollama] Server was not reachable; attempted local auto-start.")
+                print("[Ollama] Server was not reachable; attempted local auto-start with models env.")
         except Exception as exc:
             print(f"[Ollama] Auto-start skipped: {type(exc).__name__}: {exc}")
 
@@ -772,6 +790,7 @@ job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, ma
         "CLIPPEDAI_SPLIT_SCREEN": "1" if split_screen else "0",
         "TRANSCRIPTION_MODEL": os.getenv("TRANSCRIPTION_MODEL", "medium"),
         "HF_HUB_OFFLINE": "1" if (Path.home() / ".cache" / "huggingface" / "hub" / "models--Systran--faster-whisper-medium").is_dir() else os.getenv("HF_HUB_OFFLINE", "0"),
+        "PYTHONWARNINGS": "ignore::UserWarning:pyannote.audio.core.io,ignore:.*torchcodec.*",
     })
     diagnostic_log = job_dir / "diagnostics" / "qwen-decisions.jsonl"
     diagnostic_log.parent.mkdir(parents=True, exist_ok=True)
@@ -1494,8 +1513,7 @@ def import_youtube():
                        "--progress-template", "download:%(progress._percent_str)s|%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress.speed)s|%(progress.eta)s",
                        "--restrict-filenames", "--merge-output-format", "mp4", "--max-filesize", "4G",
                        "--socket-timeout", "20", "--retries", "3", "--fragment-retries", "3",
-                       "--extractor-args", "youtube:player_client=android",
-                       "-f", "best[height<=1080][ext=mp4]/best[height<=1080]/best",
+                       "-f", "bestvideo[height<=1080]+bestaudio/best[height<=1080][ext=mp4]/best",
                        "--ffmpeg-location", str(Path(ffmpeg_path).parent),
                        "-o", output_template, source_url]
             proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -2377,7 +2395,7 @@ def _open_app_window(host: str, port: int, timeout: float = 40.0) -> None:
             if profile:
                 args.append(f"--user-data-dir={profile}")
             try:
-                subprocess.Popen(
+                proc = subprocess.Popen(
                     args,
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.DEVNULL,
@@ -2385,7 +2403,8 @@ def _open_app_window(host: str, port: int, timeout: float = 40.0) -> None:
                     creationflags=getattr(subprocess, "DETACHED_PROCESS", 0)
                     | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
                 )
-                opened = True
+                time.sleep(0.5)
+                opened = (proc.poll() is None)
             except Exception:
                 opened = False
 

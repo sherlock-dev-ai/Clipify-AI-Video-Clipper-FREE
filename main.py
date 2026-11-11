@@ -18,9 +18,16 @@ import string
 import time
 import urllib.error
 import urllib.request
+import warnings
 from urllib.parse import urlsplit, urlunsplit
 from pathlib import Path
 from windows_process import install_hidden_subprocess_defaults
+
+warnings.filterwarnings("ignore", message=".*libtorchcodec.*")
+warnings.filterwarnings("ignore", message=".*torchcodec.*")
+warnings.filterwarnings("ignore", module="torchcodec")
+warnings.filterwarnings("ignore", category=UserWarning, module="torchcodec")
+warnings.filterwarnings("ignore", category=UserWarning, module="pyannote.audio.core.io")
 
 install_hidden_subprocess_defaults()
 
@@ -969,43 +976,49 @@ class ResourceManager:
     def recommended_batch_size(self, frame_w: int = 960, frame_h: int = 540) -> int:
         """Return a safe MTCNN batch size for the detected hardware.
 
-        Each PIL frame at detection scale costs roughly w*h*3 bytes in CPU
-        memory and a comparable amount in VRAM when MTCNN runs on CUDA.
-        We target ≤60 % VRAM usage, capped at 16 for safety on 8 GB cards.
+        Checks live available VRAM dynamically to avoid OOM on 6GB/8GB GPUs
+        (such as RTX 4060) when other models (like Ollama) are co-located in VRAM.
         """
         frame_mb = max(1.0, (frame_w * frame_h * 3) / 1e6)
 
         if self.cuda_available and self.vram_gb > 0:
-            # Whisper already occupies ~1.5–3 GB; leave the rest for MTCNN.
-            reserved_for_whisper_gb = 3.0
-            usable_mb = max(256.0, (self.vram_gb - reserved_for_whisper_gb) * 1000 * 0.60)
+            usable_mb = 256.0
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    free_bytes, total_bytes = torch.cuda.mem_get_info()
+                    free_mb = free_bytes / 1e6
+                    # Conservative: use at most 35% of currently available free VRAM
+                    usable_mb = max(128.0, free_mb * 0.35)
+            except Exception:
+                reserved_for_whisper_gb = 3.0
+                usable_mb = max(128.0, (self.vram_gb - reserved_for_whisper_gb) * 1000 * 0.50)
+
             batch = max(1, int(usable_mb / frame_mb))
-            # Hard ceiling: 8 GB RTX 4060 → 8 or fewer after Whisper headroom
-            return min(batch, 8 if self.vram_gb < 10 else 16)
+            # Safe ceiling: 8 GB or lower GPUs cap at 4; 12GB+ cap at 8
+            return min(batch, 4 if self.vram_gb <= 8.5 else 8)
         else:
             # CPU path: conservatively use 30 % of RAM
             usable_mb = self.ram_gb * 1000 * 0.30
             return max(1, min(int(usable_mb / frame_mb), 4))
 
     def process_with_retry(self, fn, *args, **kwargs):
-        """Run *fn* with automatic batch-size reduction on CUDA OOM."""
+        """Run *fn* with automatic batch-size reduction and cache flush on CUDA OOM."""
         batch_key = "batch_size"
         for attempt in range(3):
             try:
                 return fn(*args, **kwargs)
-            except RuntimeError as exc:
-                if "out of memory" in str(exc).lower() and attempt < 2:
+            except Exception as exc:
+                err_str = str(exc).lower()
+                is_oom = "out of memory" in err_str or "failed to allocate" in err_str
+                if is_oom and attempt < 2:
                     if batch_key in kwargs:
                         kwargs[batch_key] = max(1, kwargs[batch_key] // 2)
                         print(
-                            f"  [ResourceManager] CUDA OOM — retrying with "
+                            f"  [ResourceManager] CUDA memory pressure — retrying with "
                             f"batch_size={kwargs[batch_key]}"
                         )
-                    try:
-                        import torch
-                        torch.cuda.empty_cache()
-                    except Exception:
-                        pass
+                    self.release_gpu_memory()
                     continue
                 raise
 
@@ -1041,11 +1054,15 @@ class ResourceManager:
         return {"device": "cpu", "compute_type": "int8"}
 
     def release_gpu_memory(self) -> None:
-        """Best-effort CUDA cache flush between pipeline stages."""
+        """Best-effort CUDA cache flush and garbage collection between pipeline stages."""
+        import gc
+        gc.collect()
         try:
             import torch
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+                if hasattr(torch.cuda, "ipc_collect"):
+                    torch.cuda.ipc_collect()
         except Exception:
             pass
 
@@ -1099,17 +1116,31 @@ def create_transcriber(model_size: str) -> "Transcriber":
         # Check local HuggingFace cache to prevent ProtocolError/ConnectionResetError (10054)
         hf_cache = Path.home() / ".cache" / "huggingface" / "hub"
         arch_name = args[0] if args else kwargs.get("whisper_arch", model_size)
-        arch_clean = str(arch_name).replace(".", "-")
-        has_local = False
-        if hf_cache.is_dir():
-            for d in hf_cache.glob(f"models--*--faster-whisper-*{arch_clean}*"):
-                if d.is_dir() and any(d.rglob("model.bin")):
-                    has_local = True
-                    break
-            if not has_local and (hf_cache / "models--Systran--faster-whisper-medium").is_dir():
-                has_local = True
 
-        if has_local or os.getenv("HF_HUB_OFFLINE") == "1":
+        def _is_cached(name: str) -> bool:
+            if not hf_cache.is_dir():
+                return False
+            clean = str(name).replace(".", "-")
+            for d in hf_cache.glob(f"models--*--faster-whisper-*{clean}*"):
+                if d.is_dir() and (any(d.rglob("model.bin")) or any(d.rglob("model.safetensors")) or any(d.rglob("config.json"))):
+                    return True
+            return False
+
+        has_exact = _is_cached(arch_name)
+        if not has_exact:
+            # Fall back to best available local model to avoid network reset / 10054
+            for candidate in ("medium", "base", "small", "large-v1", "large-v2", "large-v3"):
+                if _is_cached(candidate):
+                    print(f"  [WhisperX] Requested '{arch_name}' not cached locally; using cached '{candidate}'.")
+                    arch_name = candidate
+                    if args:
+                        args = (candidate,) + args[1:]
+                    else:
+                        kwargs["whisper_arch"] = candidate
+                    has_exact = True
+                    break
+
+        if has_exact or os.getenv("HF_HUB_OFFLINE") == "1":
             kwargs["local_files_only"] = True
             os.environ["HF_HUB_OFFLINE"] = "1"
 
@@ -1120,30 +1151,44 @@ def create_transcriber(model_size: str) -> "Transcriber":
         try:
             return original_load_model(*args, **kwargs)
         except Exception as exc:
-            if kwargs.get("local_files_only"):
+            err_msg = str(exc).lower()
+            is_net_err = "connectionreseterror" in err_msg or "protocolerror" in err_msg or "10054" in err_msg or "connection" in err_msg
+            if kwargs.get("local_files_only") and not is_net_err:
                 print(f"  [WhisperX] Local load exception ({exc}), retrying without local_files_only...")
                 kwargs["local_files_only"] = False
                 os.environ.pop("HF_HUB_OFFLINE", None)
                 try:
                     return original_load_model(*args, **kwargs)
                 except Exception as net_exc:
-                    print(f"  [WhisperX] Network load exception ({net_exc}), falling back to cached medium...")
+                    # Switch to HF mirror if direct connection resets
+                    print(f"  [WhisperX] Network load exception ({net_exc}), retrying via hf-mirror.com...")
+                    os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+                    try:
+                        return original_load_model(*args, **kwargs)
+                    except Exception:
+                        pass
+            elif is_net_err:
+                print(f"  [WhisperX] Direct HuggingFace reset; retrying via hf-mirror.com...")
+                os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+                kwargs["local_files_only"] = False
+                os.environ.pop("HF_HUB_OFFLINE", None)
+                try:
+                    return original_load_model(*args, **kwargs)
+                except Exception:
+                    pass
+
+            # Final fallback to medium or any cached model
+            for candidate in ("medium", "base", "small"):
+                if _is_cached(candidate):
+                    print(f"  [WhisperX] Load exception ({exc}), falling back to cached '{candidate}'...")
                     kwargs["local_files_only"] = True
                     os.environ["HF_HUB_OFFLINE"] = "1"
                     if args:
-                        args = ("medium",) + args[1:]
+                        args = (candidate,) + args[1:]
                     else:
-                        kwargs["whisper_arch"] = "medium"
+                        kwargs["whisper_arch"] = candidate
                     return original_load_model(*args, **kwargs)
-            else:
-                print(f"  [WhisperX] Load exception ({exc}), falling back to cached medium...")
-                kwargs["local_files_only"] = True
-                os.environ["HF_HUB_OFFLINE"] = "1"
-                if args:
-                    args = ("medium",) + args[1:]
-                else:
-                    kwargs["whisper_arch"] = "medium"
-                return original_load_model(*args, **kwargs)
+            raise exc
 
     whisperx.load_model = load_model_with_silero
     try:
@@ -5410,6 +5455,9 @@ def process_single_video(
                 f" [Transcribe] Running WhisperX (model={os.getenv('TRANSCRIPTION_MODEL', TRANSCRIPTION_MODEL)})..."
             )
             transcription = transcribe_with_progress(input_path, transcriber)
+            transcriber = None
+            if RESOURCE_MANAGER:
+                RESOURCE_MANAGER.release_gpu_memory()
             save_p = transcription_path or get_transcription_file_path(input_path)
             save_transcription(transcription, save_p)
             print(f"  [Transcribe] Saved transcription cache: {os.path.basename(save_p)}")

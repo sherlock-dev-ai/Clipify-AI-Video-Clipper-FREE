@@ -442,12 +442,10 @@ ipcMain.handle('setup:launch', async () => {
   child.unref();
   setTimeout(() => {
     try {
-      const http = require('http');
-      const req = http.get('http://127.0.0.1:5000/api/health', (res) => {});
-      req.on('error', () => {
-        shell.openExternal('http://127.0.0.1:5000/');
-      });
-    } catch {}
+      shell.openExternal('http://127.0.0.1:5000/');
+    } catch (e) {
+      forward('setup:log', `openExternal failed: ${e.message}`);
+    }
   }, 2500);
   return { ok: true, launched: exe };
 });

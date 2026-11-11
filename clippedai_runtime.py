@@ -34,7 +34,12 @@ from __future__ import annotations
 
 import os
 import sys
+import warnings
 from pathlib import Path
+
+warnings.filterwarnings("ignore", message=".*libtorchcodec.*")
+warnings.filterwarnings("ignore", module="torchcodec")
+warnings.filterwarnings("ignore", category=UserWarning, module="torchcodec")
 
 __all__ = [
     "APP_DIR",

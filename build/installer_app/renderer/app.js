@@ -255,6 +255,11 @@ const $ = (id) => {
         this.paint();
       });
       this.paint();
+      setInterval(() => {
+        if (this.playing && this.audio && !this.audio.paused) {
+          this.paintTime();
+        }
+      }, 250);
       if (this.tracks.length) this.load(0, false);
       // Try to start on its own. Electron may still refuse without a gesture;
       // the rejection is handled so nothing is left in a fake "playing" state.
@@ -709,7 +714,7 @@ const $ = (id) => {
       if (subtaskEl && !$('install-workspace').hidden) {
         subtaskEl.textContent = `${currentOperationName} · ${formatDuration(elapsedMs)} elapsed`;
       }
-    }, 1000);
+    }, 500);
   }
 
   function stopElapsedClock() {
@@ -929,6 +934,7 @@ const $ = (id) => {
     } else if (Number.isFinite(sessionElapsed) && sessionElapsed > 0) {
       statusText = `${operation} · ${formatDuration(sessionElapsed)} elapsed`;
     }
+    if (operation) currentOperationName = operation;
     $('install-subtask').textContent = statusText;
     $('current-item').textContent = operation;
 
@@ -1304,8 +1310,8 @@ const $ = (id) => {
     const bestVis  = document.getElementById('game-best-vis');
     const scoreEl = document.getElementById('game-score');
     const bestEl  = document.getElementById('game-best');
-    if (bestEl && bestVis) bestVis.textContent = bestEl.textContent || '0';
-    if (scoreEl && scoreVis) scoreVis.textContent = scoreEl.textContent || '0';
+    if (bestVis) bestVis.textContent = (state.game && state.game.best) ? String(state.game.best) : (bestEl ? bestEl.textContent : '0');
+    if (scoreVis) scoreVis.textContent = (state.game && state.game.score) ? String(state.game.score) : (scoreEl ? scoreEl.textContent : '0');
     if (scoreVis || bestVis) {
       const mo = new MutationObserver((mutations) => {
         for (const m of mutations) {

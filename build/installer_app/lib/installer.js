@@ -1753,6 +1753,33 @@ class Installer extends EventEmitter {
       fs.copyFileSync(envExample, target);
       this.log('seeded .env from .env.example');
     }
+
+    // Persist user-selected or install-drive OLLAMA_MODELS into .env and Windows User Environment
+    const modelsDir = this.modelsDir();
+    if (modelsDir) {
+      try {
+        let envContent = fs.existsSync(target) ? fs.readFileSync(target, 'utf-8') : '';
+        if (/^OLLAMA_MODELS=.*$/m.test(envContent)) {
+          envContent = envContent.replace(/^OLLAMA_MODELS=.*$/m, `OLLAMA_MODELS=${modelsDir}`);
+        } else {
+          envContent += `\nOLLAMA_MODELS=${modelsDir}\n`;
+        }
+        fs.writeFileSync(target, envContent.trim() + '\n', 'utf-8');
+        this.log(`Wrote OLLAMA_MODELS=${modelsDir} to ${target}`);
+      } catch (err) {
+        this.log(`warning: could not write OLLAMA_MODELS to .env: ${err.message}`);
+      }
+
+      if (process.platform === 'win32') {
+        try {
+          const { execSync } = require('child_process');
+          execSync(`reg add "HKCU\\Environment" /v OLLAMA_MODELS /t REG_SZ /d "${modelsDir}" /f`, { windowsHide: true });
+          this.log(`Persisted HKCU\\Environment\\OLLAMA_MODELS=${modelsDir}`);
+        } catch (err) {
+          this.log(`warning: could not set registry OLLAMA_MODELS: ${err.message}`);
+        }
+      }
+    }
   }
 
   // ---------------------------------------------------------------- driver

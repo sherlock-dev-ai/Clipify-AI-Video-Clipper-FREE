@@ -1338,9 +1338,22 @@ def upload():
     file.save(target)
 
     # Reuse a matching cached transcription from the shared input folder when available.
-    cached = USER_DATA_DIR / "input" / f"{Path(safe_name).stem}_transcription.pkl"
-    if cached.exists():
-        shutil.copy2(cached, input_dir / cached.name)
+    target_stem = Path(safe_name).stem
+    candidate_stems = [
+        target_stem,
+        target_stem.replace("_", " "),
+        target_stem.replace(" ", "_"),
+        Path(file.filename).stem,
+    ]
+    for c_stem in candidate_stems:
+        cached = USER_DATA_DIR / "input" / f"{c_stem}_transcription.pkl"
+        if cached.is_file():
+            dest_pkl = input_dir / f"{target_stem}_transcription.pkl"
+            try:
+                shutil.copy2(cached, dest_pkl)
+            except Exception:
+                pass
+            break
 
     with jobs_lock:
         jobs[job_id] = {
@@ -2054,19 +2067,24 @@ def diagnostic():
         ffmpeg_version = ""
         ffmpeg_ok = False
         try:
-            import subprocess
-            _fr = subprocess.run(
-                [FFMPEG_BIN, "-version"],
-                capture_output=True, text=True, timeout=10, check=False
-            )
-            if _fr.returncode == 0:
-                ffmpeg_ok = True
-                ffmpeg_version = (_fr.stdout or "").splitlines()[0] if _fr.stdout else ""
-        except Exception as fe:
-            ffmpeg_version = str(fe)
+            ffmpeg_path = _ffmpeg_path()
+        except Exception:
+            ffmpeg_path = ""
+        if ffmpeg_path and os.path.isfile(ffmpeg_path):
+            try:
+                import subprocess
+                _fr = subprocess.run(
+                    [ffmpeg_path, "-version"],
+                    capture_output=True, text=True, timeout=10, check=False
+                )
+                if _fr.returncode == 0:
+                    ffmpeg_ok = True
+                    ffmpeg_version = (_fr.stdout or "").splitlines()[0] if _fr.stdout else ""
+            except Exception as fe:
+                ffmpeg_version = str(fe)
         report["ffmpeg"] = {
-            "path": FFMPEG_BIN,
-            "exists": os.path.isfile(FFMPEG_BIN),
+            "path": ffmpeg_path,
+            "exists": bool(ffmpeg_path and os.path.isfile(ffmpeg_path)),
             "ok": ffmpeg_ok,
             "version": ffmpeg_version,
         }

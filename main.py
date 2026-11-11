@@ -5118,7 +5118,12 @@ def find_input_videos_auto() -> List[Tuple[str, Optional[str]]]:
         if expected_pkl in pickles:
             result.append((vpath, os.path.join(input_dir_abs, expected_pkl)))
         else:
-            result.append((vpath, None))
+            alt_stems = [stem.replace("_", " "), stem.replace(" ", "_")]
+            matched_alt = next((f"{s}_transcription.pkl" for s in alt_stems if f"{s}_transcription.pkl" in pickles), None)
+            if matched_alt:
+                result.append((vpath, os.path.join(input_dir_abs, matched_alt)))
+            else:
+                result.append((vpath, None))
     return result
 
 

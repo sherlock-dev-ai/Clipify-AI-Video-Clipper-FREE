@@ -1,0 +1,63 @@
+# ClippedAI ML runtime - Tier B
+# =============================================================================
+# These packages are NOT compiled into app.exe / main.exe. The installer
+# installs them into %LOCALAPPDATA%\ClippedAI\runtime (a dedicated virtualenv)
+# and the compiled executables import them from there at run time.
+#
+# Why they are installed separately: torch alone is ~200 MB (CPU) to 4.5 GB
+# (CUDA) and must match the customer's GPU, so it is downloaded during
+# installation rather than embedded in the setup executable.
+#
+# IMPORTANT: this runtime must be CPython 3.11 x64, the same minor version the
+# executables were compiled for. Build with build/build_runtime.py.
+# =============================================================================
+
+# --- WhisperX transcription stack -------------------------------------------
+# torch 2.8 is what WhisperX 3.8.6 declares (torch~=2.8.0, torchvision~=0.23.0,
+# torchaudio~=2.8.0). Do not downgrade these independently: pip refuses to
+# resolve the set and the pipeline then runs against an unvalidated combination.
+# The Windows wheels on PyPI are CPU builds (~250 MB). For NVIDIA GPU support
+# install the CUDA build instead, from the same requirements file:
+#   pip install --extra-index-url https://download.pytorch.org/whl/cu124 \
+#       torch==2.8.0+cu124 torchvision==0.23.0+cu124 torchaudio==2.8.0+cu124
+torch==2.8.0
+torchvision==0.23.0
+torchaudio==2.8.0
+torchcodec<0.8.0,>=0.6.0
+clipsai==0.2.1
+whisperx==3.8.6
+nltk==3.10.3
+
+# --- Video / image / face stack ---------------------------------------------
+opencv-contrib-python==4.11.0.86
+mediapipe==1.0.1
+soundfile==0.14.0
+
+# facenet-pytorch (MTCNN, used for face detection) is installed separately with
+# --no-deps by build/build_runtime.py. Its metadata pins numpy<2.0.0, which is
+# incompatible with whisperx's numpy>=2.1.0. The pin is stale: facenet-pytorch
+# 2.6.0 works with NumPy 2.x, and the development environment already runs
+# exactly this combination (facenet-pytorch 2.6.0 + numpy 2.4.6). Its real
+# dependencies - torch, torchvision, Pillow - are installed above.
+
+# --- Text-to-speech (narrate feature) ---------------------------------------
+kokoro==0.9.4
+# Kokoro's English G2P loads this spaCy package and tries to download it at
+# runtime when absent. Pin the spaCy 3.8-compatible model wheel and its
+# published SHA-256 so Narration works offline after runtime installation.
+en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85
+
+# --- Shared helpers ----------------------------------------------------------
+requests>=2.32
+PyYAML>=6.0
+tqdm>=4.66
+python-dotenv>=1.0
+# ClipsAI imports `magic`. The PyPI `python-magic` package is source only and
+# fails with "failed to find libmagic"; `python-magic-bin` bundles the native
+# library for Windows, which is what clipsai needs here.
+python-magic-bin>=0.4.14
+
+# --- YouTube import ----------------------------------------------------------
+# yt-dlp is a runtime dependency on purpose: Nuitka generates one enormous C
+# file for yt_dlp.extractor._extractors and gcc fails to compile it.
+yt-dlp>=2026.1.1

@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 /**
  * Clipify AI setup - renderer controller.
@@ -881,7 +881,7 @@ const $ = (id) => {
   function onProgress(data) {
     if (data.title) $('install-title').textContent = data.title;
     const operation = data.item || data.task || 'Waiting for the next installation update…';
-    const elapsed = Number(data.taskElapsedMs);
+    const sessionElapsed = Number(data.elapsedMs);
     const quietCandidates = [data.quietForMs, data.lastActivityAgoMs]
       .filter((value) => value !== null && value !== undefined && value !== '')
       .map(Number).filter(Number.isFinite);
@@ -889,16 +889,19 @@ const $ = (id) => {
     let statusText = operation;
     if (Number.isFinite(quiet) && quiet >= 90000) {
       statusText = `${operation}. No process output or staged package-file activity for ${formatDuration(quiet)}; the child process is ${data.processRunning === false ? 'stopped' : 'still running'}, and setup is waiting safely.`;
-    } else if (Number.isFinite(elapsed) && elapsed > 0) {
-      statusText = `${operation} · ${formatDuration(elapsed)} elapsed`;
+    } else if (Number.isFinite(sessionElapsed) && sessionElapsed > 0) {
+      statusText = `${operation} · ${formatDuration(sessionElapsed)} elapsed`;
     }
     $('install-subtask').textContent = statusText;
     $('current-item').textContent = operation;
-    $('stat-speed').textContent = data.bytesTotal && data.speedBytes > 0
+
+    const hasActiveTransfer = Boolean(data.bytesTotal && data.bytesTotal > 0);
+    $('stat-speed').textContent = hasActiveTransfer && data.speedBytes > 0
       ? `${formatBytes(data.speedBytes)}/s`
-      : data.bytesTotal ? 'Waiting' : '—';
-    $('stat-done').textContent = formatBytes(data.bytesDone);
-    $('stat-total').textContent = data.bytesTotal ? formatBytes(data.bytesTotal) : '—';
+      : hasActiveTransfer ? 'Connecting…' : '—';
+    $('stat-done').textContent = hasActiveTransfer ? formatBytes(data.bytesDone) : '—';
+    $('stat-total').textContent = hasActiveTransfer ? formatBytes(data.bytesTotal) : '—';
+
     // ETA must never read as "nothing left" while work is outstanding:
     // a literal 00:00 mid-download looks like it already finished.
     const pctForEta = Number(data.percent);
@@ -908,7 +911,7 @@ const $ = (id) => {
         : Number.isFinite(data.etaMs) && data.etaMs > 0
           ? formatDuration(data.etaMs)
           : Number(data.speedBytes) > 0 ? 'Calculating…' : 'Waiting for transfer';
-    $('stat-eta').textContent = data.bytesTotal ? etaShown : '—';
+    $('stat-eta').textContent = hasActiveTransfer ? etaShown : '—';
 
     // The engine reports the weighted overall figure as `overall`. It used to be
     // read as `data.percent`, which no progress event ever carried, so pct was
@@ -948,8 +951,8 @@ const $ = (id) => {
     } else if (aria) aria.removeAttribute('aria-valuenow');
     const builder = $('builder');
     if (builder && !builder.classList.contains('done')) {
-      const recentlyActive = quiet < 7000 && data.processRunning !== false;
-      builder.dataset.motion = recentlyActive ? 'run' : 'idle';
+      const isAdvancing = (data.speedBytes && data.speedBytes > 0) || (quiet < 5000 && data.processRunning !== false);
+      builder.dataset.motion = isAdvancing ? 'run' : 'idle';
       builder.style.opacity = '1';
     }
     setStatus(data.item || 'Installing…');
@@ -967,9 +970,10 @@ const $ = (id) => {
     if (percent === null) percent = builderAt >= 0 ? builderAt : 0;
     el.style.opacity = '1';
     const width = track.clientWidth || track.getBoundingClientRect().width;
+    if (width <= 0) return;
     const mascotWidth = el.getBoundingClientRect().width || 42;
-    const center = width * Math.max(0, Math.min(100, percent)) / 100;
-    const safeCenter = Math.max(mascotWidth / 2, Math.min(width - mascotWidth / 2, center));
+    const center = Math.max(0, width - mascotWidth) * Math.max(0, Math.min(100, percent)) / 100;
+    const safeCenter = Math.max(0, Math.min(width - mascotWidth, center));
     el.style.left = `${safeCenter}px`;
     el.classList.toggle('done', percent >= 99.5);
     if (actualPercent !== null) builderAt = percent;
@@ -1227,9 +1231,14 @@ const $ = (id) => {
   function paintGameControls(gameState) {
     const toggle = $('btn-game-toggle');
     if (!toggle) return;
-    const canPause = gameState === 'playing';
-    toggle.textContent = canPause ? 'Pause' : 'Continue';
-    toggle.setAttribute('aria-label', canPause ? 'Pause game' : 'Continue game');
+    if (gameState === 'gameover') {
+      toggle.textContent = 'Play Again';
+      toggle.setAttribute('aria-label', 'Play game again');
+    } else {
+      const canPause = gameState === 'playing';
+      toggle.textContent = canPause ? 'Pause' : 'Continue';
+      toggle.setAttribute('aria-label', canPause ? 'Pause game' : 'Continue game');
+    }
   }
 
   function continueGame() {

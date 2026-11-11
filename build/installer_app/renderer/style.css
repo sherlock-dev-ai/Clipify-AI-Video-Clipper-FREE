@@ -1,0 +1,1696 @@
+/* ==========================================================================
+   Clipify AI Setup - visual system
+
+   Palette follows the established Clipify AI setup theme: coral, sage, deep
+   teal, espresso. The background is a deliberately quiet illustrated world -
+   roughly a quarter of the visual weight - so cards and text stay dominant.
+   ========================================================================== */
+
+:root {
+  --coral: #ee9877;
+  --coral-soft: #f6bfa6;
+  --coral-deep: #d97b58;
+  --sage: #6ea497;
+  --teal: #294946;
+  --espresso: #3c2515;
+  --ink: #241713;
+  --cream: #fdf7f0;
+
+  --ok: #4f9d69;
+  --warn: #c9762f;
+  --bad: #c0503f;
+
+  --radius-lg: 20px;
+  --radius: 14px;
+  --radius-sm: 10px;
+
+  --shadow-soft: 0 10px 30px rgba(36, 23, 19, 0.13);
+  --shadow-lift: 0 16px 40px rgba(36, 23, 19, 0.2);
+
+  --glass: rgba(253, 247, 240, 0.86);
+  --glass-line: rgba(255, 255, 255, 0.65);
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* Weather palettes. Only the sky/backdrop change; UI colours stay constant so
+   the foreground never loses contrast against a dark or light sky. */
+body {
+  --sky-top: #bfe3f2;
+  --sky-bot: #f6e7d3;
+  --tree: #4f8a63;
+  --tree-deep: #3d7150;
+  --tree-lit: #6da87c;
+  --trunk: #6b4f38;
+  --hill-far: #b7cfc0;
+  --hill-far-b: #a3bfad;
+  --hill-mid-b: #7ba88f;
+  --hill-near-b: #5b9687;
+  --hill-mid: #8fb59f;
+  --hill-near: #6ea497;
+  --grass: #7fae7a;
+  --mtn-far-a: #a9c2c4;
+  --mtn-far-b: #c6dad6;
+  --mtn-near-a: #7fa595;
+  --mtn-near-b: #9ec0aa;
+  --sun-color: #ffe6a8;
+  --sun-glow: rgba(255, 226, 150, 0.75);
+  --star-alpha: 0;
+  --light: 1;
+  --ui-bg: rgba(253, 247, 240, 0.86);
+  --ui-text: #241713;
+  --ui-muted: #6b564a;
+  --glass-line: rgba(255, 255, 255, 0.65);
+  --shadow-soft: 0 10px 30px rgba(36, 23, 19, 0.13);
+  --shadow-lift: 0 16px 40px rgba(36, 23, 19, 0.2);
+}
+body[data-weather="morning"] {
+  --sky-top: #cfe6f4;
+  --sky-bot: #fbe6cd;
+  --sun-color: #ffe9bd;
+  --sun-glow: rgba(255, 226, 168, 0.7);
+}
+body[data-weather="cloudy"] {
+  --sky-top: #c3ccd6;
+  --sky-bot: #e7e2dc;
+  --tree: #57705f;
+  --tree-deep: #44594b;
+  --tree-lit: #6e8a76;
+  --trunk: #5b5148;
+  --hill-far: #b3bcc2;
+  --hill-far-b: #a2acb3;
+  --hill-mid-b: #859a90;
+  --hill-near-b: #5f9c8c;
+  --hill-mid: #96a89f;
+  --mtn-far-a: #a6b0b8;
+  --mtn-far-b: #c4ccd1;
+  --sun-color: #eee6d8;
+  --sun-glow: rgba(230, 228, 216, 0.4);
+}
+body[data-weather="rain"] {
+  --sky-top: #8f9aa6;
+  --sky-bot: #b9bfc4;
+  --tree: #40684f;
+  --tree-deep: #33543f;
+  --tree-lit: #5a8467;
+  --trunk: #57493c;
+  --hill-far: #8d9b96;
+  --hill-far-b: #7e8d87;
+  --hill-mid-b: #688270;
+  --hill-near-b: #56755f;
+  --hill-mid: #76907f;
+  --hill-near: #64836e;
+  --grass: #6b9166;
+  --mtn-far-a: #79868d;
+  --mtn-far-b: #96a2a8;
+  --mtn-near-a: #5d7a6c;
+  --mtn-near-b: #77937f;
+  --sun-glow: rgba(200, 205, 210, 0.2);
+}
+body[data-weather="sunset"] {
+  --sky-top: #6a7aa6;
+  --sky-bot: #f2ac80;
+  --tree: #4a5f5c;
+  --tree-deep: #3a4c4a;
+  --tree-lit: #6a7d76;
+  --trunk: #4e4038;
+  --hill-far: #8f8ba6;
+  --hill-far-b: #807c9b;
+  --hill-mid-b: #5f7178;
+  --hill-near-b: #4d7f86;
+  --hill-mid: #6d7f86;
+  --grass: #5f7f66;
+  --mtn-far-a: #6f6a92;
+  --mtn-far-b: #a88296;
+  --mtn-near-a: #4c5566;
+  --mtn-near-b: #6b6a76;
+  --sun-color: #ffd39a;
+  --sun-glow: rgba(255, 170, 110, 0.72);
+}
+body[data-weather="night"] {
+  --sky-top: #16233a;
+  --sky-bot: #2f405a;
+  --tree: #1d3a35;
+  --tree-deep: #162c29;
+  --tree-lit: #2b5148;
+  --trunk: #241c18;
+  --hill-far: #2a3a4a;
+  --hill-far-b: #23313f;
+  --hill-mid-b: #1e2b35;
+  --hill-near-b: #18242b;
+  --hill-mid: #24333f;
+  --hill-near: #1e2b33;
+  --grass: #2c4438;
+  --mtn-far-a: #1b2739;
+  --mtn-far-b: #27374b;
+  --mtn-near-a: #16202e;
+  --mtn-near-b: #1f2c3a;
+  --sun-color: #cfd9e6;
+  --sun-glow: rgba(200, 215, 240, 0.35);
+  --star-alpha: 1;
+  --light: 0.34;
+  --ui-bg: rgba(28, 36, 48, 0.82);
+  --ui-text: #f2ece4;
+  --ui-muted: #b3bcc9;
+  --glass-line: rgba(255, 255, 255, 0.14);
+  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.4);
+  --shadow-lift: 0 16px 44px rgba(0, 0, 0, 0.5);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, sans-serif;
+  color: var(--ui-text);
+  background: var(--sky-top);
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  transition: background 2.2s var(--ease);
+}
+
+.muted { color: var(--ui-muted); }
+.mono { font-family: "Cascadia Mono", Consolas, "SF Mono", monospace; font-size: 12.5px; }
+
+/* ---------------------------------------------------------------- world -- */
+
+.world {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.sky {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-bot) 72%, var(--sky-bot) 100%);
+  transition: background 2.2s var(--ease);
+}
+
+/* --- The sun and moon ARE the day / night switch ------------------------- */
+/* These used to be painted inside .world and were unreachable: the hero and
+   panel layers covered them, and .world is pointer-events:none throughout.
+   They now live in their own layer above the screens, and only the visible one
+   takes clicks, so the hidden one can never swallow a click. */
+.celestial {
+  position: fixed;
+  inset: 0;
+  /* Above the screens (z-index 2) and the world (0), below the popup (90) and
+     the titlebar (100) so window controls and modals still win. */
+  z-index: 60;
+  pointer-events: none;
+}
+.sun, .moon {
+  position: absolute;
+  top: 9%;
+  right: 13%;
+  width: 74px;
+  height: 74px;
+  border: 0;
+  padding: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  font: inherit;
+  transition: opacity 2s var(--ease), transform 2s var(--ease);
+}
+.sun {
+  background: radial-gradient(circle at 40% 38%, var(--sun-color), var(--sun-glow) 62%, transparent 72%);
+  box-shadow: 0 0 60px 18px var(--sun-glow);
+  animation: sun-breathe 9s ease-in-out infinite;
+}
+.moon {
+  opacity: var(--star-alpha);
+  background: radial-gradient(circle at 38% 36%, #f4f1e4, #cdd6e2 70%);
+  box-shadow: 0 0 46px 10px rgba(200, 216, 240, 0.3);
+}
+.moon-crater {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(150, 165, 185, 0.45);
+}
+.moon-crater.c1 { width: 13px; height: 13px; top: 26px; left: 30px; }
+.moon-crater.c2 { width: 9px; height: 9px; top: 46px; left: 20px; }
+body[data-weather="night"] .sun,
+body[data-night="true"] .sun { opacity: 0; transform: translateY(-24px) scale(0.85); pointer-events: none; }
+body:not([data-weather="night"]) .moon { opacity: 0; pointer-events: none; }
+
+/* Hover / focus has to be obvious: this is the only day-night control there
+   is now, and it is a picture in the sky rather than a labelled button. */
+.sun:hover, .moon:hover { transform: scale(1.12); }
+.sun:focus-visible, .moon:focus-visible { outline: 2px solid var(--coral); outline-offset: 4px; }
+.sun:active, .moon:active { transform: scale(0.96); }
+
+.sky-hint {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 7px);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: #4a3a2a;
+  background: rgba(255, 244, 214, 0.92);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
+  opacity: 0;
+  transition: opacity 0.25s var(--ease);
+  pointer-events: none;
+}
+.moon .sky-hint { color: #2c3648; background: rgba(232, 238, 248, 0.92); }
+.sun:hover .sky-hint, .sun:focus-visible .sky-hint,
+.moon:hover .sky-hint, .moon:focus-visible .sky-hint { opacity: 1; }
+
+.titlebar-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--glass-line);
+}
+
+@keyframes sun-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.stars { position: absolute; inset: 0 0 42% 0; opacity: var(--star-alpha); transition: opacity 2.2s var(--ease); }
+.star {
+  position: absolute;
+  width: 2px; height: 2px;
+  border-radius: 50%;
+  background: #fff;
+  animation: twinkle 3.6s ease-in-out infinite;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.9; }
+}
+
+.clouds { position: absolute; inset: 0; }
+.cloud {
+  position: absolute;
+  display: flex;
+  align-items: flex-end;
+  opacity: 0.85;
+}
+.cloud i {
+  display: block;
+  background: #fff;
+  border-radius: 999px;
+}
+.cloud.c1 { top: 12%; left: -18%; animation: drift-a 92s linear infinite; }
+.cloud.c2 { top: 24%; left: -24%; opacity: 0.62; animation: drift-b 138s linear infinite; }
+.cloud.c3 { top: 6%; left: -30%; opacity: 0.45; animation: drift-a 168s linear infinite; }
+.cloud.c1 i { width: 62px; height: 26px; }
+.cloud.c1 i:nth-child(2) { width: 44px; height: 38px; margin-left: -18px; }
+.cloud.c1 i:nth-child(3) { width: 38px; height: 22px; margin-left: -12px; }
+.cloud.c2 i { width: 88px; height: 30px; }
+.cloud.c2 i:nth-child(2) { width: 56px; height: 44px; margin-left: -22px; }
+.cloud.c2 i:nth-child(3) { width: 48px; height: 24px; margin-left: -14px; }
+.cloud.c3 i { width: 120px; height: 34px; }
+.cloud.c3 i:nth-child(2) { width: 74px; height: 50px; margin-left: -26px; }
+.cloud.c3 i:nth-child(3) { width: 60px; height: 26px; margin-left: -16px; }
+@keyframes drift-a { from { transform: translateX(0); } to { transform: translateX(135vw); } }
+@keyframes drift-b { from { transform: translateX(0); } to { transform: translateX(120vw); } }
+body[data-weather="night"] .cloud { opacity: 0.12; }
+body[data-weather="rain"] .cloud { opacity: 0.9; }
+
+.hills { position: absolute; left: 0; right: 0; bottom: 0; height: 46%; }
+.mountains { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; }
+.mountains svg { width: 100%; height: 100%; display: block; }
+.mf-a, .mf-b, .mn-a, .mn-b, .mt-snow { transition: 1.8s var(--ease); }
+.mf-a { stop-color: var(--mtn-far-a); } .mf-b { stop-color: var(--mtn-far-b); }
+.mn-a { stop-color: var(--mtn-near-a); } .mn-b { stop-color: var(--mtn-near-b); }
+.mt-snow { fill: #ffffff; }
+body[data-weather="night"] .mt-snow { fill: #dbe6f2; }
+/* Rolling meadow: three bezier ridges, no geometry tricks. */
+.meadow { position: absolute; left: 0; right: 0; bottom: 0; height: 46%; }
+.meadow svg { width: 100%; height: 100%; display: block; }
+.hf-a, .hf-b, .hg-a, .hg-b, .hh-a, .hh-b { transition: 2.2s var(--ease); }
+.hf-a { stop-color: var(--hill-far); } .hf-b { stop-color: var(--hill-far-b); }
+.hg-a { stop-color: var(--hill-mid); } .hg-b { stop-color: var(--hill-mid-b); }
+.hh-a { stop-color: var(--hill-near); } .hh-b { stop-color: var(--hill-near-b); }
+
+.trees { position: absolute; left: 0; right: 0; bottom: 14%; height: 132px; }
+.tree {
+  position: absolute;
+  bottom: 0;
+  width: 30px;
+  height: 68px;
+}
+.tree::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 6px; height: 24px;
+  transform: translateX(-50%);
+  background: var(--trunk);
+  border-radius: 2px;
+}
+/* Foliage built from overlapping soft blobs so it reads as a canopy rather
+   than one flat ellipse, and so it stays legible against the meadow. */
+.tree::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  width: 54px; height: 74px;
+  background:
+    radial-gradient(circle at 50% 30%, var(--tree-lit) 0 34%, transparent 35%),
+    radial-gradient(circle at 30% 58%, var(--tree) 0 36%, transparent 37%),
+    radial-gradient(circle at 70% 56%, var(--tree) 0 36%, transparent 37%),
+    radial-gradient(circle at 50% 76%, var(--tree-deep) 0 38%, transparent 39%);
+  animation: tree-sway 7.5s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+@keyframes tree-sway {
+  0%, 100% { transform: translateX(-50%) rotate(-1.6deg); }
+  50% { transform: translateX(-50%) rotate(1.6deg); }
+}
+
+.drift { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+.grass { position: absolute; left: 0; right: 0; bottom: 0; height: 150px; }
+.grass-blades { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 3px; overflow: hidden; }
+.blade {
+  flex: 1 1 auto;
+  background: var(--grass);
+  border-radius: 3px 3px 0 0;
+  transform-origin: 50% 100%;
+  animation: sway 4.2s ease-in-out infinite;
+}
+@keyframes sway {
+  0%, 100% { transform: rotate(-2.4deg); }
+  50% { transform: rotate(2.4deg); }
+}
+.flowerbeds { position: absolute; inset: 0; pointer-events: none; }
+.flower {
+  position: absolute;
+  bottom: 6px;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--coral);
+  box-shadow: 10px 0 0 -1px #fff, 20px 0 0 -2px #f0d264, 30px 0 0 -1px #fff;
+  animation: sway 5s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+
+body[data-weather="sunny"] {
+  /* Alias kept so the default daytime look is reachable. */
+  --sky-top: #bfe3f2;
+  --sky-bot: #f6e7d3;
+}
+
+.fireflies { position: absolute; inset: 40% 0 0 0; opacity: 0; transition: opacity 2.4s var(--ease); }
+body[data-weather="night"] .fireflies { opacity: 1; }
+.firefly {
+  position: absolute;
+  width: 3px; height: 3px;
+  border-radius: 50%;
+  background: #ffe9a0;
+  box-shadow: 0 0 7px 2px rgba(255, 226, 140, 0.75);
+  animation: firefly 6.5s ease-in-out infinite;
+}
+@keyframes firefly {
+  0%, 100% { opacity: 0; transform: translate(0, 0); }
+  20% { opacity: 0.9; }
+  50% { opacity: 0.35; transform: translate(14px, -10px); }
+  78% { opacity: 0.85; transform: translate(-8px, -18px); }
+}
+
+.rain { position: absolute; inset: 0; opacity: 0; transition: opacity 2.4s var(--ease); }
+body[data-weather="rain"] .rain { opacity: 0.5; }
+.drop {
+  position: absolute;
+  top: -14px;
+  width: 1.5px; height: 13px;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.85));
+  animation: fall linear infinite;
+}
+@keyframes fall {
+  to { transform: translateY(110vh); }
+}
+
+/* -------------------------------------------------------------- titlebar */
+
+.titlebar {
+  position: relative;
+  /* Above the welcome popup (z-index 90) so the window controls are always
+     reachable, even while the modal is open. */
+  z-index: 100;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 16px;
+  -webkit-app-region: drag;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent);
+}
+.titlebar-brand { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 13.5px; }
+.titlebar-logo { width: 22px; height: 22px; border-radius: 6px; }
+.titlebar-actions { display: flex; gap: 4px; -webkit-app-region: no-drag; }
+.titlebar-btn {
+  width: 34px; height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.16s;
+}
+.titlebar-btn:hover { background: rgba(0, 0, 0, 0.08); }
+.titlebar-close:hover { background: #c0503f; color: #fff; }
+
+/* ----------------------------------------------------------------- steps */
+
+.steps {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  padding: 2px 20px 12px;
+}
+.steps ol { display: flex; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px 6px 6px;
+  border-radius: 999px;
+  background: var(--ui-bg);
+  border: 1px solid var(--glass-line);
+  box-shadow: var(--shadow-soft);
+  opacity: 0.55;
+  transition: opacity 0.4s var(--ease), transform 0.4s var(--ease), background 0.4s;
+}
+.step-dot {
+  width: 24px; height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.07);
+  font-size: 12px;
+  font-weight: 700;
+  flex: 0 0 auto;
+  transition: background 0.35s var(--ease), color 0.35s;
+}
+.step-name { font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.step.active { opacity: 1; transform: translateY(-1px); }
+.step.active .step-dot { background: var(--coral); color: #fff; }
+.step.done { opacity: 0.9; }
+.step.done .step-dot { background: var(--ok); color: #fff; font-size: 13px; }
+.step.done .step-dot::after { content: "\2713"; }
+.step.done .step-dot { font-size: 0; }
+.step.done .step-dot::after { font-size: 13px; }
+
+/* ---------------------------------------------------------------- screens */
+
+#screens {
+  position: relative;
+  z-index: 2;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 26px;
+}
+.screen {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 1180px;
+  width: 100%;
+  margin: 0 auto;
+  animation: screen-in 0.42s var(--ease);
+  /* Without this the taller screens clip their own action bar: the location
+     screen's content overflows and the Install button sits below the fold,
+     unreachable by a real click. */
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+.screen[hidden] { display: none; }
+@keyframes screen-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+.screen-head h2 { margin: 0 0 3px; font-size: 21px; font-weight: 650; letter-spacing: -0.01em; }
+.screen-head p { margin: 0; color: var(--ui-muted); font-size: 13.5px; }
+.screen-head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+
+/* ------------------------------------------------------------------ cards */
+
+.card {
+  background: var(--ui-bg);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(14px) saturate(1.1);
+  padding: 18px 20px;
+  animation: card-in 0.5s var(--ease) backwards;
+}
+.card-tight { padding: 14px 16px; }
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+.card h3 { margin: 0 0 10px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ui-muted); }
+
+/* ------------------------------------------------------------------- hero */
+
+.hero {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 12px 0 20px;
+  animation: card-in 0.55s var(--ease);
+}
+.hero-logo-wrap { position: relative; margin-bottom: 4px; }
+.hero-logo {
+  width: 104px; height: 104px;
+  border-radius: 26px;
+  box-shadow: var(--shadow-lift);
+  display: block;
+}
+.success-ring {
+  position: absolute;
+  inset: -14px;
+  width: 132px; height: 132px;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 5;
+}
+.success-ring circle { stroke: var(--ok); stroke-dasharray: 340; stroke-dashoffset: 340; animation: ring 0.75s var(--ease) 0.25s forwards; }
+.success-ring path { stroke: var(--ok); stroke-width: 9; stroke-dasharray: 90; stroke-dashoffset: 90; animation: ring 0.5s var(--ease) 0.75s forwards; }
+@keyframes ring { to { stroke-dashoffset: 0; } }
+.hero-title { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+.hero-sub { margin: 0; color: var(--ui-muted); font-size: 15px; }
+.hero-desc { margin: 4px 0 0; max-width: 470px; color: var(--ui-muted); font-size: 13.5px; }
+.hero-meta { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+.hero-foot { margin: 0; font-size: 12.5px; color: var(--ui-muted); min-height: 18px; }
+.pill {
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--ui-bg);
+  border: 1px solid var(--glass-line);
+  box-shadow: var(--shadow-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+.done-models { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 2px 0; }
+.done-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+
+/* ---------------------------------------------------------------- buttons */
+
+.btn {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 20px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
+  color: var(--ui-text);
+  background: rgba(0, 0, 0, 0.06);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.16s var(--ease), box-shadow 0.2s var(--ease), background 0.2s, opacity 0.2s;
+}
+.btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-soft); }
+.btn:active:not(:disabled) { transform: translateY(0); }
+.btn:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary {
+  background: linear-gradient(180deg, var(--coral-soft), var(--coral));
+  color: #3a2318;
+  box-shadow: 0 4px 14px rgba(217, 123, 88, 0.4);
+}
+.btn-primary:hover:not(:disabled) { box-shadow: 0 8px 22px rgba(217, 123, 88, 0.5); }
+.btn-ghost { background: rgba(0, 0, 0, 0.05); }
+.btn-hero { padding: 13px 30px; font-size: 15px; border-radius: 14px; margin-top: 6px; }
+.btn-sm { padding: 7px 14px; font-size: 12.5px; border-radius: 9px; }
+.btn-arrow { display: inline-block; transition: transform 0.2s var(--ease); }
+.btn:hover .btn-arrow { transform: translateX(4px); }
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  background: rgba(255, 255, 255, 0.45);
+  animation: ripple 0.6s var(--ease);
+  pointer-events: none;
+}
+@keyframes ripple { to { transform: scale(2.4); opacity: 0; } }
+
+.screen-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 2px 10px;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  /* Pinned so Back / Continue / Install are always reachable, however tall
+     the screen content grows. */
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: linear-gradient(180deg, rgba(255, 253, 248, 0) 0%, rgba(255, 253, 248, 0.86) 42%, rgba(255, 253, 248, 0.96) 100%);
+  backdrop-filter: blur(3px);
+}
+body[data-weather="night"] .screen-foot,
+body[data-night="true"] .screen-foot {
+  background: linear-gradient(180deg, rgba(18, 26, 40, 0) 0%, rgba(18, 26, 40, 0.82) 42%, rgba(18, 26, 40, 0.95) 100%);
+}
+.screen-foot .foot-summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.screen-foot .foot-actions { flex: 0 0 auto; }
+.foot-summary { font-size: 13px; font-weight: 600; color: var(--ui-muted); }
+.foot-actions { display: flex; gap: 9px; margin-left: auto; }
+
+/* ------------------------------------------------------------------ field */
+
+.field-label { display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ui-muted); margin-bottom: 7px; }
+.field-row { display: flex; gap: 9px; }
+.field-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  font-size: 13.5px;
+  padding: 11px 13px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ui-text);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.field-input:focus { outline: 0; border-color: var(--coral); box-shadow: 0 0 0 3px rgba(238, 152, 119, 0.25); }
+body[data-weather="night"] .field-input { background: rgba(255, 255, 255, 0.1); color: #f2ece4; }
+
+/* ------------------------------------------------------------ disk space */
+
+.space-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 16px 0 12px;
+}
+.space-cell {
+  background: rgba(0, 0, 0, 0.045);
+  border-radius: var(--radius);
+  padding: 11px 13px;
+}
+body[data-weather="night"] .space-cell { background: rgba(255, 255, 255, 0.07); }
+.space-label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ui-muted); font-weight: 700; }
+.space-value { display: block; font-size: 17px; font-weight: 700; margin-top: 3px; letter-spacing: -0.01em; }
+.space-meta { font-size: 12px; color: var(--ui-muted); margin-bottom: 8px; min-height: 16px; }
+
+.bar { height: 8px; border-radius: 999px; background: rgba(0, 0, 0, 0.1); overflow: hidden; }
+.bar-lg { height: 12px; }
+.bar-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--sage), var(--coral));
+  transition: width 0.45s var(--ease);
+}
+.bar-fill.bad { background: linear-gradient(90deg, #d98a6a, #c0503f); }
+.bar-indeterminate {
+  position: absolute;
+  inset: 0;
+  width: 34%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--coral-soft), transparent);
+  animation: indeterminate 1.5s ease-in-out infinite;
+}
+@keyframes indeterminate {
+  0% { left: -34%; }
+  100% { left: 100%; }
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 12px 0 0;
+  padding: 11px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+}
+.notice[hidden] { display: none; }
+.notice-icon { font-weight: 700; flex: 0 0 auto; }
+.notice-good { background: rgba(79, 157, 105, 0.14); color: var(--ok); }
+.notice-warn { background: rgba(201, 118, 47, 0.15); color: var(--warn); }
+.notice-bad { background: rgba(192, 80, 63, 0.15); color: var(--bad); }
+.notice-soft { background: rgba(110, 164, 151, 0.16); color: var(--ui-text); flex-direction: column; gap: 2px; }
+
+/* --------------------------------------------------------------- switches */
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 0;
+  cursor: pointer;
+  font-size: 13.5px;
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+}
+body[data-weather="night"] .switch-row { border-top-color: rgba(255, 255, 255, 0.1); }
+.switch-row:first-of-type { border-top: 0; }
+.switch-row input { position: absolute; opacity: 0; width: 0; height: 0; }
+.switch-box {
+  flex: 0 0 auto;
+  width: 40px; height: 23px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.2);
+  position: relative;
+  transition: background 0.24s var(--ease);
+}
+.switch-box::after {
+  content: "";
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 17px; height: 17px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.24s var(--ease);
+}
+.switch-row input:checked + .switch-box { background: var(--ok); }
+.switch-row input:checked + .switch-box::after { transform: translateX(17px); }
+.switch-row input:focus-visible + .switch-box { outline: 2px solid var(--coral); outline-offset: 2px; }
+.switch-row:hover .switch-box { filter: brightness(1.08); }
+
+/* ------------------------------------------------------- live activity feed */
+/* The point of this panel is that the window is never silent: something real
+   is always arriving, so a long wait reads as work rather than a hang. */
+.card-activity { padding: 12px 14px 10px; }
+
+.activity-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 8px;
+}
+.activity-head h3 { margin: 0; font-size: 13px; letter-spacing: 0.01em; }
+.activity-count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ui-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* A slow breathing dot: cheap proof that the process is alive even if the next
+   real line is a few seconds away. */
+.activity-pulse {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--sage);
+  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  animation: activity-pulse 1.5s ease-out infinite;
+}
+.activity-pulse.idle { animation: none; background: var(--ui-muted); opacity: 0.5; }
+@keyframes activity-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(120, 190, 150, 0.55); }
+  70%  { box-shadow: 0 0 0 7px rgba(120, 190, 150, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(120, 190, 150, 0); }
+}
+
+.activity-feed {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px 0 0;
+  height: 150px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+.activity-feed::-webkit-scrollbar { width: 7px; }
+.activity-feed::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); border-radius: 99px; }
+body[data-weather="night"] .activity-feed::-webkit-scrollbar-thumb,
+body[data-night="true"] .activity-feed::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); }
+
+.activity-feed li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 26px;
+  min-height: 26px;
+  padding: 0;
+  font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ui-muted);
+  animation: activity-in 0.28s var(--ease);
+}
+.activity-feed li.activity-spacer { display: block; min-height: 0; padding: 0; animation: none; }
+@keyframes activity-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: none; }
+}
+.activity-feed time {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  color: var(--ui-muted);
+  opacity: 0.62;
+  font-variant-numeric: tabular-nums;
+}
+.activity-feed .a-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Colour carries the kind of step, so the eye can pick out errors and finished
+   milestones without reading every line. */
+.activity-feed li[data-kind="ok"]     .a-text { color: var(--sage); }
+.activity-feed li[data-kind="error"]  .a-text { color: #e2705f; font-weight: 700; }
+.activity-feed li[data-kind="phase"]  .a-text { color: var(--ui-text); font-weight: 700; }
+.activity-feed li[data-kind="download"] .a-text,
+.activity-feed li[data-kind="blob"] .a-text { color: var(--coral); }
+.activity-feed li[data-kind="pkg"]    .a-text { color: var(--ui-text); }
+.activity-feed li.fresh .a-text { text-shadow: 0 0 12px rgba(238, 152, 119, 0.35); }
+
+
+
+.models-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 264px;
+  gap: 12px;
+  /* stretch, NOT start: with align-items:start the left column becomes
+     content-sized, which collapses the flex:1 card grid to zero height and the
+     cards become invisible. */
+  align-items: stretch;
+}
+.models-main { min-height: 0; height: 100%; display: flex; flex-direction: column; gap: 9px; }
+# Chrome on the models screen is compressed: every pixel here is a pixel the
+# card grid does not get, and the grid is what the user is trying to browse.
+#screen-models .screen-head { margin-bottom: -4px; }
+#screen-models .screen-head h2 { font-size: 20px; }
+#screen-models .notice-soft { padding: 8px 12px; font-size: 12.2px; }
+#screen-models .later-note { font-size: 11.4px; }
+.models-side { min-height: 0; display: flex; }
+
+/* ----------------------------------------------------------------- models */
+
+/* Twelve cards have to be browsable at once. The old 232px floor plus a 296px
+   detail column left room for exactly two columns, so only two models were ever
+   on screen and the rest needed scrolling to even discover. Narrower columns
+   and a tighter card fit three across and several rows in the same height. */
+.model-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(163px, 1fr));
+  /* min-content, not 1fr: 1fr resolved against the scrollable content box and
+     inflated every row to 168px, so only one row of cards ever fitted. */
+  grid-auto-rows: min-content;
+  align-content: start;
+  gap: 9px;
+  overflow-y: auto;
+  padding: 3px 5px 3px 3px;
+  min-height: 190px;
+  flex: 1 1 auto;
+  scrollbar-width: thin;
+}
+.model-grid::-webkit-scrollbar { width: 9px; }
+.model-grid::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); border-radius: 99px; }
+
+.model-card {
+  position: relative;
+  text-align: left;
+  border: 1.5px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius);
+  background: var(--ui-bg);
+  backdrop-filter: blur(12px);
+  padding: 9px 10px 8px;
+  cursor: pointer;
+  min-height: 0;
+  font: inherit;
+  color: var(--ui-text);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  /* Equal-height rows and a clamped description, so every card in a row
+     lines up regardless of how long its copy is. */
+  min-height: 168px;
+  transition: transform 0.2s var(--ease), border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  animation: card-in 0.45s var(--ease) backwards;
+}
+.model-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); border-color: rgba(238, 152, 119, 0.6); }
+.model-card:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.model-card.selected { border-color: var(--coral); box-shadow: 0 0 0 3px rgba(238, 152, 119, 0.28), var(--shadow-lift); background: linear-gradient(180deg, rgba(238, 152, 119, 0.13), var(--ui-bg)); }
+.model-card.focused { border-color: var(--sage); }
+body[data-weather="night"] .model-card { border-color: rgba(255, 255, 255, 0.14); }
+
+/* Right padding keeps the name clear of the selected check in the corner. */
+.model-head { display: flex; align-items: center; gap: 6px; padding-right: 23px; }
+.model-icon {
+  width: 28px; height: 28px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+body[data-weather="night"] .model-icon { background: rgba(255, 255, 255, 0.08); }
+.model-icon svg { display: block; }
+.model-name {
+  font-weight: 700;
+  font-size: 12.6px;
+  letter-spacing: -0.01em;
+  flex: 1 1 auto;
+  min-width: 0;
+  /* One line, ellipsised. Wrapping here is what made the head 76px tall. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.model-badges {
+  display: flex;
+  gap: 4px;
+  margin-top: 5px;
+  padding-right: 23px;
+  /* One line only. Wrapping put a second badge row on the card and cost 19px of
+     height, which is a whole extra row of cards out of the grid. */
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.badge {
+  font-size: 8.8px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+.badge-rec { background: var(--coral); color: #3a2318; }
+.badge-have { background: rgba(79, 157, 105, 0.2); color: var(--ok); }
+.badge-tag { background: rgba(0, 0, 0, 0.08); color: var(--ui-muted); font-weight: 700; }
+.model-check {
+  position: absolute;
+  top: 7px; right: 7px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.22);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  color: transparent;
+  transition: background 0.2s var(--ease), border-color 0.2s, color 0.2s, transform 0.2s var(--ease);
+}
+.model-card.selected .model-check { background: var(--coral); border-color: var(--coral); color: #fff; transform: scale(1.08); }
+.model-desc {
+  font-size: 11.2px;
+  color: var(--ui-muted);
+  line-height: 1.32;
+  margin: 5px 0 0;
+  /* Must not shrink. As a flex child with overflow:hidden it was being
+     collapsed to zero height, so the description was not rendered at all. */
+  flex: 0 0 auto;
+  /* Clamped to two lines: three lines of description per card was most of the
+     card's height, and with twelve cards that is the difference between two
+     rows on screen and four. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.model-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: auto;
+  padding-top: 6px;
+  align-content: flex-start;
+  flex: 0 0 auto;
+}
+.fact {
+  font-size: 9.8px;
+  font-weight: 600;
+  padding: 2.5px 6px;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--ui-muted);
+}
+body[data-weather="night"] .fact { background: rgba(255, 255, 255, 0.09); }
+.fact-size { background: rgba(110, 164, 151, 0.2); color: #3f7a6c; }
+body[data-weather="night"] .fact-size { color: #a8d4c8; }
+
+.card-detail { position: sticky; }
+.detail-head { margin-bottom: 12px !important; }
+.detail-body dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; font-size: 12.5px; align-items: baseline; }
+.detail-body dt { color: var(--ui-muted); font-weight: 700; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.05em; }
+.detail-body dd { margin: 0; font-weight: 600; }
+.detail-desc { font-size: 12.5px; color: var(--ui-muted); margin: 0 0 12px; line-height: 1.45; }
+.detail-title { font-size: 16px; font-weight: 700; margin: 0 0 3px; }
+.detail-tag { display: inline-block; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--coral-deep); margin-bottom: 8px; }
+.tag-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 5px; }
+/* Must stay on screen: the grid above it is the only thing allowed to shrink
+   or scroll, otherwise this note is pushed below the fold. */
+.later-note {
+  margin: 0;
+  flex: 0 0 auto;
+  font-size: 12.5px;
+  color: var(--ui-muted);
+  text-align: center;
+  padding: 2px 0 4px;
+  line-height: 1.4;
+}
+
+/* ---------------------------------------------------------------- install */
+
+.overall-value { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+.stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+.stat {
+  background: var(--ui-bg);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(12px);
+}
+.stat span { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ui-muted); font-weight: 700; }
+.stat strong { display: block; font-size: 14.5px; font-weight: 700; margin-top: 2px; }
+
+.install-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 13px;
+}
+.install-left, .install-right { min-height: 0; display: flex; flex-direction: column; gap: 11px; }
+
+.phase-list, .model-status { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.phase-list li, .model-status li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ui-muted);
+  transition: color 0.3s, opacity 0.3s;
+}
+.phase-list li::before, .model-status li::before {
+  content: "";
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.16);
+  flex: 0 0 auto;
+  transition: background 0.3s, border-color 0.3s;
+}
+.phase-list li.active { color: var(--ui-text); font-weight: 600; }
+.phase-list li.active::before { border-color: var(--coral); box-shadow: inset 0 0 0 3px var(--ui-bg); background: var(--coral); }
+.phase-list li.done::before, .model-status li.done::before { background: var(--ok); border-color: var(--ok); }
+.phase-list li.done::before::after, .model-status li.done::before::after { content: "\2713"; display: block; font-size: 9px; color: #fff; text-align: center; line-height: 12px; }
+.phase-list li.pending { opacity: 0.5; }
+.model-status li span { flex: 1 1 auto; }
+.model-status li em { font-style: normal; font-size: 11px; color: var(--ui-muted); }
+.model-status li.error { color: var(--bad); }
+
+.error-box {
+  background: rgba(192, 80, 63, 0.13);
+  border: 1px solid rgba(192, 80, 63, 0.32);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.error-box[hidden] { display: none; }
+
+/* ------------------------------------------------------------------- game */
+
+.card-game { display: flex; flex-direction: column; gap: 9px; }
+.game-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.game-head h3 { margin: 0 0 2px; }
+.game-head p { margin: 0; font-size: 12px; }
+.game-score { text-align: right; font-size: 11px; color: var(--ui-muted); line-height: 1.4; }
+.game-score strong { color: var(--ui-text); font-size: 14px; font-weight: 700; }
+#dino {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, #cfe9f4, #e8f3e2 62%, #bcd9a8 100%);
+  display: block;
+  touch-action: none;
+}
+body[data-weather="night"] #dino { background: linear-gradient(180deg, #22314a, #2c3f4d 62%, #26402f 100%); }
+.game-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.game-hint { font-size: 11px; color: var(--ui-muted); }
+
+/* ------------------------------------------------------------------ music */
+
+/* Transparent: the world shows through, so only the controls carry a surface. */
+.music {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 0 26px 8px;
+  padding: 4px 6px;
+  width: fit-content;
+  max-width: 460px;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  filter: none;
+}
+.music-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 13px 8px 11px;
+  border-radius: 15px;
+  background: rgba(255, 253, 248, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 6px 20px rgba(20, 30, 28, 0.16);
+  backdrop-filter: blur(9px) saturate(1.1);
+  min-width: 268px;
+}
+body[data-weather="night"] .music-panel,
+body[data-night="true"] .music-panel {
+  background: rgba(18, 28, 44, 0.32);
+  border-color: rgba(226, 232, 240, 0.2);
+}
+
+/* Spinning disc - rotates only while audio is actually playing. */
+.music-disc {
+  position: relative;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #2b2b30 0 22%, transparent 23%),
+    conic-gradient(from 0deg, #3a3a42, #23232a 25%, #3a3a42 50%, #23232a 75%, #3a3a42);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  animation: disc-spin 6s linear infinite;
+  animation-play-state: paused;
+}
+.music.playing .music-disc { animation-play-state: running; }
+.music-disc .disc-groove {
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+.music-disc .disc-label {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 17px; height: 17px;
+  margin: -8.5px 0 0 -8.5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 34%, #f0b48c, var(--coral-deep));
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+.music-disc .disc-arm {
+  position: absolute;
+  right: -3px; top: 1px;
+  width: 17px; height: 2px;
+  border-radius: 2px;
+  background: rgba(245, 245, 240, 0.8);
+  transform: rotate(26deg);
+  transform-origin: right center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+@keyframes disc-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.music-play { background: var(--coral); color: #3a2318; font-size: 12px; }
+.music-row {
+  /* Three transport buttons now (previous / play / skip) share this row with
+     the scrubber, so the gap gives a little back to keep them all on one line. */
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.music-row-sub { gap: 10px; padding-left: 2px; }
+.music-btn {
+  border: 0;
+  background: rgba(0, 0, 0, 0.07);
+  color: var(--ui-text);
+  border-radius: 50%;
+  width: 27px; height: 27px;
+  cursor: pointer;
+  font-size: 10px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  line-height: 1;
+  transition: background 0.18s, transform 0.18s var(--ease), opacity 0.18s;
+}
+.music-btn:hover:not(:disabled) { background: rgba(238, 152, 119, 0.45); transform: scale(1.08); }
+.music-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.music-btn:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.music-play { background: var(--coral); color: #3a2318; font-size: 12px; }
+/* Skip and previous are secondary to play, so they read smaller and quieter. */
+#btn-music-prev, #btn-music-next { width: 23px; height: 23px; font-size: 9px; }
+.music-btn:disabled { opacity: 0.32; cursor: not-allowed; }
+.music.muted .music-play { background: rgba(0, 0, 0, 0.14); color: var(--ui-muted); }
+.music.muted .music-track { opacity: 0.5; font-style: italic; }
+.music.empty { opacity: 0.6; }
+.music-note { color: var(--coral-deep); font-size: 13px; flex: 0 0 auto; }
+.music-track {
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.music-time {
+  font-size: 10.5px;
+  color: var(--ui-muted);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.music-volume { flex: 1 1 auto; min-width: 70px; height: 3px; accent-color: var(--coral); cursor: pointer; }
+.music-count { font-size: 10px; color: var(--ui-muted); font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+
+/* Compact premium player: title/artist stacked above a transport row. */
+.music-head { display: flex; align-items: center; gap: 9px; min-width: 0; margin-bottom: 7px; }
+.music-meta { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.music-artist {
+  font-size: 10.5px;
+  color: var(--ui-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.music-seek { flex: 1 1 auto; min-width: 60px; height: 4px; accent-color: var(--coral); cursor: pointer; }
+.music-seek:disabled { opacity: 0.35; cursor: default; }
+.music-seek:focus-visible { outline: 2px solid var(--coral); outline-offset: 3px; }
+
+.build-marker {
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--ui-muted);
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(41, 73, 70, 0.16);
+  background: rgba(255, 253, 248, 0.72);
+  color: var(--ui-text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 13px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s, border-color 0.18s, transform 0.18s;
+}
+.github-link:hover { background: #fffdf8; border-color: var(--coral); transform: translateY(-1px); }
+.github-link:hover { background: rgba(0, 0, 0, 0.07); color: var(--ui-text); }
+.github-link:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+
+/* -------------------------------------------------------------- statusbar */
+
+.statusbar {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 26px 8px;
+  font-size: 11.5px;
+  color: var(--ui-muted);
+}
+.statusbar-spacer { flex: 1 1 auto; }
+
+/* ------------------------------------------------------------- responsive */
+
+@media (max-width: 1180px) {
+  .models-layout { grid-template-columns: 1fr 232px; }
+}
+#screen-location,
+#screen-install {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  padding-right: 6px;
+}
+#screen-location::-webkit-scrollbar,
+#screen-install::-webkit-scrollbar { width: 9px; }
+#screen-location::-webkit-scrollbar-thumb,
+#screen-install::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); border-radius: 99px; }
+
+@media (max-width: 1000px) {
+  .models-layout { grid-template-columns: 1fr; }
+  .models-side { position: static; }
+  .install-body { grid-template-columns: 1fr; }
+  /* The grid now sizes itself from the available height, so these caps would
+     only fight the layout. */
+  .model-card { min-height: 0; }
+}
+@media (max-height: 720px) {
+  .hero-logo { width: 78px; height: 78px; border-radius: 20px; }
+  .hero-title { font-size: 25px; }
+  .hero-desc { display: none; }
+  .model-card { min-height: 0; }
+  .model-desc { -webkit-line-clamp: 2; line-clamp: 2; }
+  .steps { padding-bottom: 8px; }
+}
+@media (max-height: 640px) {
+  .steps ol { gap: 4px; }
+  .step-name { display: none; }
+  .step { padding: 5px; }
+  .hero-meta, .hero-foot { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* --- Progress character ------------------------------------------------- */
+.bar-track { position: relative; overflow: visible; }
+.builder {
+  position: absolute;
+  left: 0; top: 50%;
+  width: 26px; height: 30px;
+  margin-left: -13px;
+  margin-top: -26px;
+  pointer-events: none;
+  z-index: 2;
+  transition: left 0.55s cubic-bezier(0.33, 1, 0.68, 1);
+}
+.builder-shadow {
+  position: absolute; left: 3px; bottom: -3px;
+  width: 20px; height: 4px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.22);
+}
+.builder-body {
+  position: absolute; left: 7px; bottom: 1px;
+  width: 12px; height: 15px;
+  border-radius: 3px 3px 2px 2px;
+  background: #6f9c7a;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12);
+}
+.builder-head {
+  position: absolute; left: 9px; bottom: 15px;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: #e8c39a;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.14);
+}
+.builder-arm {
+  position: absolute; left: 15px; bottom: 12px;
+  width: 9px; height: 3px;
+  border-radius: 2px;
+  background: #e8c39a;
+  transform-origin: 0% 50%;
+  animation: builder-swing 1.5s ease-in-out infinite;
+}
+.builder-tool {
+  position: absolute; left: 22px; bottom: 9px;
+  width: 3px; height: 8px;
+  border-radius: 1px;
+  background: #b98a5c;
+  box-shadow: 2px 0 0 -1px #8a6a4a;
+}
+@keyframes builder-swing {
+  0%, 100% { transform: rotate(-24deg); }
+  50% { transform: rotate(20deg); }
+}
+.builder.done .builder-arm { animation: builder-cheer 0.7s ease-in-out 3; }
+.builder.done .builder-tool { background: #e07a5f; }
+@keyframes builder-cheer {
+  0%, 100% { transform: rotate(-40deg); }
+  50% { transform: rotate(46deg); }
+}
+
+/* Explicit daylight (used when the pull string hands control back). */
+body[data-weather="day"] { --sky-a: #cfe6f4; --sky-b: #eaf4f7; --sky-c: #f6efdf; }
+body[data-weather="day"] .sun { opacity: 1; transform: none; }
+body[data-weather="day"] .moon { opacity: 0; }
+body[data-weather="day"] .stars { opacity: 0; }
+body[data-weather="day"] .fireflies { opacity: 0; }
+body[data-weather="day"] .rain { opacity: 0; }
+/* Bats only exist at night; bees are for daylight. */
+.bats { position: absolute; left: 0; right: 0; top: 0; height: 68%; opacity: 0; transition: opacity 1.2s var(--ease); z-index: 1; pointer-events: none; }
+body[data-weather="night"] .bats,
+body[data-night="true"] .bats { opacity: 1; }
+.bat {
+  position: absolute;
+  width: 13px; height: 7px;
+  color: #1d2433;
+}
+.bat::before, .bat::after {
+  content: "";
+  position: absolute; top: 0;
+  width: 8px; height: 6px;
+  background: currentColor;
+  border-radius: 60% 60% 30% 30%;
+}
+.bat::before { left: 0; transform-origin: 100% 50%; animation: bat-flap 0.28s ease-in-out infinite alternate; }
+.bat::after { right: 0; transform-origin: 0% 50%; animation: bat-flap 0.28s ease-in-out infinite alternate-reverse; }
+@keyframes bat-flap {
+  from { transform: rotate(-16deg) scaleY(0.72); }
+  to { transform: rotate(16deg) scaleY(1); }
+}
+
+/* --- First-run welcome popup ----------------------------------------- */
+.popup {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* The titlebar sits above this popup on purpose (z-index 100) so the window
+     controls stay reachable while a modal is open. That drag region swallows
+     any click that lands in the top 44px, so the card must be kept clear of it:
+     with only 24px of padding the action row could reach the titlebar band and
+     the confirm button became unclickable. 68px clears the titlebar and leaves
+     the card centred in the space below it. */
+  padding: 68px 24px 24px;
+}
+.popup[hidden] { display: none; }
+.popup-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(32, 22, 18, 0.44);
+  backdrop-filter: blur(4px);
+  animation: popup-fade 0.34s var(--ease);
+}
+.popup-card {
+  position: relative;
+  width: min(520px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 30px 32px 26px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #fffdf8 0%, #fff6ec 100%);
+  box-shadow: 0 30px 80px rgba(48, 28, 20, 0.36), 0 2px 0 rgba(255, 255, 255, 0.8) inset;
+  text-align: center;
+  animation: popup-rise 0.44s var(--ease);
+}
+body[data-weather="night"] .popup-card {
+  background: linear-gradient(180deg, #1e2a3f 0%, #26364f 100%);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), 0 2px 0 rgba(255, 255, 255, 0.06) inset;
+}
+.popup-glow {
+  position: absolute;
+  left: 50%; top: -70px;
+  width: 280px; height: 200px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 50%, rgba(255, 200, 140, 0.4), transparent 68%);
+  pointer-events: none;
+}
+.popup-logo {
+  width: 66px; height: 66px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 8px 22px rgba(120, 70, 45, 0.3);
+}
+.popup-title {
+  margin: 14px 0 8px;
+  font-size: 22px;
+  font-weight: 680;
+  letter-spacing: -0.01em;
+}
+.popup-body {
+  margin: 0 0 16px;
+  color: var(--ui-muted);
+  font-size: 13.8px;
+  line-height: 1.62;
+}
+.popup-points {
+  list-style: none;
+  margin: 0 0 22px;
+  padding: 0;
+  display: grid;
+  gap: 9px;
+  text-align: left;
+}
+.popup-points li {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 13px;
+  border-radius: 12px;
+  background: rgba(238, 152, 119, 0.1);
+  border: 1px solid rgba(238, 152, 119, 0.2);
+  font-size: 13px;
+  line-height: 1.4;
+}
+body[data-weather="night"] .popup-points li {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.popup-ico { font-size: 16px; line-height: 1; opacity: 0.85; }
+.popup-actions { display: flex; justify-content: center; gap: 10px; }
+.popup-actions .btn { min-width: 210px; }
+
+/* --- Pre-download warning ------------------------------------------------ */
+/* Same card language as the welcome popup so it reads as part of the same
+   product, with an amber cast because it is a heads-up rather than a greeting. */
+.popup-card-warn {
+  width: min(560px, 100%);
+  background: linear-gradient(180deg, #fffdf7 0%, #fff4e2 100%);
+}
+.popup-glow-warn {
+  background: radial-gradient(ellipse at 50% 50%, rgba(244, 178, 92, 0.44), transparent 68%);
+}
+.popup-badge {
+  width: 54px; height: 54px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+}
+.popup-badge-warn {
+  color: #7a4a10;
+  background: radial-gradient(circle at 38% 34%, #ffe6ac, #f0ad4a 72%);
+  box-shadow: 0 0 0 7px rgba(244, 178, 92, 0.22), 0 8px 20px rgba(180, 120, 40, 0.3);
+}
+.popup-points-warn li {
+  background: rgba(244, 178, 92, 0.13);
+  border-color: rgba(214, 150, 62, 0.26);
+  align-items: flex-start;
+}
+.popup-points-warn .popup-ico {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  font-size: 15px;
+  opacity: 1;
+}
+.popup-points-warn strong { color: #6b3f10; }
+.popup-estimate {
+  margin: 0 0 20px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.045);
+  border: 1px dashed rgba(214, 150, 62, 0.4);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #6b5540;
+}
+.popup-estimate:empty { display: none; }
+
+/* --- Sun / night explainer inside the welcome popup ---------------------- */
+/* A literal sun -> moon demonstration, because the control is a picture in the
+   sky and the first-run popup is the only place to say what it does. */
+.popup-sky-demo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(120, 186, 232, 0.16), rgba(58, 74, 122, 0.2));
+  border: 1px solid rgba(90, 120, 180, 0.26);
+}
+.demo-sun, .demo-moon {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.demo-sun {
+  background: radial-gradient(circle at 38% 34%, #ffe6a3, #f4a93c 70%);
+  box-shadow: 0 0 12px 3px rgba(244, 169, 60, 0.55);
+  animation: demo-sun-pulse 2.6s ease-in-out infinite;
+}
+.demo-moon {
+  background: radial-gradient(circle at 38% 34%, #f6f3e6, #c3cddc 72%);
+  box-shadow: 0 0 12px 3px rgba(196, 210, 232, 0.45);
+  animation: demo-moon-pulse 2.6s ease-in-out infinite;
+  animation-delay: 1.3s;
+}
+@keyframes demo-sun-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.12); }
+}
+@keyframes demo-moon-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.12); }
+}
+.demo-arrow { font-size: 17px; color: #6a7fa8; flex: 0 0 auto; }
+.popup-sky-text {
+  flex: 1 1 190px;
+  margin: 0;
+  text-align: left;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #4a5570;
+}
+.popup-sky-text strong { color: #33405e; }
+
+@keyframes popup-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes popup-rise {
+  from { opacity: 0; transform: translateY(18px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .popup-scrim, .popup-card { animation: none; }
+}

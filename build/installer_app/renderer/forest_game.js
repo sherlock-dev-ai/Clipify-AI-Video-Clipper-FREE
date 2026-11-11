@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 // Compact woodland runner. It owns one RAF loop only while visible and playing;
 // the installer engine has no dependency on this optional activity.
@@ -41,6 +41,7 @@
       this.onPointer = () => {
         this.canvas.focus({ preventScroll: true });
         if (this.state === 'playing') this.jump();
+        else if (this.state === 'gameover') this.restart();
       };
       this.bound = false;
       this.resize();
@@ -315,11 +316,13 @@
           continue;
         }
         let obstacleTop = this.groundY - obstacle.height;
+        let obstacleBottom = this.groundY;
         if (obstacle.type === 'branch' && !obstacle.landed) {
           if (!obstacle.falling) continue;
           obstacleTop = obstacle.fallY;
+          obstacleBottom = obstacleTop + obstacle.height;
         }
-        if (playerFeet > obstacleTop + 5 && playerTop < this.groundY) return true;
+        if (playerFeet > obstacleTop + 4 && playerTop < obstacleBottom - 4) return true;
       }
       return false;
     }
@@ -362,11 +365,14 @@
       for (let layer = 0; layer < 3; layer += 1) {
         const factor = [0.12, 0.28, 0.52][layer];
         const spacing = [88, 112, 144][layer];
-        const drift = (this.backgroundOffset * factor) % spacing;
+        const baseOffset = this.backgroundOffset * factor;
+        const drift = baseOffset % spacing;
+        const baseCol = Math.floor(baseOffset / spacing);
         for (let index = -1; index < width / spacing + 2; index += 1) {
+          const col = baseCol + index;
           const x = index * spacing - drift + (layer * 21);
-          const treeHeight = height * ([0.38, 0.53, 0.68][layer]) * (0.86 + ((index * 13 + layer * 7) % 9) / 42);
-          this.drawTree(ctx, x, ground - [48, 15, -5][layer], treeHeight, [0.50, 0.72, 1][layer], layer, index);
+          const treeHeight = height * ([0.38, 0.53, 0.68][layer]) * (0.86 + ((Math.abs(col * 13 + layer * 7)) % 9) / 42);
+          this.drawTree(ctx, x, ground - [48, 15, -5][layer], treeHeight, [0.50, 0.72, 1][layer], layer, col);
         }
       }
 
@@ -398,9 +404,51 @@
 
       for (const obstacle of this.obstacles) this.drawObstacle(ctx, obstacle);
       this.drawFirefly(ctx);
+      if (this.state === 'gameover') {
+        this.drawGameOver(ctx, width, height);
+      }
     }
 
-    drawTree(ctx, x, base, height, scale, layer, index) {
+    drawGameOver(ctx, width, height) {
+      const night = document.body.dataset.theme === 'night';
+      ctx.save();
+      ctx.fillStyle = night ? 'rgba(10, 18, 15, 0.78)' : 'rgba(28, 38, 30, 0.72)';
+      ctx.fillRect(0, 0, width, height);
+
+      const cardW = Math.min(340, width - 40);
+      const cardH = 150;
+      const cardX = (width - cardW) / 2;
+      const cardY = (height - cardH) / 2;
+      ctx.fillStyle = night ? '#1a2c24' : '#2d4034';
+      ctx.strokeStyle = night ? '#355444' : '#4d6956';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(cardX, cardY, cardW, cardH, 16);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 20px "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Game Over', width / 2, cardY + 32);
+
+      ctx.font = '14px "Segoe UI", system-ui, sans-serif';
+      ctx.fillStyle = night ? '#a3c2af' : '#b8d4c2';
+      ctx.fillText(`Score: ${this.score}   ·   Best: ${this.best}`, width / 2, cardY + 68);
+
+      ctx.fillStyle = night ? '#2a4437' : '#3d5646';
+      ctx.beginPath();
+      ctx.roundRect(width / 2 - 100, cardY + 95, 200, 34, 17);
+      ctx.fill();
+      ctx.fillStyle = '#e8bf78';
+      ctx.font = 'bold 13px "Segoe UI", system-ui, sans-serif';
+      ctx.fillText('↻  Click or Space to Retry', width / 2, cardY + 112);
+
+      ctx.restore();
+    }
+
+    drawTree(ctx, x, base, height, scale, layer, worldIndex) {
       const night = document.body.dataset.theme === 'night';
       const trunkWidth = Math.max(3, height * 0.085);
       const trunk = ['#314a3d', '#293e31', '#1e3228'][layer];
@@ -422,7 +470,7 @@
       const canopyColors = night ? ['#142d25', '#1b3b2e', '#244536'] : ['#2d5140', '#3e6549', '#56734d'];
       const canopyY = base - height * .83;
       for (let blob = 0; blob < 8; blob += 1) {
-        const seed = Math.abs((index + 4) * 17 + blob * 11 + layer * 29);
+        const seed = Math.abs((worldIndex + 4) * 17 + blob * 11 + layer * 29);
         const bx = x + Math.sin(seed * 2.13) * height * .25;
         const by = canopyY + Math.cos(seed * 1.37) * height * .16;
         const rx = height * (.13 + (seed % 4) * .018);

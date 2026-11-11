@@ -54,3 +54,23 @@ build_test/main_dist/
 # FFmpeg source archives and embeddable interpreter (downloaded, not shipped)
 tools/*.zip
 tools/python310/
+tools/ffmpeg/
+
+# Node modules & Electron build artifacts
+node_modules/
+build/installer_app/node_modules/
+build/installer_app/out/
+build/installer_app/build/
+build/installer_app/resources/payload/
+build/installer_app/resources/.payload-stage*
+
+# Large media downloads & installer binaries (packaged via releases)
+installer/
+narrate download/
+narrate clips/
+qa/qa-live-20261008/
+*.mp4
+!website/*.mp4
+*.exe
+
+

@@ -311,7 +311,25 @@ def normalize_ollama_base_url(value: Optional[str]) -> str:
 
 OLLAMA_BASE_URL = normalize_ollama_base_url(os.getenv("OLLAMA_URL"))
 OLLAMA_URL = f"{OLLAMA_BASE_URL}/api/chat"
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:14b")
+def _resolve_default_model(base_url: str) -> str:
+    env_val = os.getenv("OLLAMA_MODEL")
+    if env_val:
+        return env_val
+    try:
+        req = urllib.request.Request(f"{base_url}/api/tags")
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            installed = [m.get("name", "") for m in data.get("models", [])]
+            for preferred in ("qwen3:8b", "qwen3:14b", "qwen3:4b", "qwen2.5:3b"):
+                if any(m.startswith(preferred) for m in installed):
+                    return preferred
+            if installed:
+                return installed[0].split(":")[0] + ":" + (installed[0].split(":")[1] if ":" in installed[0] else "latest")
+    except Exception:
+        pass
+    return "qwen3:8b"
+
+OLLAMA_MODEL = _resolve_default_model(OLLAMA_BASE_URL)
 CAPTION_FONT = os.getenv("CLIPPEDAI_FONT", "Montserrat Extra Bold")
 CAPTION_FONT_SIZE = int(os.getenv("CLIPPEDAI_FONT_SIZE", "78"))
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "600"))
@@ -2444,6 +2462,101 @@ def trim_leading_trailing_silence_conservative(clip, transcription):
         start_char=clip.start_char,
         end_char=clip.end_char,
     )
+
+
+def _camera_follow_axis(current: float, target: float, deadzone: float = 38.0, unsafe_face: bool = False) -> tuple[float, float]:
+    delta = target - current
+    if not unsafe_face and abs(delta) <= deadzone:
+        return current, 0.0
+    step = delta * 0.50
+    return current + step, step
+
+
+def _camera_track_association_cost(track: dict, detection: dict, dt: float) -> float | None:
+    pred_x = track.get("cx", 0.0) + track.get("velocity_x", 0.0) * dt
+    pred_y = track.get("cy", 0.0) + track.get("velocity_y", 0.0) * dt
+    dx = abs(detection.get("cx", 0.0) - pred_x)
+    dy = abs(detection.get("cy", 0.0) - pred_y)
+    dist = (dx * dx + dy * dy) ** 0.5
+    if dist > 0.06 + track.get("w", 0.1) * 0.4:
+        return None
+    return dist
+
+
+def _camera_challenger_qualifies(
+    current_score: float,
+    challenger_score: float,
+    challenger_visible: int,
+    separation_px: float,
+    score_gap: float = 0.006,
+    min_separation_px: float = 270.0,
+) -> bool:
+    if challenger_score - current_score < score_gap:
+        return False
+    if challenger_visible < 5:
+        return False
+    if separation_px < min_separation_px:
+        return False
+    return True
+
+
+def _camera_face_fits_crop(
+    crop_x: float,
+    crop_w: float,
+    scaled_w: float,
+    face: dict,
+    crop_y: float = 0.0,
+    crop_h: float = 0.0,
+    scaled_h: float = 0.0,
+) -> bool:
+    w = face.get("w", 0.1)
+    face_left = (face.get("cx", 0.5) - w / 2.0) * scaled_w
+    face_right = (face.get("cx", 0.5) + w / 2.0) * scaled_w
+    margin_x = max(40.0, crop_w * 0.04)
+    if face_left - crop_x < margin_x or (crop_x + crop_w) - face_right < margin_x:
+        return False
+    if crop_h > 0 and scaled_h > 0 and "cy" in face and "h" in face:
+        h = face.get("h", 0.1)
+        head_top = (face.get("cy", 0.5) - h / 2.0 - h * 0.35) * scaled_h
+        head_bottom = (face.get("cy", 0.5) + h / 2.0) * scaled_h
+        if head_top < crop_y or head_bottom > crop_y + crop_h:
+            return False
+    return True
+
+
+def _camera_face_box_fits_panel(box: list[float] | tuple[float, ...], panel_w: float, panel_h: float) -> bool:
+    x1, y1, x2, y2 = box[:4]
+    margin_x = 30.0
+    if x1 < margin_x or x2 > panel_w - margin_x:
+        return False
+    h = y2 - y1
+    head_top = y1 - h * 0.35
+    if head_top < 0 or y2 > panel_h:
+        return False
+    return True
+
+
+def _camera_split_primary_face_is_safe(detections: list, panel_w: float, panel_h: float) -> bool:
+    if not detections:
+        return False
+    primary = max(detections, key=lambda d: d[1] if isinstance(d, (list, tuple)) and len(d) > 1 else 0.0)
+    box = primary[0] if isinstance(primary, (list, tuple)) else primary
+    return _camera_face_box_fits_panel(box, panel_w, panel_h)
+
+
+def _camera_split_hold_state(current_hold: bool, valid_sample: bool, is_switch: bool) -> bool:
+    if is_switch:
+        return False
+    if valid_sample:
+        return True
+    return current_hold
+
+
+def _split_panel_hold_for_gap(last_seen: float | None, current_time: float) -> bool:
+    if last_seen is None:
+        return False
+    gap = current_time - last_seen
+    return 0.20 <= gap <= 0.60
 
 
 def _detect_person_trajectory(input_path: str, target_w: int, target_h: int,

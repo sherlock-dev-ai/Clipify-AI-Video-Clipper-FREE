@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 /**
  * The actual installation engine.
@@ -273,19 +273,33 @@ class Installer extends EventEmitter {
     this.emit('activity', entry);
   }
 
+  resetByteProgress() {
+    this.bytesDone = 0;
+    this.bytesTotal = 0;
+    this.speedBytes = 0;
+    this.byteSample = null;
+  }
+
   updateByteProgress(done, total) {
     const now = Date.now();
     const nextDone = Math.max(0, Number(done) || 0);
     const nextTotal = Math.max(0, Number(total) || 0);
     const previous = this.byteSample;
-    if (previous && previous.total === nextTotal && nextDone >= previous.done && now > previous.at) {
-      this.speedBytes = ((nextDone - previous.done) / (now - previous.at)) * 1000;
+    if (previous && previous.total === nextTotal && nextDone >= previous.done) {
+      const dt = (now - previous.at) / 1000;
+      if (dt >= 0.15) {
+        const instantSpeed = (nextDone - previous.done) / dt;
+        this.speedBytes = this.speedBytes > 0
+          ? Math.round(this.speedBytes * 0.65 + instantSpeed * 0.35)
+          : Math.round(instantSpeed);
+        this.byteSample = { done: nextDone, total: nextTotal, at: now };
+      }
     } else {
-      this.speedBytes = 0;
+      this.byteSample = { done: nextDone, total: nextTotal, at: now };
+      if (!previous) this.speedBytes = 0;
     }
     this.bytesDone = nextDone;
     this.bytesTotal = nextTotal;
-    this.byteSample = { done: nextDone, total: nextTotal, at: now };
   }
 
   /**
@@ -575,18 +589,52 @@ class Installer extends EventEmitter {
   // --------------------------------------------------------------- download
 
   /**
-   * Streams an HTTPS download to disk, reporting byte progress.
-   * Redirects are followed, and a non-2xx response rejects with a readable
-   * message so the UI can offer a retry instead of appearing to hang.
+   * Streams a download to disk, reporting byte progress.
+   * Supports HTTP/HTTPS, follows redirects, performs automatic retries on network failures,
+   * and verifies downloaded content size.
    */
-  downloadFile(url, destination, onProgress) {
+  async downloadFile(url, destination, onProgress, maxRetries = 3) {
+    const tempFile = `${destination}.tmp`;
+    let attempt = 0;
+    while (attempt < maxRetries) {
+      attempt += 1;
+      this.checkCancelled();
+      try {
+        await this._performDownload(url, tempFile, onProgress);
+        try {
+          if (fs.existsSync(destination)) fs.unlinkSync(destination);
+        } catch {}
+        fs.renameSync(tempFile, destination);
+        return;
+      } catch (err) {
+        try { if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile); } catch {}
+        if (this.cancelled || err.cancelled) throw err;
+        this.log(`download attempt ${attempt} failed: ${err.message}`);
+        if (attempt >= maxRetries) {
+          throw new Error(`Download failed after ${maxRetries} attempts: ${err.message}`);
+        }
+        this.note(`Download interrupted (${err.message}). Retrying (${attempt}/${maxRetries})…`, 'warn');
+        await new Promise((r) => setTimeout(r, attempt * 1500));
+      }
+    }
+  }
+
+  _performDownload(url, destination, onProgress) {
     return new Promise((resolve, reject) => {
       const get = (target, redirectsLeft) => {
         if (this.cancelled) {
           reject(Object.assign(new Error('Installation cancelled'), { cancelled: true }));
           return;
         }
-        const request = https.get(
+        let parsedUrl;
+        try {
+          parsedUrl = new URL(target);
+        } catch (e) {
+          reject(new Error(`Invalid download URL: ${target}`));
+          return;
+        }
+        const transport = parsedUrl.protocol === 'http:' ? http : https;
+        const request = transport.get(
           target,
           { headers: { 'User-Agent': 'ClipifyAI-Setup/2.0' } },
           (response) => {
@@ -614,13 +662,19 @@ class Installer extends EventEmitter {
             });
             response.pipe(out);
             out.on('finish', () => {
-              out.close(() => resolve(total));
+              out.close(() => {
+                if (total > 0 && done < total) {
+                  reject(new Error(`Download truncated: expected ${total} bytes, received ${done}`));
+                } else {
+                  resolve(total || done);
+                }
+              });
             });
             out.on('error', reject);
           }
         );
         request.on('error', reject);
-        request.setTimeout(60000, () => request.destroy(new Error('download timed out')));
+        request.setTimeout(90000, () => request.destroy(new Error('download timed out')));
       };
       get(url, 5);
     });
@@ -756,6 +810,7 @@ class Installer extends EventEmitter {
         this.emitProgress();
       });
 
+      this.resetByteProgress();
       await fs.promises.mkdir(unpackDir, { recursive: true });
       this.note('Unpacking the Python engine into an isolated staging folder', 'info');
       this.updatePhase(id, 80, 'Unpacking Python engine');
@@ -1276,6 +1331,7 @@ class Installer extends EventEmitter {
         this.throttledNote('ollama-dl', `Ollama installer ${Math.round((done / Math.max(total, 1)) * 100)}%`, 'download', 900);
         this.emitProgress();
       });
+      this.resetByteProgress();
       this.note('Running the Ollama installer', 'info');
       this.updatePhase(id, 55, 'Installing Ollama');
       this.emitProgress();
@@ -1555,8 +1611,7 @@ class Installer extends EventEmitter {
     }
 
     this.activeItem = '';
-    this.bytesDone = 0;
-    this.bytesTotal = 0;
+    this.resetByteProgress();
     const failed = this.models.filter((m) => m.status === 'failed');
     if (failed.length > 0) {
       this.finishPhase(id, 'error', `${failed.length} model(s) failed`);

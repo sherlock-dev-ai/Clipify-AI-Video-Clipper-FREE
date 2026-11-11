@@ -1,0 +1,92 @@
+{
+  "name": "clipify-ai-setup",
+  "productName": "Clipify AI Setup",
+  "version": "2.0.0",
+  "description": "Clipify AI installer - your local AI-powered clipping workspace",
+  "author": "sherlock-dev-ai",
+  "license": "MIT",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "assets": "python tools/prepare_assets.py",
+    "start": "electron .",
+    "dist": "electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "electron": "^44.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "dev.sherlock.clipifyai.setup",
+    "productName": "Clipify AI Setup",
+    "copyright": "Copyright (c) sherlock-dev-ai",
+    "directories": {
+      "output": "out",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "lib/**/*.js",
+      "renderer/**/*",
+      "package.json"
+    ],
+  "extraResources": [
+    {
+      "from": "resources/catalog.json",
+      "to": "catalog.json"
+    },
+    {
+      "from": "build/icon.ico",
+      "to": "icon.ico"
+    },
+    {
+      "from": "resources/payload",
+        "to": "payload",
+        "filter": [
+          "**/*",
+          "!**/*.pdb",
+          "!**/*.log"
+        ]
+      },
+      {
+        "from": "resources/music",
+        "to": "music",
+        "filter": [
+          "**/*.mp3"
+        ]
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "artifactName": "Clipify AI Setup.exe",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "artifactName": "Clipify AI Setup.exe",
+      "unicode": true,
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "allowElevation": true,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": false,
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
+    },
+    "compression": "maximum",
+    "asar": true
+  },
+  "allowScripts": {
+    "electron@44.5.1": true
+  }
+}

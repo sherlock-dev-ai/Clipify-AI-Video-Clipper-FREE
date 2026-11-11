@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import os
@@ -517,14 +517,17 @@ def _yt_dlp_command() -> list[str] | None:
     binary = shutil.which("yt-dlp") or shutil.which("yt-dlp.exe")
     if binary:
         return [binary]
-    try:
-        import yt_dlp  # noqa: F401
-    except ImportError:
-        return None
     runtime = runtime_python()
     if runtime is not None:
+        runtime_scripts_exe = runtime.parent / "yt-dlp.exe"
+        if runtime_scripts_exe.is_file():
+            return [str(runtime_scripts_exe)]
         return [str(runtime), "-m", "yt_dlp"]
-    return [sys.executable, "-m", "yt_dlp"]
+    try:
+        import yt_dlp  # noqa: F401
+        return [sys.executable, "-m", "yt_dlp"]
+    except ImportError:
+        return None
 
 
 
@@ -861,6 +864,28 @@ def narrate_videos():
         "folder": str(NARRATE.default_library()),
         "folders": [str(folder) for folder in folders],
         "is_custom": NARRATE.has_custom_library(),
+        "extra_clips_available": NARRATE.has_extra_clips(),
+        "extra_clips_enabled": NARRATE.extra_clips_enabled(),
+        "extra_clips_count": NARRATE.extra_clips_count(),
+    })
+
+
+@app.post("/api/narrate/extra-clips")
+def narrate_toggle_extra_clips():
+    """Enable or disable the extra background clips (narrate download)."""
+    data = request.get_json(silent=True) or {}
+    enable = bool(data.get("enable", True))
+    enabled = NARRATE.set_extra_clips_enabled(enable)
+    videos = NARRATE.scan_videos()
+    folders = NARRATE.library_folders()
+    return jsonify({
+        "ok": True,
+        "extra_clips_available": NARRATE.has_extra_clips(),
+        "extra_clips_enabled": enabled,
+        "extra_clips_count": NARRATE.extra_clips_count(),
+        "count": len(videos),
+        "videos": videos,
+        "folders": [str(folder) for folder in folders],
     })
 
 

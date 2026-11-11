@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Clipify AI</title><link rel="icon" type="image/png" href="{{ url_for('static', filename='icon.png', v='20261018-3') }}"><link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20261018-3') }}"><link rel="stylesheet" href="{{ url_for('static', filename='studio.css', v='20260922-3') }}">
+</head>
+<body>
+<div class="aurora aurora-one"></div><div class="aurora aurora-two"></div><div class="aurora aurora-three"></div><div class="noise"></div>
+<aside class="sidebar">
+  <div class="brand">
+    <img class="brand-mark" src="{{ url_for('static', filename='icon.png', v='20261018-3') }}" alt="" aria-hidden="true">
+    <div class="brand-copy"><b>Clipify AI</b><span>SHORT STUDIO</span></div>
+  </div>
+  <a class="sidebar-github" href="https://github.com/sherlock-dev-ai" target="_blank" rel="noopener noreferrer"><span>↗</span> GitHub</a>
+  <nav>
+    <a class="active" href="#create" data-nav="create">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.75 18.25 12 12 20.25 5.75 12 12 3.75Zm0 3.5L8.25 12 12 15.75 15.75 12 12 7.25Z"/></svg>
+      <span>Create</span>
+    </a>
+    <a href="/narrate" class="narrate-nav">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a5 5 0 0 0-5 5v4a5 5 0 0 0 10 0V8a5 5 0 0 0-5-5Zm-2.5 5a2.5 2.5 0 0 1 5 0v4a2.5 2.5 0 0 1-5 0V8ZM4 11h2a6 6 0 0 0 12 0h2a8 8 0 0 1-7 7.94V21h-2v-2.06A8 8 0 0 1 4 11Z"/></svg>
+      <span>Narrate</span>
+    </a>
+    <a href="#projects" data-nav="projects">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-9Zm2.5-.5a.5.5 0 0 0-.5.5v9c0 .28.22.5.5.5h11a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-11Zm2 2.5h7v2h-7v-2Zm0 4h7v2h-7v-2Z"/></svg>
+      <span>Projects</span>
+    </a>
+    <a href="#editor" data-nav="editor">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5 14.5 8l2.5 2.5L8.5 19H6v-2.5Zm9.7-10.8 2.1 2.1a1 1 0 0 1 0 1.4l-1.1 1.1-3.5-3.5 1.1-1.1a1 1 0 0 1 1.4 0Z"/></svg>
+      <span>Editor</span>
+    </a>
+    <a href="#assets" data-nav="assets">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h8a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3Zm0 2a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1H8Zm2 2h4v2h-4V9Zm0 4h4v2h-4v-2Z"/></svg>
+      <span>Assets</span>
+    </a>
+  </nav>
+  <div class="side-spacer"></div>
+  <div class="side-card"><span class="dot" id="healthDot"></span><div class="status-copy"><b>Local AI</b><small id="healthText">Checking Ollama…</small></div></div>
+</aside>
+<main class="main">
+<section id="create" class="page-section">
+  <header class="topbar">
+    <div>
+      <span class="eyebrow">CLIPIFY AI / AI VIDEO WORKSPACE</span>
+      <h1 class="living-title">CREATE<br>A SHORT</h1>
+      <p>Turn long-form footage into polished vertical edits with local AI, smart transcription, and gaming-aware composition.</p>
+    </div>
+    <div class="top-actions"><a class="github-watermark" href="https://github.com/sherlock-dev-ai" target="_blank" rel="noopener noreferrer" aria-label="Open Sherlock Dev AI on GitHub"><span aria-hidden="true">↗</span> GitHub</a><button class="ghost" id="openOutput">Open output</button><div class="status-pill" id="statusPill"><span></span> Checking local services</div></div>
+  </header>
+  <div class="workflow">
+    <div class="workflow-step active"><b>01</b><div><strong>Source</strong><small>Upload</small></div></div>
+    <div class="workflow-step active"><b>02</b><div><strong>Edit</strong><small>Mode + crop</small></div></div>
+    <div class="workflow-step"><b>03</b><div><strong>Generate</strong><small>Render</small></div></div>
+    <div class="workflow-step"><b>04</b><div><strong>Review</strong><small>Publish</small></div></div>
+  </div>
+  <section class="studio-hero">
+    <div class="studio-hero-copy">
+      <span class="hero-chip"><i></i> LOCAL AI STUDIO</span>
+      <h2 class="typewriter-headline" aria-label="From long-form video to a Short worth watching."><span id="typewriterLead">From long-form video to a </span><em id="typewriterFocus">Short worth watching.</em><i class="typewriter-cursor" aria-hidden="true"></i></h2>
+      <p>Qwen finds the moment. WhisperX understands every word. Clipify AI handles the edit, framing, captions and final 9:16 render.</p>
+      <div class="hero-metrics"><span><b>01</b> Find the moment</span><span><b>02</b> Smart framing</span><span><b>03</b> Captions</span><span><b>04</b> Export</span></div>
+    </div>
+    <div class="hero-orbit" aria-hidden="true"><div class="orbit-ring r1"></div><div class="orbit-ring r2"></div><div class="orbit-core">✦</div><span class="orbit-node n1">Q</span><span class="orbit-node n2">W</span><span class="orbit-node n3">9:16</span></div>
+  </section>
+  <div class="editing-mode-strip">
+    <div class="mode-strip-head"><div><span class="kicker">EDITING INTELLIGENCE</span><h2>Choose the way your Short should feel</h2></div><span class="mode-strip-note">AI adapts the edit to your content</span></div>
+    <div class="mode-grid top-mode-grid">{% for key, mode in modes.items() %}<button class="mode-card {% if key == 'viral' %}selected{% endif %}" data-mode="{{ key }}"><span class="mode-icon">{{ mode.icon }}</span><span class="mode-name">{{ mode.name }}</span><span class="mode-desc">{{ mode.description }}</span></button>{% endfor %}</div>
+  </div>
+  <div class="workspace-grid">
+    <div class="left-column">
+      <section class="panel upload-panel">
+        <div class="section-head"><div><span class="kicker">01 · SOURCE</span><h2>Start with a video</h2></div><span class="hint">LOCAL · PRIVATE · YOUR CONTENT</span></div>
+        <div class="source-options">
+          <label class="dropzone" id="dropzone"><input type="file" id="videoInput" accept="video/*" hidden><div class="upload-icon">↑</div><strong>Upload a video</strong><span>Drop it here or <u>browse files</u></span><small>MP4 · MOV · MKV · WEBM</small></label>
+          <div class="source-divider"><span>OR</span></div>
+          <div class="youtube-import"><div class="youtube-mark">▶</div><div><strong>Paste a YouTube link</strong><span>Download a video you have permission to use.</span></div><div class="youtube-input-row"><input id="youtubeUrl" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=…"><button class="ghost" type="button" id="youtubeImport">Import video</button></div><small id="youtubeStatus" class="source-status" aria-live="polite"></small><div class="youtube-progress" id="youtubeProgress" hidden><div class="youtube-progress-track"><div class="youtube-progress-bar" id="youtubeProgressBar"></div></div></div></div>
+        </div>
+        <div class="file-chip source-chip" id="fileChip" hidden><span>◉</span><b id="fileName"></b><i id="fileSize"></i></div>
+      </section>
+      <section class="panel settings-panel">
+        <div class="section-head"><div><span class="kicker">02</span><h2>AI & Generation Settings</h2></div><span class="hint">Local editorial control</span></div>
+        <div class="control-grid three"><label class="model-field"><span>AI model</span><div class="model-picker"><select id="modelSelect" disabled><option>Checking local models…</option></select><button type="button" class="mini-refresh" id="refreshModelsBtn" aria-label="Refresh available models">↻</button></div></label><label>Caption font<select id="fontSelect"><option selected>Montserrat Extra Bold</option><option>Arial</option><option>Arial Black</option><option>Segoe UI</option><option>Segoe UI Black</option><option>Impact</option><option>Tahoma</option><option>Trebuchet MS</option><option>Verdana</option><option>Calibri</option><option>Aptos</option><option>Comic Sans MS</option><option>Georgia</option></select></label><label>Number of Shorts<select id="clips"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option></select></label></div>
+        <p class="field-error" id="modelError" role="alert" hidden></p>
+        <div class="duration-row"><label>Min length<select id="minDuration"><option selected>25</option><option>30</option><option>35</option><option>40</option><option>45</option><option>50</option><option>55</option><option>60</option></select></label><label>Max length<select id="maxDuration"><option>25</option><option>30</option><option>35</option><option>40</option><option>45</option><option>50</option><option>55</option><option selected>60</option></select></label></div>
+        <div class="duration-note" id="durationNote">Recommended: 25–60 seconds. Qwen can refine boundaries inside candidates.</div>
+        <div class="split-toggle-row">
+          <label class="toggle-row"><input type="checkbox" id="splitScreenToggle"><span class="switch"></span><b>Enable 2-panel split screen</b></label>
+          <small>Creates a cinematic two-frame composition before render.</small>
+        </div>
+      </section>
+      <section class="panel branding-panel">
+        <div class="section-head"><div><span class="kicker">03</span><h2>Watermark & Branding</h2></div><span class="optional">OPTIONAL</span></div>
+        <div class="brand-grid">
+          <div class="brand-controls">
+            <label class="toggle-row"><input type="checkbox" id="logoEnabled"><span class="switch"></span><b>Enable Logo / Watermark</b></label>
+            <div class="logo-upload-row"><label class="upload-logo-button"><input type="file" id="logoInput" accept="image/png,image/jpeg,image/webp" hidden><span>＋ Upload logo</span></label><button class="ghost" type="button" id="clearLogo">Remove</button></div>
+            <label>Logo image / folder<input id="logoPath" value="" placeholder="Uploaded logo or local folder path"></label>
+            <div class="two"><label>Position<select id="logoPosition">{% for p in ['top-left','top-center','top-right','center-left','center','center-right','bottom-left','bottom-center','bottom-right'] %}<option value="{{p}}">{{p|replace('-',' ')|title}}</option>{% endfor %}<option value="custom">Custom / Drag in Preview</option></select></label><label>Margin<input id="logoMargin" type="number" min="5" max="200" value="40"></label></div>
+            <div class="slider-row"><label>Logo size <output id="logoSizeOut">8%</output></label><input id="logoSize" type="range" min="3" max="20" value="8"></div>
+            <div class="slider-row"><label>Opacity <output id="logoOpacityOut">80%</output></label><input id="logoOpacity" type="range" min="10" max="100" value="80"></div>
+            <label class="toggle-row compact"><input type="checkbox" id="logoBgRemove"><span class="switch"></span><b>Remove solid logo background</b></label>
+            <div class="two"><label>Background color<input id="logoBgColor" type="color" value="#9B5CFF"></label><label>Key tolerance<input id="logoBgSimilarity" type="number" min="0.01" max="0.8" step="0.01" value="0.22"></label></div>
+            <small class="control-help">Use this for a logo with a flat/solid background. Transparent PNGs need no removal.</small>
+          </div>
+          <div class="logo-card"><div class="logo-preview">C</div><small>Small, subtle and positioned over the final 1080×1920 render.</small></div>
+        </div>
+      </section>
+      <section class="panel text-panel">
+        <div class="section-head"><div><span class="kicker">04</span><h2>Text Overlay</h2></div><span class="optional">OPTIONAL</span></div>
+        <label class="toggle-row"><input type="checkbox" id="textEnabled"><span class="switch"></span><b>Enable Text Overlay</b></label>
+        <div class="text-grid">
+          <label>Text<textarea id="overlayText" maxlength="100" placeholder="e.g. THAT'S CRAZY!"></textarea></label>
+          <div class="text-controls"><label>Position<select id="textPosition">{% for p in ['top-left','top-center','top-right','center-left','center','center-right','bottom-left','bottom-center','bottom-right'] %}<option value="{{p}}">{{p|replace('-',' ')|title}}</option>{% endfor %}<option value="custom">Custom / Drag in Preview</option></select></label><label>Size<input id="textSize" type="number" min="3" max="12" value="6"> %</label><label>Margin<input id="textMargin" type="number" min="20" max="500" value="110"> px</label></div>
+        </div>
+        <div class="text-style-row"><label>Text color<input id="textColor" type="color" value="#FFFFFF"></label><label class="toggle-row compact"><input type="checkbox" id="textBgEnabled" checked><span class="switch"></span><b>Background</b></label><label>BG color<input id="textBgColor" type="color" value="#000000"></label><div class="slider-row"><label>BG opacity <output id="textBgOpacityOut">65%</output></label><input id="textBgOpacity" type="range" min="0" max="100" value="65"></div></div>
+      </section>
+      <button class="primary big" id="createBtn" disabled><span>Generate Shorts</span><b>→</b></button>
+    </div>
+    <aside class="preview-column">
+      <section class="panel preview-panel"><div class="preview-head"><div><span class="kicker">PREVIEW</span><h2>Output preview</h2></div><span class="format-pill">1080 × 1920 · 9:16</span></div><div class="preview-frame" id="previewFrame"><video id="sourcePreview" controls muted playsinline hidden></video><div class="preview-placeholder"><span>9:16</span><b>Your Short preview</b><small>Upload a video, then drag the logo/text.</small></div><div class="preview-logo draggable-overlay" id="previewLogo"><img id="previewLogoImg" alt="Logo preview"></div><div class="preview-text draggable-overlay" id="previewText">Your text</div><div class="drag-hint">Drag logo or text to position</div></div><div class="preview-meta" id="previewMeta">Upload a video to preview the source. Branding previews update instantly.</div><div class="preview-actions"><button class="ghost" id="previewReview">Open Editor</button><button class="ghost" id="openOutput2">Open Output</button></div></section>
+    </aside>
+  </div>
+  <section class="panel progress-panel" id="progressPanel" data-state="idle" hidden>
+    <div class="progress-top"><div><span class="kicker">GENERATE</span><h2 id="progressTitle">Processing locally</h2></div><strong id="progressPercent">0%</strong></div>
+    <div class="progress-track"><div class="progress-bar" id="progressBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>
+    <div class="stage-row"><div class="stage-icon" id="stageIcon" aria-hidden="true">&#9711;</div><div><b id="stageText">Preparing&#8230;</b><small id="subStage">Clipify AI is working locally</small></div><span class="live" id="progressStatus">LIVE</span></div>
+    <div class="steps" aria-label="Pipeline progress">
+      <div data-step="transcribe" data-state="pending"><span class="step-indicator" aria-hidden="true">&#183;</span>Transcribe</div>
+      <div data-step="analyze" data-state="pending"><span class="step-indicator" aria-hidden="true">&#183;</span>AI analyze</div>
+      <div data-step="edit" data-state="pending"><span class="step-indicator" aria-hidden="true">&#183;</span>Smart edit</div>
+      <div data-step="caption" data-state="pending"><span class="step-indicator" aria-hidden="true">&#183;</span>Captions</div>
+      <div data-step="render" data-state="pending"><span class="step-indicator" aria-hidden="true">&#183;</span>Render</div>
+    </div>
+    <details class="logs"><summary>Processing log</summary><pre id="log"></pre></details>
+  </section>
+  <section class="results" id="results" hidden>
+    <div class="results-head"><div><span class="kicker">OUTPUT · READY TO WATCH</span><h2>Your finished Shorts</h2><p class="results-subtitle">Your best render is ready below. Play it here, review it, or download it.</p></div><button class="ghost" id="newBtn">＋ New video</button></div>
+    <article class="featured-result panel" id="featuredResult" hidden>
+      <div class="featured-video-shell"><video id="featuredVideo" controls playsinline preload="metadata"></video><div class="featured-badge">✓ FINISHED SHORT</div></div>
+      <div class="featured-copy"><span class="kicker">JUST GENERATED</span><h3 id="featuredTitle">Your Short is ready</h3><p id="featuredMeta">1080 × 1920 · captions · local AI</p><div class="featured-actions"><button class="primary" id="featuredReview"><span>Open in Editor</span><b>→</b></button><a class="ghost" id="featuredDownload" href="#" download>Download ↓</a></div></div>
+    </article>
+    <div class="result-grid" id="resultGrid"></div>
+  </section>
+</section>
+
+<section id="projects" class="page-section secondary-section"><header class="section-page-head"><div><span class="eyebrow">WORKSPACE</span><h1>Projects</h1><p>Local projects survive browser refreshes because they are read from the jobs folder.</p></div><button class="ghost" id="refreshProjects">↻ Refresh</button></header><div class="project-grid" id="projectList"><div class="empty-state">Loading projects…</div></div><section class="restore-section"><div class="section-page-head compact-head"><div><span class="eyebrow">RECOVERY</span><h2>Recently deleted</h2></div><button class="ghost" id="refreshTrash">↻ Refresh</button></div><div class="trash-list" id="trashList"><div class="empty-state">No deleted projects.</div></div></section></section>
+<section id="editor" class="page-section secondary-section"><header class="section-page-head"><div><span class="eyebrow">REVIEW & EDITOR</span><h1>Editor</h1><p>Brand a finished Short locally without rerunning WhisperX, ClipsAI or Qwen. Drag overlays directly on the video.</p></div></header><div class="editor-layout"><div class="panel editor-video"><div class="editor-preview-frame" id="editorPreviewFrame"><video id="reviewVideo" controls playsinline hidden></video><div id="reviewVideoStatus" class="review-video-status" role="status" aria-live="polite" hidden><span id="reviewVideoSpinner" class="review-video-spinner" aria-hidden="true"></span><span id="reviewVideoStatusText"></span></div><div id="editorLogo" class="editor-overlay editor-logo"><img id="editorLogoImg" alt="Logo"></div><div id="editorText" class="editor-overlay editor-text">Your text</div><div id="editorDragHint">Drag logo/text · changes are applied to the exported edit</div></div><div id="reviewEmpty" class="empty-state">Select a generated Short from Projects or Create.</div></div><div class="panel editor-info"><span class="kicker">POST-RENDER BRANDING</span><h2 id="reviewTitle">No Short selected</h2><p id="reviewMeta">1080 × 1920 · local render</p><div class="editor-metadata" id="editorMetadata" hidden><b id="editorMetaDescription"></b><small id="editorSelectionNote" class="selection-note" hidden></small><div id="editorMetaHashtags"></div><small id="editorMetaTags"></small></div><div class="editor-control-stack"><label class="toggle-row"><input type="checkbox" id="editorLogoEnabled"><span class="switch"></span><b>Logo</b></label><div class="editor-actions"><a class="ghost" id="reviewDownload" href="#" download>Download ↓</a><button class="primary" id="applyEditorBranding" type="button"><span>Apply to Finished Short</span></button></div><label class="upload-logo-button"><input type="file" id="editorLogoInput" accept="image/png,image/jpeg,image/webp" hidden><span>＋ Upload logo</span></label><div class="two"><label>Logo size<input id="editorLogoSize" type="range" min="3" max="20" value="8"></label><label>Opacity<input id="editorLogoOpacity" type="range" min="10" max="100" value="80"></label></div><label class="toggle-row compact"><input type="checkbox" id="editorLogoBgRemove"><span class="switch"></span><b>Remove logo background</b></label><label>BG key color<input id="editorLogoBgColor" type="color" value="#9B5CFF"></label><label class="toggle-row"><input type="checkbox" id="editorTextEnabled"><span class="switch"></span><b>Text</b></label><textarea id="editorTextValue" maxlength="100" placeholder="Text overlay"></textarea><label>Text size<input id="editorTextSize" type="number" min="3" max="12" value="6"></label><label>Text color<input id="editorTextColor" type="color" value="#FFFFFF"></label><label class="toggle-row compact"><input type="checkbox" id="editorTextBg" checked><span class="switch"></span><b>Text background</b></label><label>BG color<input id="editorTextBgColor" type="color" value="#000000"></label><div class="slider-row"><label>BG opacity <output id="editorTextBgOpacityOut">65%</output></label><input id="editorTextBgOpacity" type="range" min="0" max="100" value="65"></div></div><button class="primary big" id="applyEditorBrandingMain" disabled><span>Apply to Finished Short</span><b>→</b></button><a id="reviewDownloadMain" class="download" href="#" hidden download>Download Short ↓</a><button class="ghost full" id="editorToCreate">← Back to Create</button></div></div></section>
+<section id="assets" class="page-section secondary-section"><header class="section-page-head"><div><span class="eyebrow">LOCAL FILES</span><h1>Assets</h1><p>Browse source videos, final Shorts and metadata stored inside each project.</p></div><button class="ghost" id="refreshAssets">↻ Refresh</button></header><div class="asset-toolbar"><select id="assetProject"><option value="">Choose a project</option></select></div><div class="asset-list panel" id="assetList"><div class="empty-state">Choose a project to load assets.</div></div></section>
+<footer>Clipify AI · local AI editing workspace · WhisperX + ClipsAI + Ollama + FFmpeg</footer>
+</main>
+  <script src="{{ url_for('static', filename='pipeline_status.js', v='20261018-1') }}"></script><script src="{{ url_for('static', filename='review_player.js', v='20261013-1') }}"></script><script src="{{ url_for('static', filename='app.js', v='20261018-1') }}"></script>
+</body></html>

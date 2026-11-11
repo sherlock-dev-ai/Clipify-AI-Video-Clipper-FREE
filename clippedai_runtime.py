@@ -158,6 +158,8 @@ def _candidate_runtime_dirs() -> list[Path]:
 
     candidates.append(USER_DATA_DIR / "runtime")
     candidates.append(APP_DIR / "runtime")
+    if Path(r"L:\tester\runtime").is_dir():
+        candidates.append(Path(r"L:\tester\runtime"))
 
     seen: set[str] = set()
     unique: list[Path] = []

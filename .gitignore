@@ -1,5 +1,7 @@
 # Environment variables
 .env
+.env.local
+.env.*.local
 
 # Input directory - ignore all content except placeholder
 input/*
@@ -9,51 +11,108 @@ input/*
 output/*
 !output/.gitkeep
 
-# FFmpeg log
-ffmpeg.log
+# Jobs & user session workspaces
+jobs/
+temp/
+tmp/
+logs/
+*.log
+events.jsonl
+qwen-decisions.jsonl
+short_*.json
+short_*.txt
+extra-clips-enabled.txt
+.install-driver-ok
 
-# Virtual environment
+# Virtual environments & runtime
+runtime/
 env/
 venv/
 .env/
 .venv/
+.Python
 
-# Python
+# Python bytecode & cache
 *.pyc
 __pycache__/
 *.pyo
 *.pyd
 *.pkl
-.Python
 *.so
 .pytest_cache/
 .coverage
 
 # User & local settings
 settings/
+models/
 
-# IDE
+# IDE & Editor
 .vscode/
 .idea/
 *.swp
 *.swo
+.aider*
+.localpilot/
+.kilo/
+.twix/
 
-# OS
+# OS artifacts
 .DS_Store
 Thumbs.db
-.aider*
+desktop.ini
 
-# Build artifacts
+# Build artifacts & caches
 build/dist/
 build/_app_build/
 build/_main_build/
 build/installer/
 build/*.log
 build/stdlib_flags.json
-build_test/dist_test/
-build_test/module_dist/
-build_test/standalone_dist/
-build_test/main_dist/
+build/test-*/
+build/**/nuitka-cache/
+build/narrate-icon-fix-*/
+build/narrate-icon-final-*/
+build/installer-regression-*/
+build/installer-validation-*/
+build/Clipify AI QA*/
+build/baseline-*/
+build/evergreen-*/
+build/final-*/
+build/*-qa-*/
+build/icon-refresh-*/
+build/installer-refresh-*/
+build/fftest/
+build/frames*/
+build/verify/
+build/shots/
+build/HKCU/
+build/qa-*
+build/qa_*/
+build/rename-*
+build/worker_recovery_*
+build/installer-preserved/
+HKCU/
+Microsoft/
+spaces/
+Cache/
+Dictionary/
+Storage/
+Worker/
+*.otf
+*.ttf
+build_test/
+
+# QA test run outputs & recovery (preserve qa/*.py tests)
+qa/qa-live-*/
+qa/qa_evidence/
+qa/worker_recovery_*/
+qa/qa-audit-*/
+qa/evergreen-*/
+qa/installer_acceptance_*/
+dist/
+out/
+*.blockmap
+_merge_archive*/
 
 # FFmpeg source archives and embeddable interpreter (downloaded, not shipped)
 tools/*.zip
@@ -68,13 +127,25 @@ build/installer_app/build/
 build/installer_app/resources/payload/
 build/installer_app/resources/.payload-stage*
 
-# Large media downloads & installer binaries (packaged via releases)
+# Media files, downloads, models & binaries
 installer/
 narrate download/
 narrate clips/
-qa/qa-live-20261008/
+qa/qa-live-*/
+test video/
+test_videos/
 *.mp4
 !website/*.mp4
+*.mp3
+!build/installer_app/resources/music/*.mp3
+*.wav
+*.avi
+*.mkv
+*.mov
 *.exe
-
-
+*.bin
+*.pt
+*.safetensors
+*.onnx
+*.sqlite3
+*.db

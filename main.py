@@ -14,6 +14,13 @@ import socket
 import statistics
 import subprocess
 import sys
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(line_buffering=True)
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(line_buffering=True)
+except Exception:
+    pass
 import string
 import time
 import urllib.error
@@ -25,9 +32,10 @@ from windows_process import install_hidden_subprocess_defaults
 
 warnings.filterwarnings("ignore", message=".*libtorchcodec.*")
 warnings.filterwarnings("ignore", message=".*torchcodec.*")
-warnings.filterwarnings("ignore", module="torchcodec")
-warnings.filterwarnings("ignore", category=UserWarning, module="torchcodec")
-warnings.filterwarnings("ignore", category=UserWarning, module="pyannote.audio.core.io")
+warnings.filterwarnings("ignore", module=".*torchcodec.*")
+warnings.filterwarnings("ignore", module=".*pyannote.*")
+warnings.filterwarnings("ignore", category=UserWarning, module=".*pyannote.*")
+warnings.filterwarnings("ignore", category=UserWarning, module=".*torchcodec.*")
 
 install_hidden_subprocess_defaults()
 
@@ -1152,6 +1160,16 @@ def create_transcriber(model_size: str) -> "Transcriber":
             return original_load_model(*args, **kwargs)
         except Exception as exc:
             err_msg = str(exc).lower()
+            if "out of memory" in err_msg or "failed to allocate" in err_msg or "cuda" in err_msg:
+                print(f"  [WhisperX] Memory error on CUDA ({exc}), retrying with CPU and int8...")
+                kwargs["device"] = "cpu"
+                kwargs["compute_type"] = "int8"
+                kwargs["local_files_only"] = True
+                try:
+                    return original_load_model(*args, **kwargs)
+                except Exception:
+                    pass
+
             is_net_err = "connectionreseterror" in err_msg or "protocolerror" in err_msg or "10054" in err_msg or "connection" in err_msg
             if kwargs.get("local_files_only") and not is_net_err:
                 print(f"  [WhisperX] Local load exception ({exc}), retrying without local_files_only...")

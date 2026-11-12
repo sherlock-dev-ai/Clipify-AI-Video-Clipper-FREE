@@ -440,13 +440,6 @@ ipcMain.handle('setup:launch', async () => {
     return { ok: false, error: `Clipify AI could not be launched: ${error.message}` };
   }
   child.unref();
-  setTimeout(() => {
-    try {
-      shell.openExternal('http://127.0.0.1:5000/');
-    } catch (e) {
-      forward('setup:log', `openExternal failed: ${e.message}`);
-    }
-  }, 2500);
   return { ok: true, launched: exe };
 });
 

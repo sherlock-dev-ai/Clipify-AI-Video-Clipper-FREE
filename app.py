@@ -2394,12 +2394,20 @@ def _open_app_window(host: str, port: int, timeout: float = 40.0) -> None:
             ]
             if profile:
                 args.append(f"--user-data-dir={profile}")
+            si = subprocess.STARTUPINFO()
+            try:
+                import ctypes
+                if ctypes.windll.user32.OpenInputDesktop(0, False, 0x01FF):
+                    si.lpDesktop = r"WinSta0\Default"
+            except Exception:
+                pass
             try:
                 proc = subprocess.Popen(
                     args,
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
+                    startupinfo=si,
                     creationflags=getattr(subprocess, "DETACHED_PROCESS", 0)
                     | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
                 )
@@ -2428,12 +2436,20 @@ def _is_port_in_use(host: str, port: int) -> bool:
 if __name__ == "__main__":
     _host, _port = APP_HOST, APP_PORT
     if _is_port_in_use(_host, _port):
-        # Already running: surface the app in the browser rather than failing on bind
-        try:
-            import webbrowser
-            webbrowser.open(f"http://{_host}:{_port}/")
-        except Exception:
-            pass
+        # Already running: surface the app in a dedicated app window rather than failing on bind
+        browser = _find_app_browser()
+        if browser:
+            si = subprocess.STARTUPINFO()
+            try:
+                import ctypes
+                if ctypes.windll.user32.OpenInputDesktop(0, False, 0x01FF):
+                    si.lpDesktop = r"WinSta0\Default"
+            except Exception:
+                pass
+            try:
+                subprocess.Popen([browser, f"--app=http://{_host}:{_port}/", "--window-size=1440,900"], startupinfo=si)
+            except Exception:
+                pass
         sys.exit(0)
 
     if os.environ.get("CLIPPEDAI_NO_BROWSER", "").strip() not in {"1", "true", "yes"}:

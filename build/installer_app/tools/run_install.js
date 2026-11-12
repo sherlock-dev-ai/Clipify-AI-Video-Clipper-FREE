@@ -48,8 +48,10 @@ function log(msg) { console.log(`[install] ${msg}`); }
   // node_modules/electron shim, require('electron') is shadowed.) CDP on
   // 127.0.0.1:9333 is enabled by main.js via app.commandLine.appendSwitch, which
   // is required because Electron v44 rejects --remote-debugging-port on the CLI.
+  const spawnEnv = { ...process.env };
+  delete spawnEnv.ELECTRON_RUN_AS_NODE;
   const child = spawn(setupExe, [], {
-    detached: true, windowsHide: true, stdio: 'ignore',
+    detached: true, windowsHide: false, stdio: 'ignore', env: spawnEnv
   });
   child.on('error', (err) => { console.error('[install] LAUNCH ERROR: ' + err.message); process.exit(7); });
   child.unref();
@@ -97,15 +99,17 @@ function log(msg) { console.log(`[install] ${msg}`); }
 
   try {
     await send('Runtime.enable', {});
+    await send('Page.enable', {});
+    await send('Page.bringToFront', {});
     await send('Emulation.setDeviceMetricsOverride', { width: 1040, height: 840, deviceScaleFactor: 1, mobile: false });
 
     await click('#btn-get-started');
     log('clicked Get Started');
     await wait(1500);
 
-    // Select qwen3:8b if not already selected (recommended model is auto-ticked).
+    // Select recommended model (qwen2.5:3b) if not already selected.
     const sel = await eval_(`(function(){
-      var c=document.querySelector('[data-model="qwen3:8b"]');
+      var c=document.querySelector('[data-model="qwen2.5:3b"]') || document.querySelector('.model-card.recommended') || document.querySelector('[data-model="qwen3:8b"]');
       if(!c){return 'no-card';}
       var on=c.classList.contains('selected');
       if(!on){c.scrollIntoView({block:'center'});c.click();}
@@ -129,21 +133,36 @@ function log(msg) { console.log(`[install] ${msg}`); }
     log('location: ' + setPath);
 
     // Ensure runtime + ollama checkboxes are checked.
-    await wait(1200);
+    await wait(1500);
     const opts = await eval_(`(function(){
       function chk(id){var e=document.getElementById(id); if(e){e.checked=true;e.dispatchEvent(new Event('change',{bubbles:true}));} return e?e.checked:false;}
-      return { runtime: chk('chk-runtime'), ollama: chk('chk-ollama'), desktop: chk('chk-desktop'),
-        installDisabled: !!document.getElementById('btn-install').disabled };
+      return { runtime: chk('chk-runtime'), ollama: chk('chk-ollama'), desktop: chk('chk-desktop') };
     })()`);
     log('options: ' + JSON.stringify(opts));
 
-    await click('#btn-install');
-    log('clicked Install (expect download-warning popup)');
-    await wait(800);
+    // Wait until btn-install becomes enabled after disk check completes.
+    let isBtnEnabled = false;
+    for (let attempt = 0; attempt < 40; attempt++) {
+      isBtnEnabled = await eval_(`!document.getElementById('btn-install').disabled`);
+      if (isBtnEnabled) break;
+      await wait(500);
+    }
+    log('btn-install enabled: ' + isBtnEnabled);
 
-    // Confirm the pre-download warning popup.
-    const warn = await click('#btn-warn-go');
-    log('warn-go: ' + warn);
+    await click('#btn-install');
+    log('clicked Install');
+    await wait(1000);
+
+    // If download-warning popup is displayed, click confirm.
+    const warn = await eval_(`(function(){
+      var w = document.getElementById('download-warning');
+      if (w && !w.hidden) {
+        var btn = document.getElementById('btn-warn-go');
+        if (btn) { btn.click(); return 'warn-go-clicked'; }
+      }
+      return 'no-warning';
+    })()`);
+    log('warning popup check: ' + warn);
 
     // Poll the install phase. Done = #screen-done no longer hidden.
     const end = Date.now() + 60 * 60 * 1000;

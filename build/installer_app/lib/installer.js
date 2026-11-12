@@ -724,7 +724,12 @@ class Installer extends EventEmitter {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
         const relative = rel ? path.join(rel, entry.name) : entry.name;
-        if (entry.isDirectory()) walk(full, relative);
+        if (entry.name === 'runtime' || entry.name === '__pycache__' || entry.name === '.git') continue;
+        let isDir = entry.isDirectory();
+        if (!isDir && entry.isSymbolicLink()) {
+          try { isDir = fs.statSync(full).isDirectory(); } catch { isDir = false; }
+        }
+        if (isDir) walk(full, relative);
         else files.push({ full, relative });
       }
     };

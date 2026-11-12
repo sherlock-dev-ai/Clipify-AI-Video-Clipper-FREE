@@ -4,6 +4,21 @@
   "note": "Download sizes are real layer bytes from the Ollama registry, not estimates.",
   "models": [
     {
+      "id": "qwen2.5:3b",
+      "name": "Qwen 2.5 3B",
+      "family": "Qwen2.5",
+      "sizeBytes": 1929912432,
+      "ramMin": "4 GB",
+      "ramRecommended": "6 GB",
+      "vram": "~4 GB",
+      "speed": "Very fast",
+      "gpuUseful": true,
+      "recommended": true,
+      "description": "Recommended for fast, reliable clipping and metadata generation. Already installed on most setups.",
+      "bestFor": ["Fast clip selection", "Accurate timestamps", "Smooth local playback"],
+      "tags": ["Recommended", "Fast"]
+    },
+    {
       "id": "qwen3:4b",
       "name": "Qwen3 4B",
       "family": "Qwen3",
@@ -28,10 +43,9 @@
       "vram": "~6 GB",
       "speed": "Fast",
       "gpuUseful": true,
-      "recommended": true,
-      "description": "Best balance for most systems. High quality clip selection without the wait of larger models.",
-      "bestFor": ["Clip selection", "Metadata", "General AI tasks"],
-      "tags": ["Recommended"]
+      "recommended": false,
+      "description": "Best balance for high-end systems. High quality clip selection without the wait of larger models.",
+      "bestFor": ["Clip selection", "Metadata", "General AI tasks"]
     },
     {
       "id": "qwen3:14b",

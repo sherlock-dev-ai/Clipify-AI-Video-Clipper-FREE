@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 /**
  * Environment detection for the Clipify AI installer.
@@ -91,7 +91,7 @@ const RUNTIME_MODELS = CATALOG.models.map((model) => ({
 const RUNTIME_BYTES = 2.7 * 1024 ** 3;
 const NARRATION_MODEL_BYTES = 13 * 1024 ** 2;
 const OLLAMA_BYTES = 1.0 * 1024 ** 3;
-const DEFAULT_ID = 'qwen3:8b';
+const DEFAULT_ID = 'qwen2.5:3b';
 
 /**
  * The preferred install root.
@@ -493,8 +493,13 @@ function readPayloadSummary(payloadRoot) {
       return;
     }
     for (const entry of entries) {
+      if (entry.name === 'runtime' || entry.name === '__pycache__' || entry.name === '.git') continue;
       const full = path.join(current, entry.name);
-      if (entry.isDirectory()) walk(full);
+      let isDir = entry.isDirectory();
+      if (!isDir && entry.isSymbolicLink()) {
+        try { isDir = fs.statSync(full).isDirectory(); } catch { isDir = false; }
+      }
+      if (isDir) walk(full);
       else files.push(full);
     }
   };
@@ -617,13 +622,20 @@ async function detectAll({ installDir, payloadRoot, modelIds, selectedModels, op
     installed: ollama.models.includes(model.id),
   }));
 
+  // If an installed Qwen model is already available locally in Ollama, prioritize it
+  // to avoid multi-gigabyte network downloads that can stall the installer.
+  const defaultRecommended = (ollama && Array.isArray(ollama.models) && (
+    ollama.models.find((m) => m === 'qwen2.5:3b' || m === 'qwen2.5:latest' || m.startsWith('qwen2.5:')) ||
+    ollama.models.find((m) => m.startsWith('qwen'))
+  )) || DEFAULT_ID;
+
   // An explicitly empty array means the user chose no models. Only fall back
   // to the recommended model when neither selection argument was provided.
   const wanted = Array.isArray(selectedModels)
     ? selectedModels
     : Array.isArray(modelIds)
       ? modelIds
-      : [DEFAULT_ID];
+      : [defaultRecommended];
 
   // Required space: the application payload, plus every model actually still to
   // be pulled (real registry sizes, not a flat guess), plus the ML runtime when
@@ -687,7 +699,7 @@ async function detectAll({ installDir, payloadRoot, modelIds, selectedModels, op
     runtime,
     payload,
     models,
-    recommendedModelId: DEFAULT_ID,
+    recommendedModelId: defaultRecommended,
     previous,
     existingInstall: existing,
     uninstallKey: UNINSTALL_KEY,

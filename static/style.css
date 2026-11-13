@@ -891,10 +891,11 @@ label {
 .preview-head { align-items: center; margin-bottom: 14px; }
 .preview-frame, .editor-preview-frame {
   position: relative;
-  width: min(100%, 320px);
+  width: min(100%, 240px);
+  max-height: min(46vh, 400px);
   aspect-ratio: 9 / 16;
   margin: 0 auto;
-  border-radius: 26px;
+  border-radius: 20px;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,0.08);
   background: linear-gradient(180deg, #0d1116, #05080c);
@@ -1041,10 +1042,10 @@ label {
   overflow: hidden;
   background: #02070b;
   border: 1px solid rgba(255,255,255,0.12);
-  width: 230px;
+  width: 220px;
   max-width: 100%;
   aspect-ratio: 9 / 16;
-  max-height: min(52vh, 440px);
+  max-height: min(46vh, 390px);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
 }
 .featured-video-shell video {

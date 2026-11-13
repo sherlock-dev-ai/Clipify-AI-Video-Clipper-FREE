@@ -5178,26 +5178,18 @@ def resize_to_vertical_with_zoom(input_path: str, output_path: str, zoom_factor:
     split_screen = _split_screen_enabled()
 
     if split_screen:
-        # Tier 1: Try dual-person split layout (ideal for interviews/podcasts with 2 speakers)
+        # Tier 1: Try dual-person split layout (one speaker on top, other speaker on bottom)
         try:
             if _compose_dual_person_split(input_path, output_path, target_w, target_h):
                 if _validate_camera_render(input_path, output_path, target_w, target_h):
                     return True
-            print("  [Framing] Dual-person split not applicable; checking solo split layout...")
+            print("  [Framing] Dual-person split not applicable (requires 2 distinct people); falling back to standard framing.")
         except Exception as exc:
-            print(f"  [Framing] Dual split skipped ({type(exc).__name__}: {exc}); checking solo split layout...")
+            print(f"  [Framing] Dual split skipped ({type(exc).__name__}: {exc}); falling back to standard framing.")
 
-        # Tier 2: Try solo split layout (top close-up, bottom contextual scene)
-        try:
-            if _compose_solo_split_layout(input_path, output_path, target_w, target_h):
-                if _validate_camera_render(input_path, output_path, target_w, target_h):
-                    return True
-            print("  [Framing] Solo split not applicable; falling back to standard vertical framing.")
-        except Exception as exc:
-            print(f"  [Framing] Solo split skipped ({type(exc).__name__}: {exc}); falling back to standard vertical framing.")
-
-        # Tier 3: Gracefully fall through to the standard tracked vertical layout below
-        # so clips are ALWAYS generated without crashing the user's pipeline.
+        # If 2 distinct people are not present in this shot, fall through to the
+        # standard non-split framing (which is working 100% fine) rather than duplicating
+        # the same person on both top and bottom panels.
 
     zoom = max(1.0, min(1.15, float(zoom_factor)))
     points, info = _detect_person_trajectory(input_path, target_w, target_h, zoom)

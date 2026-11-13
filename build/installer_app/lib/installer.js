@@ -1886,7 +1886,7 @@ class Installer extends EventEmitter {
     const id = 'verify';
     this.beginPhase(id);
     this.activeTask = 'Verifying Clipify AI';
-    const requiredFiles = [APP_EXE, 'main.exe'];
+    const requiredFiles = [APP_EXE];
     for (const name of requiredFiles) {
       const file = path.join(this.options.installDir, name);
       let stat;
@@ -1898,6 +1898,25 @@ class Installer extends EventEmitter {
         this.finishPhase(id, 'error', `${name} did not pass file verification`);
         throw new Error(`Required application file ${name} failed verification.`);
       }
+    }
+
+    // Verify worker pipeline (accept either main.py or main.exe)
+    const workerPy = path.join(this.options.installDir, 'main.py');
+    const workerExe = path.join(this.options.installDir, 'main.exe');
+    let hasWorker = false;
+    try {
+      const s = await fs.promises.stat(workerPy);
+      if (s.isFile() && s.size > 1024) hasWorker = true;
+    } catch {}
+    if (!hasWorker) {
+      try {
+        const s = await fs.promises.stat(workerExe);
+        if (s.isFile() && s.size > 1024) hasWorker = true;
+      } catch {}
+    }
+    if (!hasWorker) {
+      this.finishPhase(id, 'error', 'main.py / main.exe failed verification');
+      throw new Error('Required application worker file (main.py / main.exe) failed verification.');
     }
     this.updatePhase(id, 35, 'Application files verified');
     this.emitProgress();

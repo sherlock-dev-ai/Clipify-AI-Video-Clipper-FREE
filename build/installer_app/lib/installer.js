@@ -1684,17 +1684,23 @@ class Installer extends EventEmitter {
     this.log(`Start Menu folder prepared: ${startMenu}`);
     this.note(`Preparing the Start Menu folder in ${startMenu}`, 'info');
 
+    const desktopDir = [
+      path.join(os.homedir(), 'OneDrive', 'Desktop'),
+      path.join(os.homedir(), 'Desktop'),
+    ].find((d) => fs.existsSync(d)) || path.join(os.homedir(), 'Desktop');
+
     if (desktopShortcut) {
       this.emit('create-shortcut', {
         applicationType: 'product',
         targetPath: runTarget,
-        shortcutPath: path.join(os.homedir(), 'Desktop', `${APP_SHORTCUT_NAME}.lnk`),
+        shortcutPath: path.join(desktopDir, `${APP_SHORTCUT_NAME}.lnk`),
         iconPath,
         description: APP_SHORTCUT_NAME,
         workingDirectory: target,
       });
       this.note('Creating a desktop shortcut', 'info');
     }
+    // Create shortcut in Start Menu Programs folder
     this.emit('create-shortcut', {
       applicationType: 'product',
       targetPath: runTarget,
@@ -1703,6 +1709,18 @@ class Installer extends EventEmitter {
       description: APP_SHORTCUT_NAME,
       workingDirectory: target,
     });
+    // Also create top-level shortcut in Start Menu\Programs\
+    const topStartMenu = path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs');
+    if (fs.existsSync(topStartMenu)) {
+      this.emit('create-shortcut', {
+        applicationType: 'product',
+        targetPath: runTarget,
+        shortcutPath: path.join(topStartMenu, `${APP_SHORTCUT_NAME}.lnk`),
+        iconPath,
+        description: APP_SHORTCUT_NAME,
+        workingDirectory: target,
+      });
+    }
     this.note('Creating Start Menu shortcuts', 'info');
     this.emit('create-shortcut', {
       applicationType: 'setup',

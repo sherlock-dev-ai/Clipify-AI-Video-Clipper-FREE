@@ -17,6 +17,38 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit, urlunsplit
 from windows_process import clear_ffmpeg_report_environment, install_hidden_subprocess_defaults
 
+import traceback
+def _log_unhandled_exception(exc_type, exc_value, exc_traceback):
+    with open(os.path.join(ROOT, "app_crash.log"), "a", encoding="utf-8") as f:
+        f.write(f"\n--- CRASH AT {datetime.now()} ---\n")
+        traceback.print_exception(exc_type, exc_value, exc_traceback, file=f)
+sys.excepthook = _log_unhandled_exception
+
+# Safeguard against headless GUI runs where stdio handles may be None or invalid
+try:
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8", errors="replace")
+    else:
+        sys.stdout.write("")
+        sys.stdout.flush()
+except Exception:
+    try:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+try:
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w", encoding="utf-8", errors="replace")
+    else:
+        sys.stderr.write("")
+        sys.stderr.flush()
+except Exception:
+    try:
+        sys.stderr = open(os.devnull, "w", encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 warnings.filterwarnings("ignore", message=".*libtorchcodec.*")
 warnings.filterwarnings("ignore", message=".*torchcodec.*")
 warnings.filterwarnings("ignore", module="torchcodec")
@@ -2322,16 +2354,7 @@ def _find_app_browser() -> str:
     import os as _os
 
     candidates: list[str] = []
-    for var in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
-        base = _os.environ.get(var)
-        if not base:
-            continue
-        # Edge is the browser guaranteed on Windows 11 and on any current
-        # Windows 10, and it is the same engine as the WebView2 runtime that
-        # pywebview would use anyway.
-        candidates.append(os.path.join(base, "Microsoft", "Edge", "Application", "msedge.exe"))
-        candidates.append(os.path.join(base, "Microsoft", "Edge", "Application", "msedge.exe"))
-    # Chromium/Chrome, for machines that removed Edge but kept Chrome.
+    # Check Google Chrome first: reliable chromeless --app window without profile lock clashes
     for var in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
         base = _os.environ.get(var)
         if not base:
@@ -2339,6 +2362,12 @@ def _find_app_browser() -> str:
         candidates.extend(
             glob.glob(os.path.join(base, "Google", "Chrome", "Application", "chrome.exe"))
         )
+    # Edge as secondary option
+    for var in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
+        base = _os.environ.get(var)
+        if not base:
+            continue
+        candidates.append(os.path.join(base, "Microsoft", "Edge", "Application", "msedge.exe"))
     for candidate in candidates:
         if candidate and _os.path.isfile(candidate):
             return candidate
@@ -2362,17 +2391,7 @@ def _window_icon() -> str:
 
 
 def _app_window_shortcut(browser: str, url: str, profile: str, extra: str = "") -> str:
-    """Create the launcher shortcut that gives the app window its own icon.
-
-    The window is a Chromium app-mode process, so by default Windows shows
-    Edge's globe for it in the taskbar, the Alt+Tab list and the title bar. A
-    shortcut whose AppUserModelID matches ``--app-id`` makes Windows adopt the
-    shortcut's own icon for the window instead, which is the standard way to
-    brand a Chromium app window. The shortcut is reused, and rebuilt when the
-    arguments change.
-
-    Returns the shortcut path, or an empty string when it could not be made.
-    """
+    """Create the launcher shortcut that gives the app window its own icon."""
     import os as _os
     import subprocess
 
@@ -2381,7 +2400,7 @@ def _app_window_shortcut(browser: str, url: str, profile: str, extra: str = "") 
             _os.environ.get("APPDATA", ""), "Microsoft", "Windows", "Start Menu", "Programs"
         )
         _os.makedirs(programs, exist_ok=True)
-        link = _os.path.join(programs, "Clipify AI.lnk")
+        link = _os.path.join(programs, "Clipify AI App Window.lnk")
     except OSError:
         return ""
 
@@ -2395,9 +2414,6 @@ def _app_window_shortcut(browser: str, url: str, profile: str, extra: str = "") 
     if extra:
         args = f"{extra} {args}"
 
-    # Always rewritten rather than cached: a stale shortcut would keep launching
-    # the old profile or miss a flag, and the COM call is cheap at startup.
-    # WScript.Shell is the only COM API available without extra dependencies.
     script = (
         "$s = New-Object -ComObject WScript.Shell; "
         f"$l = $s.CreateShortcut('{link}'); "
@@ -2450,6 +2466,8 @@ def _open_app_window(host: str, port: int, timeout: float = 40.0) -> None:
             profile = None
 
         browser = _find_app_browser()
+        with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
+            _lf.write(f"[{datetime.now()}] _open_app_window browser={browser}\n")
         opened = False
         if browser:
             args = [
@@ -2459,36 +2477,35 @@ def _open_app_window(host: str, port: int, timeout: float = 40.0) -> None:
                 "--no-default-browser-check",
                 "--no-first-run",
             ]
-            if profile:
+            is_edge = "edge" in os.path.basename(browser).lower()
+            if profile and not is_edge:
                 args.append(f"--user-data-dir={profile}")
-            si = subprocess.STARTUPINFO()
-            try:
-                import ctypes
-                if ctypes.windll.user32.OpenInputDesktop(0, False, 0x01FF):
-                    si.lpDesktop = r"WinSta0\Default"
-            except Exception:
-                pass
             try:
                 proc = subprocess.Popen(
                     args,
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
-                    startupinfo=si,
-                    creationflags=getattr(subprocess, "DETACHED_PROCESS", 0)
-                    | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
                 )
-                time.sleep(0.5)
-                opened = (proc.poll() is None)
-            except Exception:
+                time.sleep(0.6)
+                poll_code = proc.poll()
+                opened = (poll_code is None or poll_code == 0)
+                with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
+                    _lf.write(f"[{datetime.now()}] _open_app_window Popen poll={poll_code} opened={opened}\n")
+            except Exception as _e:
                 opened = False
+                with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
+                    _lf.write(f"[{datetime.now()}] _open_app_window Popen failed: {_e}\n")
 
         if not opened:
             try:
                 import webbrowser
                 webbrowser.open(url)
-            except Exception:
-                pass
+                with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
+                    _lf.write(f"[{datetime.now()}] _open_app_window webbrowser.open fallback used\n")
+            except Exception as _we:
+                with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
+                    _lf.write(f"[{datetime.now()}] _open_app_window webbrowser.open failed: {_we}\n")
 
     threading.Thread(target=wait_then_open, name="clipify-open-window", daemon=True).start()
 
@@ -2502,23 +2519,67 @@ def _is_port_in_use(host: str, port: int) -> bool:
 
 if __name__ == "__main__":
     _host, _port = APP_HOST, APP_PORT
+    with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
+        _lf.write(f"[{datetime.now()}] Startup check: host={_host}, port={_port}\n")
     if _is_port_in_use(_host, _port):
-        # Already running: surface the app in a dedicated app window rather than failing on bind
-        browser = _find_app_browser()
-        if browser:
-            si = subprocess.STARTUPINFO()
-            try:
-                import ctypes
-                if ctypes.windll.user32.OpenInputDesktop(0, False, 0x01FF):
-                    si.lpDesktop = r"WinSta0\Default"
-            except Exception:
-                pass
-            try:
-                subprocess.Popen([browser, f"--app=http://{_host}:{_port}/", "--window-size=1440,900"], startupinfo=si)
-            except Exception:
-                pass
-        sys.exit(0)
+        with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
+            _lf.write(f"[{datetime.now()}] Port {_port} is in use, checking health\n")
+        is_healthy = False
+        try:
+            import urllib.request
+            with urllib.request.urlopen(f"http://{_host}:{_port}/api/health", timeout=1.2) as r:
+                if r.status == 200:
+                    is_healthy = True
+        except Exception as _he:
+            with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
+                _lf.write(f"[{datetime.now()}] Health check failed: {_he}\n")
+            is_healthy = False
 
+        if is_healthy:
+            with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
+                _lf.write(f"[{datetime.now()}] Healthy already running! Opening browser and exiting 0\n")
+            browser = _find_app_browser()
+            if browser:
+                si = subprocess.STARTUPINFO()
+                try:
+                    import ctypes
+                    if ctypes.windll.user32.OpenInputDesktop(0, False, 0x01FF):
+                        si.lpDesktop = r"WinSta0\Default"
+                except Exception:
+                    pass
+                try:
+                    subprocess.Popen([browser, f"--app=http://{_host}:{_port}/", "--window-size=1440,900"], startupinfo=si)
+                except Exception:
+                    import webbrowser
+                    webbrowser.open(f"http://{_host}:{_port}/")
+            else:
+                import webbrowser
+                webbrowser.open(f"http://{_host}:{_port}/")
+            sys.exit(0)
+        else:
+            with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
+                _lf.write(f"[{datetime.now()}] Unhealthy port occupant! Killing stale listener\n")
+            try:
+                import subprocess
+                subprocess.run(
+                    ["powershell", "-NoProfile", "-Command",
+                     f"Get-NetTCPConnection -LocalPort {_port} -ErrorAction SilentlyContinue | ForEach-Object {{ Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }}"],
+                    timeout=5, capture_output=True, check=False
+                )
+                time.sleep(1.0)
+            except Exception:
+                pass
+
+    with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
+        _lf.write(f"[{datetime.now()}] Starting Flask app on {_host}:{_port}\n")
     if os.environ.get("CLIPPEDAI_NO_BROWSER", "").strip() not in {"1", "true", "yes"}:
         _open_app_window(_host, _port)
-    app.run(host=_host, port=_port, debug=False, threaded=True)
+    try:
+        app.run(host=_host, port=_port, debug=False, threaded=True)
+        with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
+            _lf.write(f"[{datetime.now()}] app.run returned cleanly\n")
+    except BaseException as _be:
+        with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
+            _lf.write(f"[{datetime.now()}] app.run exception: {type(_be).__name__}: {_be}\n")
+            import traceback
+            traceback.print_exc(file=_lf)

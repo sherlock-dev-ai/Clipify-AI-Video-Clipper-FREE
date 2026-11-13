@@ -1412,11 +1412,13 @@ class Installer extends EventEmitter {
         }
       }
       if (!exe) {
-        this.finishPhase(id, 'error', 'Ollama could not be installed');
-        throw new Error(
-          `Ollama install failed (exit ${result.code}) — ollama.exe was not found ` +
-          `after ${120}s. Try running OllamaSetup.exe manually, then restart this installer.`
+        this.finishPhase(id, 'done', 'Ollama installation deferred');
+        this.note(
+          'Ollama installation was skipped or timed out. You can install Ollama anytime from ollama.com or directly inside Clipify AI.',
+          'warn'
         );
+        this.emitProgress();
+        return;
       }
     }
 
@@ -1490,8 +1492,11 @@ class Installer extends EventEmitter {
 
     const exe = findOllama();
     if (!exe) {
-      this.finishPhase(id, 'error', 'Ollama is not available');
-      throw new Error('Ollama is not available');
+      this.note('Local AI engine (Ollama) not detected \u2014 model downloads deferred to in-app setup', 'info');
+      this.updatePhase(id, 100, 'Model downloads deferred');
+      this.finishPhase(id, 'done', 'deferred to in-app');
+      this.emitProgress();
+      return;
     }
     await this.startOllamaServer(exe);
 
@@ -1650,12 +1655,16 @@ class Installer extends EventEmitter {
     this.resetByteProgress();
     const failed = this.models.filter((m) => m.status === 'failed');
     if (failed.length > 0) {
-      this.finishPhase(id, 'error', `${failed.length} model(s) failed`);
+      this.note(
+        `Model download deferred for ${failed.map((m) => m.id).join(', ')}. You can download local models directly inside Clipify AI anytime.`,
+        'warn'
+      );
+      this.finishPhase(id, 'done', `${failed.length} model(s) deferred`);
       this.emitProgress();
-      throw new Error(`Model download failed: ${failed.map((m) => m.id).join(', ')}`);
+    } else {
+      this.finishPhase(id, 'done', `${this.installedModels.length} model(s) ready`);
+      this.emitProgress();
     }
-    this.finishPhase(id, 'done', `${this.installedModels.length} model(s) ready`);
-    this.emitProgress();
   }
 
   // ------------------------------------------------------ step: shortcuts

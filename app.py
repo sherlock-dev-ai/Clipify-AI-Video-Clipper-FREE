@@ -478,7 +478,7 @@ def _ollama_models() -> list[str]:
 
 
 def _default_model(models: list[str]) -> str:
-    for preferred in ("qwen3:8b", "qwen3:14b"):
+    for preferred in ("qwen2.5:3b", "qwen2.5:latest", "qwen:latest", "qwen3:8b", "qwen3:14b"):
         if preferred in models:
             return preferred
     qwen = [m for m in models if m.lower().startswith("qwen")]
@@ -1844,6 +1844,73 @@ def metadata(job_id: str, filename: str):
         return jsonify({"ok": True, **json.loads(meta.read_text(encoding="utf-8"))})
     except Exception as exc:
         return jsonify({"ok": False, "error": f"Metadata read failed: {exc}"}), 500
+
+
+# --- Social Media Publishing & MCP Integration ---
+
+@app.get("/api/publish/platforms")
+def get_publish_platforms():
+    """Return configured social platforms and account status."""
+    from tools.mcp_publish import list_social_accounts
+    return jsonify({"ok": True, "platforms": list_social_accounts()})
+
+
+@app.post("/api/publish/credentials")
+def save_publish_credentials():
+    """Save API credentials for YouTube, Instagram, or TikTok."""
+    from tools.mcp_publish import load_credentials, save_credentials
+    data = request.get_json(silent=True) or {}
+    platform = str(data.get("platform", "")).lower()
+    if platform not in {"youtube", "instagram", "tiktok"}:
+        return jsonify({"ok": False, "error": "Invalid platform specified."}), 400
+    creds = load_credentials()
+    if platform not in creds:
+        creds[platform] = {}
+    creds[platform].update({k: v for k, v in data.items() if k != "platform"})
+    creds[platform]["enabled"] = True
+    saved = save_credentials(creds)
+    return jsonify({"ok": saved, "platform": platform, "configured": True})
+
+
+@app.post("/api/publish/upload")
+def publish_short():
+    """Publish a generated Short to YouTube, TikTok, Instagram, or export as package."""
+    from tools.mcp_publish import (
+        publish_youtube_short, publish_instagram_reel,
+        publish_tiktok_video, export_social_package
+    )
+    data = request.get_json(silent=True) or {}
+    platform = str(data.get("platform", "youtube")).lower()
+    job_id = str(data.get("job_id", "")).strip()
+    filename = str(data.get("filename", "")).strip()
+    title = str(data.get("title", "")).strip()
+    description = str(data.get("description", "")).strip()
+    tags = data.get("tags") if isinstance(data.get("tags"), list) else []
+    privacy = str(data.get("privacy", "public")).lower()
+
+    job_dir = _safe_job_directory(job_id)
+    if not job_dir or not job_dir.is_dir():
+        return jsonify({"ok": False, "error": "Project not found."}), 404
+
+    video_path = job_dir / "output" / filename
+    if not video_path.is_file():
+        return jsonify({"ok": False, "error": f"Video file '{filename}' not found."}), 404
+
+    metadata_path = job_dir / "output" / f"{Path(filename).stem}.json"
+    meta_path_str = str(metadata_path) if metadata_path.is_file() else None
+
+    if platform == "youtube":
+        res = publish_youtube_short(str(video_path), title or Path(filename).stem, description, tags, privacy)
+    elif platform == "instagram":
+        res = publish_instagram_reel(str(video_path), description or title)
+    elif platform == "tiktok":
+        res = publish_tiktok_video(str(video_path), title or description)
+    elif platform in {"package", "export"}:
+        res = export_social_package(str(video_path), meta_path_str)
+    else:
+        return jsonify({"ok": False, "error": f"Unsupported platform: {platform}"}), 400
+
+    return jsonify(res)
 
 @app.get("/api/status/<job_id>")
 def status(job_id: str):

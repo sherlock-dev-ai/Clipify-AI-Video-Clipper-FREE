@@ -2298,3 +2298,128 @@ if ('IntersectionObserver' in window) {
 } else {
   revealSections.forEach(section => section.classList.add('reveal-visible'));
 }
+
+// --- Social Publishing & MCP Integration ---
+function initSocialPublishing() {
+  const modal = $('#publishModal');
+  const closeBtn = $('#closePublishModal');
+  const cancelBtn = $('#cancelPublish');
+  const form = $('#publishForm');
+  const featuredPublish = $('#featuredPublish');
+  const reviewPublish = $('#reviewPublish');
+  const statusMsg = $('#publishStatusMsg');
+  const pubTabs = $$('.pub-tab');
+
+  function openPublish(jobId, filename) {
+    if (!modal) return;
+    const jId = jobId || state.jobId;
+    const fName = filename || state.outputs[state.currentOutputIndex] || 'short_01.mp4';
+    if (!jId || !fName) {
+      alert('Please generate or select a Short first.');
+      return;
+    }
+    $('#publishJobId').value = jId;
+    $('#publishFilename').value = fName;
+    $('#publishTitle').value = fName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
+    $('#publishDescription').value = '#Shorts #ClipifyAI #Viral';
+    if (statusMsg) { statusMsg.style.display = 'none'; statusMsg.textContent = ''; }
+
+    fetchMetadata(jId, fName).then(meta => {
+      if (meta && meta.title) $('#publishTitle').value = meta.title;
+      if (meta && meta.description) {
+        const hashtags = Array.isArray(meta.hashtags) ? meta.hashtags.join(' ') : (Array.isArray(meta.tags) ? meta.tags.map(t => t.startsWith('#') ? t : '#' + t).join(' ') : '#Shorts');
+        $('#publishDescription').value = `${meta.description}\n\n${hashtags}`;
+      }
+    }).catch(() => {});
+
+    modal.hidden = false;
+  }
+
+  function closePublish() {
+    if (modal) modal.hidden = true;
+  }
+
+  featuredPublish?.addEventListener('click', () => openPublish());
+  reviewPublish?.addEventListener('click', () => {
+    const curFile = state.reviewFile || state.outputs[state.currentOutputIndex];
+    openPublish(state.jobId, curFile);
+  });
+  closeBtn?.addEventListener('click', closePublish);
+  cancelBtn?.addEventListener('click', closePublish);
+
+  pubTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      pubTabs.forEach(t => {
+        t.classList.remove('active');
+        t.style.background = 'transparent';
+        t.style.border = '1px solid transparent';
+        t.style.color = 'var(--muted,#c9b9a4)';
+      });
+      tab.classList.add('active');
+      tab.style.background = 'rgba(215,187,148,0.22)';
+      tab.style.border = '1px solid rgba(215,187,148,0.4)';
+      tab.style.color = 'var(--text,#f3eadf)';
+      const platform = tab.dataset.platform;
+      $('#publishPlatform').value = platform;
+      const submitBtn = $('#submitPublish span');
+      if (submitBtn) {
+        submitBtn.textContent = platform === 'package' ? '📦 Export Package' : `🚀 Publish to ${tab.textContent}`;
+      }
+    });
+  });
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const jobId = $('#publishJobId').value;
+    const filename = $('#publishFilename').value;
+    const platform = $('#publishPlatform').value;
+    const title = $('#publishTitle').value.trim();
+    const description = $('#publishDescription').value.trim();
+    const privacy = $('#publishPrivacy').value;
+    const submitBtn = $('#submitPublish');
+
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.querySelector('span').textContent = 'Publishing…'; }
+    if (statusMsg) {
+      statusMsg.style.display = 'block';
+      statusMsg.style.background = 'rgba(215,187,148,0.12)';
+      statusMsg.style.color = 'var(--text,#f3eadf)';
+      statusMsg.textContent = `Preparing ${platform.toUpperCase()} distribution…`;
+    }
+
+    try {
+      const resp = await fetch('/api/publish/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: jobId, filename, platform, title, description, privacy })
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error(data.error || 'Publishing failed.');
+
+      if (statusMsg) {
+        statusMsg.style.background = 'rgba(74,222,128,0.15)';
+        statusMsg.style.border = '1px solid rgba(74,222,128,0.4)';
+        statusMsg.style.color = '#4ade80';
+        if (data.status === 'published' && data.url) {
+          statusMsg.innerHTML = `✓ Successfully published to ${platform}! <a href="${data.url}" target="_blank" style="color:#60a5fa;text-decoration:underline;margin-left:8px;">View Short ↗</a>`;
+        } else if (data.status === 'manual_action_ready') {
+          statusMsg.innerHTML = `✓ Ready to publish! ${data.message || ''} ${data.studio_url ? `<a href="${data.studio_url}" target="_blank" style="color:#60a5fa;text-decoration:underline;margin-left:8px;">Open Studio Upload ↗</a>` : ''}`;
+        } else {
+          statusMsg.innerHTML = `✓ Package exported to: <code>${data.export_directory || data.copy_file || 'social_export'}</code>`;
+        }
+      }
+    } catch (err) {
+      if (statusMsg) {
+        statusMsg.style.background = 'rgba(239,68,68,0.15)';
+        statusMsg.style.border = '1px solid rgba(239,68,68,0.4)';
+        statusMsg.style.color = '#ef4444';
+        statusMsg.textContent = `Error: ${err.message}`;
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.querySelector('span').textContent = '🚀 Publish Now';
+      }
+    }
+  });
+}
+initSocialPublishing();

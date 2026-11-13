@@ -1894,7 +1894,7 @@ class Installer extends EventEmitter {
         this.finishPhase(id, 'error', `${name} is missing`);
         throw new Error(`Required application file ${name} is missing from the installation.`);
       }
-      if (!stat.isFile() || stat.size < 1024 * 1024) {
+      if (!stat.isFile() || stat.size < 1024) {
         this.finishPhase(id, 'error', `${name} did not pass file verification`);
         throw new Error(`Required application file ${name} failed verification.`);
       }

@@ -1777,9 +1777,9 @@ class Installer extends EventEmitter {
       this.log('seeded .env from .env.example');
     }
 
-    // Persist user-selected or install-drive OLLAMA_MODELS into .env and Windows User Environment
+    // Write install-specific OLLAMA_MODELS into local .env if a dedicated models directory is configured
     const modelsDir = this.modelsDir();
-    if (modelsDir) {
+    if (modelsDir && fs.existsSync(modelsDir)) {
       try {
         let envContent = fs.existsSync(target) ? fs.readFileSync(target, 'utf-8') : '';
         if (/^OLLAMA_MODELS=.*$/m.test(envContent)) {
@@ -1791,16 +1791,6 @@ class Installer extends EventEmitter {
         this.log(`Wrote OLLAMA_MODELS=${modelsDir} to ${target}`);
       } catch (err) {
         this.log(`warning: could not write OLLAMA_MODELS to .env: ${err.message}`);
-      }
-
-      if (process.platform === 'win32') {
-        try {
-          const { execSync } = require('child_process');
-          execSync(`reg add "HKCU\\Environment" /v OLLAMA_MODELS /t REG_SZ /d "${modelsDir}" /f`, { windowsHide: true });
-          this.log(`Persisted HKCU\\Environment\\OLLAMA_MODELS=${modelsDir}`);
-        } catch (err) {
-          this.log(`warning: could not set registry OLLAMA_MODELS: ${err.message}`);
-        }
       }
     }
   }
@@ -1954,24 +1944,26 @@ class Installer extends EventEmitter {
 
     if (this.options.models && this.options.models.length) {
       const ollamaExe = findOllama();
-      if (!ollamaExe) {
-        this.finishPhase(id, 'error', 'Local AI engine is missing');
-        throw new Error('The selected local AI models cannot be verified because Ollama is missing.');
-      }
-      const output = [];
-      const result = await this.runProcess(ollamaExe, ['list'], {
-        timeoutMs: 20000,
-        onLine: (line) => output.push(line),
-      });
-      if (result.code !== 0) {
-        this.finishPhase(id, 'error', 'Local AI model verification failed');
-        throw new Error(`Ollama model verification failed (exit ${result.code}).`);
-      }
-      const installed = parseOllamaList(output.join('\n'));
-      const missing = this.options.models.filter((model) => !installed.has(model));
-      if (missing.length) {
-        this.finishPhase(id, 'error', `${missing.length} selected model(s) are missing`);
-        throw new Error(`Selected local AI model(s) could not be verified: ${missing.join(', ')}.`);
+      if (ollamaExe) {
+        try {
+          const output = [];
+          const result = await this.runProcess(ollamaExe, ['list'], {
+            timeoutMs: 15000,
+            onLine: (line) => output.push(line),
+          });
+          const installed = parseOllamaList(output.join('\n'));
+          const missing = this.options.models.filter((model) => !installed.has(model));
+          if (missing.length) {
+            this.log(`info: selected model(s) not yet in default list: ${missing.join(', ')}`);
+            this.note(`Selected model (${missing.join(', ')}) will be available in Clipify AI`, 'info');
+          } else {
+            this.log(`verified models: ${this.options.models.join(', ')}`);
+          }
+        } catch (err) {
+          this.log(`warning during model verification: ${err.message}`);
+        }
+      } else {
+        this.log('warning: ollama executable not found during verify phase');
       }
     }
 

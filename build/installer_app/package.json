@@ -1,7 +1,7 @@
 {
   "name": "clipify-ai-setup",
   "productName": "Clipify AI Setup",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Clipify AI installer - your local AI-powered clipping workspace",
   "author": "sherlock-dev-ai",
   "license": "MIT",
@@ -29,6 +29,7 @@
       "preload.js",
       "lib/**/*.js",
       "renderer/**/*",
+      "build/icon.ico",
       "package.json"
     ],
   "extraResources": [

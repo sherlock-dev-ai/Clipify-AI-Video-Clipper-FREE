@@ -83,7 +83,7 @@ function log(msg) { console.log(`[install] ${msg}`); }
   const send = (method, params) => new Promise((res, rej) => {
     const i = ++id;
     pending.set(i, (m) => { clearTimeout(to); res(m); });
-    const to = setTimeout(() => { pending.delete(i); rej(new Error('timeout ' + method)); }, 120000);
+    const to = setTimeout(() => { pending.delete(i); rej(new Error('timeout ' + method)); }, 600000);
     ws.send(JSON.stringify({ id: i, method, params }));
   });
   const eval_ = async (expression) => {

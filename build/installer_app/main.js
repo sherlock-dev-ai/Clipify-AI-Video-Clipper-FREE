@@ -146,7 +146,26 @@ function createWindow() {
   const workArea = screen.getPrimaryDisplay().workAreaSize;
   const width = Math.min(1040, Math.max(820, workArea.width - 24));
   const height = Math.min(780, Math.max(640, workArea.height - 24));
-  const iconPath = path.join(process.resourcesPath, 'icon.ico');
+  const { nativeImage } = require('electron');
+  const iconCandidates = [
+    path.join(process.resourcesPath, 'icon.ico'),
+    path.join(process.resourcesPath, 'payload', 'icon.ico'),
+    path.join(__dirname, 'build', 'icon.ico'),
+    path.join(__dirname, 'resources', 'payload', 'icon.ico'),
+    path.join(__dirname, 'renderer', 'logo-round.png'),
+    path.join(__dirname, 'renderer', 'logo.png'),
+  ];
+  const iconPath = iconCandidates.find((p) => {
+    try { return fs.existsSync(p); } catch { return false; }
+  }) || path.join(__dirname, 'build', 'icon.ico');
+
+  let windowIcon = null;
+  try {
+    if (fs.existsSync(iconPath)) {
+      windowIcon = nativeImage.createFromPath(iconPath);
+    }
+  } catch {}
+
   mainWindow = new BrowserWindow({
     width,
     height,
@@ -157,7 +176,7 @@ function createWindow() {
     frame: false,
     show: false,
     backgroundColor: '#07070c',
-    icon: iconPath,
+    icon: (windowIcon && !windowIcon.isEmpty()) ? windowIcon : iconPath,
     title: 'Clipify AI Setup',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -168,7 +187,12 @@ function createWindow() {
   });
   if (process.platform === 'win32') {
     try {
-      mainWindow.setAppDetails({ appId: WINDOWS_APP_ID, appIconPath: iconPath });
+      if (windowIcon && !windowIcon.isEmpty()) {
+        mainWindow.setIcon(windowIcon);
+      }
+      if (fs.existsSync(iconPath)) {
+        mainWindow.setAppDetails({ appId: WINDOWS_APP_ID, appIconPath: iconPath });
+      }
     } catch (error) {
       writeStartupLog(`could not set Windows taskbar identity: ${error.message}`);
     }

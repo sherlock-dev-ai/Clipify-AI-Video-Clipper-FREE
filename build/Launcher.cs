@@ -13,6 +13,8 @@ namespace ClipifyAI
         {
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             string appPy = Path.Combine(baseDir, "app.py");
+            string logFile = Path.Combine(baseDir, "launcher.log");
+            string pyLog = Path.Combine(baseDir, "python_live.log");
 
             // 1. Check if server is already running and healthy on port 5000
             bool alreadyRunning = false;
@@ -48,32 +50,58 @@ namespace ClipifyAI
             }
             if (!File.Exists(pythonExe))
             {
-                pythonExe = Path.Combine(baseDir, ".venv", "Scripts", "pythonw.exe");
-            }
-            if (!File.Exists(pythonExe))
-            {
                 pythonExe = "python.exe";
             }
 
-            // 3. Launch app.py
+            // 3. Configure environment and launch
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = pythonExe;
-            psi.Arguments = "\"" + appPy + "\"";
+            psi.Arguments = "-u \"" + appPy + "\"";
             psi.WorkingDirectory = baseDir;
             psi.UseShellExecute = false;
             psi.CreateNoWindow = true;
-            psi.WindowStyle = ProcessWindowStyle.Hidden;
+            psi.RedirectStandardOutput = true;
+            psi.RedirectStandardError = true;
+
+            // Environment
+            string runtimeDir = Path.Combine(baseDir, "runtime");
+            string ffmpegDir = Path.Combine(baseDir, "tools", "ffmpeg", "ffmpeg-9.0.1-essentials_build", "bin");
+            string currentPath = Environment.GetEnvironmentVariable("PATH") ?? "";
+            psi.EnvironmentVariables["PATH"] = Path.Combine(runtimeDir, "Scripts") + ";" + runtimeDir + ";" + ffmpegDir + ";" + currentPath;
+            psi.EnvironmentVariables["CLIPPEDAI_DATA_DIR"] = baseDir;
+            psi.EnvironmentVariables["CLIPPEDAI_RUNTIME"] = runtimeDir;
 
             try
             {
-                Process p = Process.Start(psi);
-                if (p != null)
-                {
-                    p.WaitForExit();
-                }
+                Process p = new Process();
+                p.StartInfo = psi;
+
+                FileStream logStream = new FileStream(pyLog, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+                StreamWriter sw = new StreamWriter(logStream) { AutoFlush = true };
+
+                p.OutputDataReceived += (s, e) => { if (e.Data != null) sw.WriteLine("[OUT] " + e.Data); };
+                p.ErrorDataReceived += (s, e) => { if (e.Data != null) sw.WriteLine("[ERR] " + e.Data); };
+
+                p.Start();
+                p.BeginOutputReadLine();
+                p.BeginErrorReadLine();
+
+                p.WaitForExit();
+
+                sw.Flush();
+                logStream.Flush();
+                sw.Close();
+                logStream.Close();
+
+                File.AppendAllText(logFile, string.Format("[{0}] Python process exited with code {1}\n", DateTime.Now, p.ExitCode));
             }
             catch (Exception ex)
             {
+                try
+                {
+                    File.AppendAllText(logFile, "[" + DateTime.Now + "] Launch exception: " + ex.ToString() + "\n");
+                }
+                catch { }
                 System.Windows.Forms.MessageBox.Show(
                     "Clipify AI failed to start: " + ex.Message,
                     "Clipify AI Error",

@@ -556,7 +556,7 @@ class Installer extends EventEmitter {
             });
           } catch { watcher = null; }
         }
-        if (watcher) watcher.on('error', () => {});
+        if (watcher) watcher.on('error', () => { });
       }
       if (heartbeatMs > 0 && typeof onHeartbeat === 'function') {
         heartbeat = setInterval(() => {
@@ -610,11 +610,11 @@ class Installer extends EventEmitter {
         await this._performDownload(url, tempFile, onProgress);
         try {
           if (fs.existsSync(destination)) fs.unlinkSync(destination);
-        } catch {}
+        } catch { }
         fs.renameSync(tempFile, destination);
         return;
       } catch (err) {
-        try { if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile); } catch {}
+        try { if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile); } catch { }
         if (this.cancelled || err.cancelled) throw err;
         this.log(`download attempt ${attempt} failed: ${err.message}`);
         if (attempt >= maxRetries) {

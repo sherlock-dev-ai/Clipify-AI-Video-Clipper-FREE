@@ -4928,18 +4928,16 @@ def _compose_dual_person_split(source_path: str, output_path: str,
                      sum(o["cx"] for o in clusters[1]) / len(clusters[1]))
 
     if centroids is not None and points:
-        # A dual panel can only show two different people when two people are on
-        # screen. On single-shooter or mostly-solo footage the empty panel reads
-        # as a bug, so measure the overlap and hand the clip back to the normal
-        # tracked layout when it is too rare to carry a two-person frame.
         def _role_of(cx: float) -> int:
             return 0 if abs(cx - centroids[0]) <= abs(cx - centroids[1]) else 1
 
-        both = sum(1 for p in points if len({_role_of(t["cx"]) for t in p.get("tracks", [])}) == 2)
-        overlap = both / max(1, len(points))
-        if overlap < 0.40:
-            print(f"  [Framing] Split-screen skipped: both people share the frame in only "
-                  f"{overlap:.0%} of shots; using the single tracked layout instead.")
+        c0_tracks = sum(1 for p in points if any(_role_of(t["cx"]) == 0 for t in p.get("tracks", [])))
+        c1_tracks = sum(1 for p in points if any(_role_of(t["cx"]) == 1 for t in p.get("tracks", [])))
+        sep = abs(centroids[1] - centroids[0])
+
+        # Dual split needs both speakers to have genuine presence and separation in the clip.
+        if c0_tracks < 3 or c1_tracks < 3 or sep < 0.10:
+            print(f"  [Framing] Dual-person split not applicable (c0={c0_tracks}, c1={c1_tracks}, sep={sep:.2f}); checking solo layout...")
             return False
 
     if centroids is None:
@@ -5025,7 +5023,10 @@ def _compose_dual_person_split(source_path: str, output_path: str,
     ok = os.path.isfile(output_path) and os.path.getsize(output_path) > 1024
     if ok:
         if centroids is not None:
-            _hold_missing_split_people(output_path, panel_h, target_w, target_h)
+            try:
+                _hold_missing_split_people(output_path, panel_h, target_w, target_h)
+            except Exception as hold_err:
+                print(f"  [Framing] Panel hold note: {hold_err}; retaining rendered split output.")
         print(f"  [Framing] Split-screen: {top_note}, panels {target_w}x{panel_h}")
     return ok
 

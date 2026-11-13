@@ -996,42 +996,74 @@ label {
 
 .results { margin-top: 22px; }
 .featured-result {
-  display: block;
-  padding: 18px;
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+  padding: 22px;
   border-radius: 26px;
-  border: 1px solid var(--line);
-  background: rgba(13, 17, 22, 0.8);
+  border: 1px solid var(--line-strong, rgba(215, 187, 148, 0.25));
+  background: rgba(13, 17, 22, 0.88);
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.45);
+  max-width: 860px;
+  margin: 18px auto 0;
 }
 .featured-carousel-shell {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 44px;
-  gap: 14px;
+  display: flex;
   align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 .carousel-nav {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border: 1px solid var(--line);
   border-radius: 50%;
-  background: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.06);
   color: var(--text);
-  font-size: 30px;
+  font-size: 24px;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
 }
-.carousel-nav:disabled { opacity: 0.35; cursor: not-allowed; }
-.featured-video-shell { position: relative; border-radius: 22px; overflow: hidden; background: #02070b; border: 1px solid rgba(255,255,255,0.08); }
-.featured-video-shell video { width: 100%; display: block; aspect-ratio: 9 / 16; object-fit: cover; }
-.featured-badge { position: absolute; top: 12px; left: 12px; padding: 7px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; }
-.featured-copy { display: flex; flex-direction: column; justify-content: center; margin-top: 16px; }
+.carousel-nav:hover:not(:disabled) {
+  background: rgba(215, 187, 148, 0.2);
+  border-color: var(--warm);
+}
+.carousel-nav:disabled { opacity: 0.25; cursor: not-allowed; }
+.featured-video-shell {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #02070b;
+  border: 1px solid rgba(255,255,255,0.12);
+  width: 230px;
+  max-width: 100%;
+  aspect-ratio: 9 / 16;
+  max-height: min(52vh, 440px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+.featured-video-shell video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: 18px;
+}
+.featured-badge { position: absolute; top: 10px; left: 10px; padding: 5px 9px; border-radius: 999px; background: rgba(0,0,0,0.65); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.2); font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #fff; }
+.featured-copy { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
 .featured-meta-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.carousel-index { color: var(--muted); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; }
-.featured-copy h3 { margin: 12px 0 8px; font-size: clamp(2rem, 3vw, 3rem); letter-spacing: -0.08em; line-height: 0.98; }
-.featured-copy p { margin: 0; color: var(--muted); line-height: 1.6; }
-.featured-dots { display: flex; gap: 8px; margin-top: 18px; }
-.featured-dots .dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); cursor: pointer; }
-.featured-dots .dot.active { background: var(--warm); border-color: var(--warm); }
-.featured-actions { display: flex; gap: 10px; margin-top: 18px; }
+.carousel-index { color: var(--muted); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; }
+.featured-copy h3 { margin: 10px 0 6px; font-size: clamp(1.4rem, 2.2vw, 2.2rem); letter-spacing: -0.05em; line-height: 1.1; word-break: break-word; }
+.featured-copy p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.featured-dots { display: flex; gap: 6px; margin-top: 14px; }
+.featured-dots .dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.1); cursor: pointer; transition: all 0.2s ease; }
+.featured-dots .dot.active { background: var(--warm); border-color: var(--warm); transform: scale(1.2); }
+.featured-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
 .result-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

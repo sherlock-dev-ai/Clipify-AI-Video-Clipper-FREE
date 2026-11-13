@@ -1321,7 +1321,7 @@ async function watchJob(jobId){
     try{
       const d=JSON.parse(event.data);
       const failed=d.kind==='error'||(d.kind==='status'&&d.status==='error');
-      const succeeded=d.kind==='done'||d.kind==='complete'||(d.kind==='status'&&d.status==='done');
+      const succeeded=(d.kind==='complete'&&d.pipeline===true)||d.kind==='done'||(d.kind==='status'&&d.status==='done');
 
       if(d.kind==='log'){
         addLog(d.message);
@@ -1588,8 +1588,10 @@ function renderOutputCarousel(){
         ${state.outputs.map((_, index)=>`<button class="dot ${index===state.currentOutputIndex ? 'active' : ''}" type="button" aria-label="Go to clip ${index + 1}" data-index="${index}"></button>`).join('')}
       </div>
       <div class="featured-actions">
-        <button class="primary" id="featuredReview" type="button"><span>Open in Editor</span><b>→</b></button>
+        <button class="primary" id="featuredReview" type="button"><span>✏️ Edit in Studio</span><b>→</b></button>
+        <button class="secondary" id="featuredPublish" type="button" style="background:rgba(215,187,148,0.18);border:1px solid rgba(215,187,148,0.4);color:var(--text);border-radius:10px;padding:9px 18px;font-weight:600;cursor:pointer;"><span>🚀 Share / Publish</span></button>
         <a class="ghost" id="featuredDownload" href="${src}" download="${currentFile}">Download ↓</a>
+        <button class="ghost" id="featuredNew" type="button">＋ New</button>
       </div>
     </div>
   `;
@@ -1607,6 +1609,14 @@ function renderOutputCarousel(){
   }
 
   featuredReview?.addEventListener('click', ()=>selectReview(state.jobId, currentFile));
+  featured.querySelector('#featuredPublish')?.addEventListener('click', ()=>{
+    if(window.openPublishModal){
+      window.openPublishModal(state.jobId, currentFile);
+    }
+  });
+  featured.querySelector('#featuredNew')?.addEventListener('click', ()=>{
+    $('#newBtn')?.click();
+  });
   featuredDownload?.addEventListener('click', (event)=>{
     event.preventDefault();
     window.location.href = `${src}?download=1`;

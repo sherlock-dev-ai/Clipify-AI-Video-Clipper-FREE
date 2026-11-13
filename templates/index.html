@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Clipify AI</title><link rel="icon" type="image/png" href="{{ url_for('static', filename='icon.png', v='20261018-3') }}"><link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20261018-3') }}"><link rel="stylesheet" href="{{ url_for('static', filename='studio.css', v='20260922-3') }}">
+  <title>Clipify AI</title><link rel="icon" type="image/png" href="{{ url_for('static', filename='icon.png', v='20261018-3') }}"><link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20261018-3') }}"><link rel="stylesheet" href="{{ url_for('static', filename='studio.css', v='20260922-3') }}"><link rel="stylesheet" href="{{ url_for('static', filename='tour.css', v='20261113-1') }}">
 </head>
 <body>
 <div class="aurora aurora-one"></div><div class="aurora aurora-two"></div><div class="aurora aurora-three"></div><div class="noise"></div>
@@ -34,6 +34,7 @@
       <span>Assets</span>
     </a>
   </nav>
+  <button class="sidebar-tour-btn" type="button" onclick="window.startClipifyTour && window.startClipifyTour()"><span>💡</span> App Tour</button>
   <div class="side-spacer"></div>
   <div class="side-card"><span class="dot" id="healthDot"></span><div class="status-copy"><b>Local AI</b><small id="healthText">Checking Ollama…</small></div></div>
 </aside>
@@ -199,5 +200,5 @@
 
 <footer>Clipify AI · local AI editing workspace · WhisperX + ClipsAI + Ollama + FFmpeg</footer>
 </main>
-  <script src="{{ url_for('static', filename='pipeline_status.js', v='20261113-1') }}"></script><script src="{{ url_for('static', filename='review_player.js', v='20261113-1') }}"></script><script src="{{ url_for('static', filename='app.js', v='20261113-1') }}"></script>
+  <script src="{{ url_for('static', filename='pipeline_status.js', v='20261113-1') }}"></script><script src="{{ url_for('static', filename='review_player.js', v='20261113-1') }}"></script><script src="{{ url_for('static', filename='app.js', v='20261113-1') }}"></script><script src="{{ url_for('static', filename='tour.js', v='20261113-1') }}"></script>
 </body></html>

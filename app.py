@@ -745,6 +745,8 @@ job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, ma
         job["stage"] = "Starting Clipify AI"
         job["detail"] = "Launching the local pipeline…"
         job["stage_started"] = __import__("time").time()
+        job["events"] = []
+        job["outputs"] = []
 
     job_dir = JOBS / job_id
     input_dir = job_dir / "input"
@@ -860,7 +862,7 @@ job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, ma
         emit(job_id, "worker_exit", "Pipeline worker exited.",
              return_code=return_code, output_count=len(outputs), status=job["status"])
         if return_code == 0 and outputs:
-            emit(job_id, "complete", f"Created {len(outputs)} professional Short(s).", progress=100)
+            emit(job_id, "complete", f"Created {len(outputs)} professional Short(s).", progress=100, pipeline=True)
         else:
             emit(job_id, "error", job["detail"], return_code=return_code)
     except Exception as exc:
@@ -1580,7 +1582,7 @@ def import_youtube():
             with jobs_lock:
                 jobs[job_id].update(filename=safe_name, status="uploaded", progress=100,
                                     stage="Video ready", detail="YouTube download complete.")
-                jobs[job_id]["events"].append({"kind":"complete","message":"YouTube download complete.","progress":100})
+                jobs[job_id]["events"].append({"kind":"download_complete","message":"YouTube download complete.","progress":100})
         except Exception as exc:
             if proc is not None:
                 try:

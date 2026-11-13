@@ -1399,6 +1399,13 @@ async function loadJobResult(jobId){
         `[Done] ${outputs.length} Short(s) ready.`
       );
 
+      // Automatically show Share & Publish options once clipping completes
+      setTimeout(() => {
+        if (window.openPublishModal) {
+          window.openPublishModal(jobId, outputs[0]);
+        }
+      }, 700);
+
     }else{
 
       addLog(
@@ -2067,6 +2074,7 @@ async function loadProjects(){
 
       <div class="project-actions">
         <button class="ghost project-open">Open</button>
+        <button class="ghost project-share" title="Share & Publish this project's Short" style="color:var(--warm,#d6b388);font-weight:600;">🚀 Share</button>
         <button class="ghost project-rename" title="Rename project">Rename</button>
         <button class="ghost project-delete" title="Move project to Recently deleted">Delete</button>
       </div>
@@ -2084,6 +2092,14 @@ async function loadProjects(){
         else
           window.location.hash='create';
       };
+
+    el.querySelector('.project-share')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const output = x.outputs?.[0] || 'short_01.mp4';
+      if (window.openPublishModal) {
+        window.openPublishModal(x.id, output);
+      }
+    });
 
     el.querySelectorAll('.project-output').forEach(button=>{
       button.onclick=()=>selectReview(x.id,button.dataset.output);
@@ -2310,7 +2326,13 @@ function initSocialPublishing() {
   const statusMsg = $('#publishStatusMsg');
   const pubTabs = $$('.pub-tab');
 
-  function openPublish(jobId, filename) {
+  // Ensure modal is strictly hidden on initial page load
+  if (modal) {
+    modal.style.display = 'none';
+    modal.hidden = true;
+  }
+
+  function openPublish(jobId, filename, optionalTitle) {
     if (!modal) return;
     const jId = jobId || state.jobId;
     const fName = filename || state.outputs[state.currentOutputIndex] || 'short_01.mp4';
@@ -2320,7 +2342,7 @@ function initSocialPublishing() {
     }
     $('#publishJobId').value = jId;
     $('#publishFilename').value = fName;
-    $('#publishTitle').value = fName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
+    $('#publishTitle').value = optionalTitle || fName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
     $('#publishDescription').value = '#Shorts #ClipifyAI #Viral';
     if (statusMsg) { statusMsg.style.display = 'none'; statusMsg.textContent = ''; }
 
@@ -2332,12 +2354,19 @@ function initSocialPublishing() {
       }
     }).catch(() => {});
 
+    modal.style.display = 'flex';
     modal.hidden = false;
   }
 
   function closePublish() {
-    if (modal) modal.hidden = true;
+    if (modal) {
+      modal.style.display = 'none';
+      modal.hidden = true;
+    }
   }
+
+  window.openPublishModal = openPublish;
+  window.closePublishModal = closePublish;
 
   featuredPublish?.addEventListener('click', () => openPublish());
   reviewPublish?.addEventListener('click', () => {

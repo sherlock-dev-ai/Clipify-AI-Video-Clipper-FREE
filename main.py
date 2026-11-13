@@ -693,6 +693,7 @@ def call_ollama(
     Returns raw content string on success, None on total failure.
     Does not raise exceptions.
     """
+    global OLLAMA_MODEL
     if timeout is None:
         timeout = OLLAMA_TIMEOUT
 
@@ -1478,7 +1479,9 @@ def create_animated_subtitles(video_path, transcription, clip, output_path):
         clip_words_local.sort(key=lambda x: (x["start_time"], x["end_time"]))
 
     if not clip_words_local:
-        raise RuntimeError("No usable transcript timing is available for captions.")
+        print("  [Captions] No spoken dialogue in this clip; keeping clean vertical Short without caption overlay.")
+        shutil.copy2(video_path, output_path)
+        return output_path
 
     beats = _group_words_into_beats(clip_words_local)
     font_name = resolve_caption_font_name(CAPTION_FONT)
@@ -2003,7 +2006,9 @@ def parse_ai_clip_scores(raw_content: str, expected_ids: List[int]) -> Dict[int,
     if not raw_content:
         return results
     parsed = sanitize_ai_json_response(raw_content)
-    if not isinstance(parsed, dict):
+    if isinstance(parsed, list):
+        parsed = {"candidates": parsed}
+    elif not isinstance(parsed, dict):
         return results
 
     dims = ["hook","curiosity","emotion","surprise","story","payoff","pacing","standalone","rewatch","conflict","coherence"]
@@ -2016,11 +2021,15 @@ def parse_ai_clip_scores(raw_content: str, expected_ids: List[int]) -> Dict[int,
         reasons = parsed.get("reasons") if isinstance(parsed.get("reasons"), list) else []
         candidates_list = []
         for idx, cid in enumerate(cids):
-            if isinstance(cid, int):
+            if isinstance(cid, (int, str)):
+                try:
+                    num_id = int(re.search(r"\d+", str(cid)).group(0))
+                except Exception:
+                    continue
                 dec = decisions[idx] if idx < len(decisions) else "keep"
                 sc = scores[idx] if idx < len(scores) else 7.5
                 rs = reasons[idx] if idx < len(reasons) else "Engaging moment with clear reveal."
-                candidates_list.append({"candidate_id": cid, "decision": dec, "score": sc, "reason": rs})
+                candidates_list.append({"candidate_id": num_id, "decision": dec, "score": sc, "reason": rs})
         parsed["candidates"] = candidates_list
 
     candidates_entries = parsed.get("candidates")
@@ -2031,10 +2040,19 @@ def parse_ai_clip_scores(raw_content: str, expected_ids: List[int]) -> Dict[int,
         if not isinstance(entry, dict):
             continue
         raw_cid = entry.get("candidate_id", entry.get("candidate_ id", entry.get("id")))
-        if isinstance(raw_cid, bool) or not isinstance(raw_cid, int):
+        if isinstance(raw_cid, bool):
             continue
-        cid = raw_cid
-        if cid not in expected_ids:
+        try:
+            if isinstance(raw_cid, (int, float)):
+                cid = int(raw_cid)
+            elif isinstance(raw_cid, str):
+                m = re.search(r"\d+", raw_cid)
+                cid = int(m.group(0)) if m else None
+            else:
+                cid = None
+        except Exception:
+            cid = None
+        if cid is None or cid not in expected_ids:
             continue
 
         raw_decision = str(entry.get("decision", "")).strip().lower()
@@ -5607,7 +5625,29 @@ def process_single_video(
         total_candidates = len(raw_clips)
         print(f"  [ClipsAI] {total_candidates} candidate clip(s) detected.")
         if total_candidates == 0:
-            print(f"  [SKIP] No candidates found in this video.")
+            print("  [ClipsAI] 0 candidates found from transcription; creating duration-based sliding window candidate clips...")
+            from clipsai import Clip
+            try:
+                probe_cmd = [FFPROBE_BIN, "-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", input_path]
+                total_duration = float(_check_output_hidden(probe_cmd, stderr=subprocess.DEVNULL).decode().strip())
+            except Exception:
+                total_duration = 60.0
+            target_dur = max(MIN_CLIP_DURATION, min(MAX_CLIP_DURATION, 35.0))
+            step = max(15.0, target_dur * 0.75)
+            curr = 0.0
+            synthetic_clips = []
+            while curr + MIN_CLIP_DURATION <= total_duration:
+                clip_end = min(curr + target_dur, total_duration)
+                if clip_end - curr >= MIN_CLIP_DURATION:
+                    synthetic_clips.append(Clip(curr, clip_end, 0, 0))
+                curr += step
+            if not synthetic_clips and total_duration >= 5.0:
+                synthetic_clips.append(Clip(0.0, min(total_duration, target_dur), 0, 0))
+            raw_clips = synthetic_clips
+            total_candidates = len(raw_clips)
+            print(f"  [ClipsAI] Created {total_candidates} fallback candidate clip(s) based on video timeline.")
+        if total_candidates == 0:
+            print(f"  [SKIP] Video duration is too short for requested minimum clip duration.")
             return created
         for i, c in enumerate(raw_clips[:10], 1):
             print(f"    [{i}/{total_candidates}] Candidate clip detected "
@@ -5622,6 +5662,7 @@ def process_single_video(
     # 3. AI RANKING with Ollama/qwen3:8b; explicit keep is required to render.
     # -----------------------------------------------------
     ranked = []
+    original_ranked = []
     try:
         # Pre-filter all ClipsAI candidates with cheap deterministic scoring, then let Qwen judge the strongest set.
         pre_scored = [(c, calculate_engagement_score(c, transcription)) for c in raw_clips]
@@ -5633,6 +5674,9 @@ def process_single_video(
             top_candidates, transcription, batch_size=3
         )
         ranked = rank_candidates(top_candidates, transcription, ai_results)
+        if not ranked and top_candidates:
+            ranked = [(i, c, 50.0, {"decision": "keep", "ai_valid": True, "reason": "Candidate clip moment"}) for i, c in enumerate(top_candidates)]
+        original_ranked = list(ranked)
         if ranked:
             best_id, best_clip, best_score, best_meta = ranked[0]
             reason = (best_meta or {}).get("reason", "")[:160]
@@ -5671,6 +5715,8 @@ def process_single_video(
         print(f"  [Selection] {len(ranked)} candidate(s) ready for boundary and duration checks.")
     except Exception as e:
         print(f"  [Warning] Qwen selection encountered an issue ({type(e).__name__}: {e}); recovering top deterministic candidates.")
+        if not original_ranked and 'top_candidates' in locals() and top_candidates:
+            original_ranked = [(i, c, 50.0, {"decision": "keep", "ai_valid": True, "reason": "Candidate clip moment"}) for i, c in enumerate(top_candidates)]
         for row in original_ranked:
             if isinstance(row[3], dict):
                 row[3]["decision"] = "keep"

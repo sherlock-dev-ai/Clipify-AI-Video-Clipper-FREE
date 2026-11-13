@@ -139,8 +139,143 @@ $('#improveScript').onclick=async()=>{const text=$('#scriptInput').value.trim()|
 $('#useOriginal').onclick=()=>$('#improveBox').hidden=true;$('#useImproved').onclick=()=>{setScriptText($('#improvedScript').textContent,true);$('#improveBox').hidden=true;};
 async function generate(){const progress=$('#narrateProgress');progress.hidden=false;$('#generateNarrate').disabled=true;try{const r=await fetch('/api/narrate/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({script:$('#scriptInput').value,voice:state.voice.id,video:state.clip.id,speed:+$('#voiceSpeed').value,target_duration:state.scriptGenerated?targetDuration():null,caption_mode:state.mode,caption_size:captionSize()})});const d=await r.json();if(!r.ok)throw Error(d.error);state.job=d.job_id;await watch(d.job_id);}catch(e){alert(e.message);$('#generateNarrate').disabled=false;}}
 $('#generateNarrate').onclick=generate;
-async function watch(id){while(true){const r=await fetch(`/api/narrate/status/${id}`,{cache:'no-store'});const d=await r.json();$('#narrateBar').style.width=`${d.progress||0}%`;$('#narratePercent').textContent=`${d.progress||0}%`;$('#narrateStage').textContent=d.stage||'Working...';$('#narrateDetail').textContent=d.detail||'';if(d.status==='done'){const url=`/api/narrate/result-media/${encodeURIComponent(id)}/${encodeURIComponent(d.output)}`;$('#narratePreview').src=url;$('#narratePreview').load();$('#narratePreview').play().catch(()=>{});$('#narrateAudio').src=url;$('#narrateAudio').load();$('#resultInfo').hidden=false;$('#resultTitle').textContent=d.metadata?.title||'Your Narrated Short';$('#resultMeta').textContent=`${formatTime(d.duration)} · ${state.voice.name} · ${state.clip.name} · 1080×1920`;$('#narrateDownload').href=url;$('#generateNarrate').disabled=false;return;}if(d.status==='error'){throw Error(d.error||'Narration failed.');}await new Promise(x=>setTimeout(x,600));}}
-async function loadHistory(){const container=$('#narrateHistory');if(!container)return;try{const r=await fetch('/api/narrate/history',{cache:'no-store'});const data=await r.json();const items=data.history||[];container.innerHTML=items.length?items.map(item=>`<article class="history-card"><div class="history-thumb"><video muted playsinline preload="metadata" src="${item.url}"></video></div><div class="history-copy"><strong>${escapeHtml(item.title)}</strong><small>${formatTime(item.duration)} · ${escapeHtml(item.voice)}</small></div><div class="history-actions"><a class="download" href="${item.url}" download>Download</a><button class="quiet history-delete" type="button" data-id="${escapeHtml(item.id)}">Delete</button></div></article>`).join(''):'<div class="history-empty">No narrated shorts yet.</div>';container.querySelectorAll('.history-delete').forEach(button=>button.onclick=async()=>{if(!confirm('Delete this narrated short?'))return;const r=await fetch(`/api/narrate/history/${encodeURIComponent(button.dataset.id)}`,{method:'DELETE'});if(r.ok)loadHistory();});}catch(error){container.innerHTML='<div class="history-empty">History is unavailable right now.</div>';}}
+async function watch(id){while(true){const r=await fetch(`/api/narrate/status/${id}`,{cache:'no-store'});const d=await r.json();$('#narrateBar').style.width=`${d.progress||0}%`;$('#narratePercent').textContent=`${d.progress||0}%`;$('#narrateStage').textContent=d.stage||'Working...';$('#narrateDetail').textContent=d.detail||'';if(d.status==='done'){const url=`/api/narrate/result-media/${encodeURIComponent(id)}/${encodeURIComponent(d.output)}`;$('#narratePreview').src=url;$('#narratePreview').load();$('#narratePreview').play().catch(()=>{});$('#narrateAudio').src=url;$('#narrateAudio').load();$('#resultInfo').hidden=false;$('#resultTitle').textContent=d.metadata?.title||'Your Narrated Short';$('#resultMeta').textContent=`${formatTime(d.duration)} · ${state.voice.name} · ${state.clip.name} · 1080×1920`;$('#narrateDownload').href=url;$('#generateNarrate').disabled=false;
+const pubBtn = $('#narratePublish');
+if (pubBtn) {
+  pubBtn.onclick = () => {
+    if (window.openPublishModal) {
+      window.openPublishModal(id, d.output, d.metadata?.title || 'Your Narrated Short');
+    }
+  };
+}
+setTimeout(() => {
+  if (window.openPublishModal) {
+    window.openPublishModal(id, d.output, d.metadata?.title || 'Your Narrated Short');
+  }
+}, 700);
+return;}if(d.status==='error'){throw Error(d.error||'Narration failed.');}await new Promise(x=>setTimeout(x,600));}}
+async function loadHistory(){const container=$('#narrateHistory');if(!container)return;try{const r=await fetch('/api/narrate/history',{cache:'no-store'});const data=await r.json();const items=data.history||[];container.innerHTML=items.length?items.map(item=>`<article class="history-card"><div class="history-thumb"><video muted playsinline preload="metadata" src="${item.url}"></video></div><div class="history-copy"><strong>${escapeHtml(item.title)}</strong><small>${formatTime(item.duration)} · ${escapeHtml(item.voice)}</small></div><div class="history-actions"><a class="download" href="${item.url}" download>Download</a><button class="quiet history-share" type="button" data-id="${escapeHtml(item.id)}" data-title="${escapeHtml(item.title)}">Share</button><button class="quiet history-delete" type="button" data-id="${escapeHtml(item.id)}">Delete</button></div></article>`).join(''):'<div class="history-empty">No narrated shorts yet.</div>';
+container.querySelectorAll('.history-share').forEach(button=>button.onclick=()=>{
+  if (window.openPublishModal) {
+    window.openPublishModal(button.dataset.id, 'output.mp4', button.dataset.title);
+  }
+});
+container.querySelectorAll('.history-delete').forEach(button=>button.onclick=async()=>{if(!confirm('Delete this narrated short?'))return;const r=await fetch(`/api/narrate/history/${encodeURIComponent(button.dataset.id)}`,{method:'DELETE'});if(r.ok)loadHistory();});}catch(error){container.innerHTML='<div class="history-empty">History is unavailable right now.</div>';}}
 $('#refreshHistory')?.addEventListener('click',loadHistory);
+
+// Social publishing modal controller for Narrate Studio
+function initNarratePublishing() {
+  const modal = $('#publishModal');
+  const closeBtn = $('#closePublishModal');
+  const cancelBtn = $('#cancelPublish');
+  const form = $('#publishForm');
+  const statusMsg = $('#publishStatusMsg');
+  const pubTabs = document.querySelectorAll('.pub-tab');
+
+  if (modal) {
+    modal.style.display = 'none';
+    modal.hidden = true;
+  }
+
+  function openPublish(jobId, filename, optionalTitle) {
+    if (!modal) return;
+    $('#publishJobId').value = jobId || '';
+    $('#publishFilename').value = filename || 'output.mp4';
+    $('#publishTitle').value = optionalTitle || 'Narrated Short';
+    $('#publishDescription').value = '#Shorts #ClipifyAI #Narrate';
+    if (statusMsg) { statusMsg.style.display = 'none'; statusMsg.textContent = ''; }
+    modal.style.display = 'flex';
+    modal.hidden = false;
+  }
+
+  function closePublish() {
+    if (modal) {
+      modal.style.display = 'none';
+      modal.hidden = true;
+    }
+  }
+
+  window.openPublishModal = openPublish;
+  window.closePublishModal = closePublish;
+  closeBtn?.addEventListener('click', closePublish);
+  cancelBtn?.addEventListener('click', closePublish);
+
+  pubTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      pubTabs.forEach(t => {
+        t.classList.remove('active');
+        t.style.background = 'transparent';
+        t.style.border = '1px solid transparent';
+        t.style.color = 'var(--muted,#c9b9a4)';
+      });
+      tab.classList.add('active');
+      tab.style.background = 'rgba(215,187,148,0.22)';
+      tab.style.border = '1px solid rgba(215,187,148,0.4)';
+      tab.style.color = 'var(--text,#f3eadf)';
+      const platform = tab.dataset.platform;
+      $('#publishPlatform').value = platform;
+      const submitBtn = $('#submitPublish span');
+      if (submitBtn) {
+        submitBtn.textContent = platform === 'package' ? '📦 Export Package' : `🚀 Publish to ${tab.textContent}`;
+      }
+    });
+  });
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const jobId = $('#publishJobId').value;
+    const filename = $('#publishFilename').value;
+    const platform = $('#publishPlatform').value;
+    const title = $('#publishTitle').value.trim();
+    const description = $('#publishDescription').value.trim();
+    const privacy = $('#publishPrivacy').value;
+    const submitBtn = $('#submitPublish');
+
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.querySelector('span').textContent = 'Publishing…'; }
+    if (statusMsg) {
+      statusMsg.style.display = 'block';
+      statusMsg.style.background = 'rgba(215,187,148,0.12)';
+      statusMsg.style.color = 'var(--text,#f3eadf)';
+      statusMsg.textContent = `Preparing ${platform.toUpperCase()} distribution…`;
+    }
+
+    try {
+      const resp = await fetch('/api/publish/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: jobId, filename, platform, title, description, privacy })
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error(data.error || 'Publishing failed.');
+
+      if (statusMsg) {
+        statusMsg.style.background = 'rgba(74,222,128,0.15)';
+        statusMsg.style.border = '1px solid rgba(74,222,128,0.4)';
+        statusMsg.style.color = '#4ade80';
+        if (data.status === 'published' && data.url) {
+          statusMsg.innerHTML = `✓ Successfully published to ${platform}! <a href="${data.url}" target="_blank" style="color:#60a5fa;text-decoration:underline;margin-left:8px;">View Short ↗</a>`;
+        } else if (data.status === 'manual_action_ready') {
+          statusMsg.innerHTML = `✓ Ready to publish! ${data.message || ''} ${data.studio_url ? `<a href="${data.studio_url}" target="_blank" style="color:#60a5fa;text-decoration:underline;margin-left:8px;">Open Studio Upload ↗</a>` : ''}`;
+        } else {
+          statusMsg.innerHTML = `✓ Package exported to: <code>${data.export_directory || data.copy_file || 'social_export'}</code>`;
+        }
+      }
+    } catch (err) {
+      if (statusMsg) {
+        statusMsg.style.background = 'rgba(239,68,68,0.15)';
+        statusMsg.style.border = '1px solid rgba(239,68,68,0.4)';
+        statusMsg.style.color = '#ef4444';
+        statusMsg.textContent = `Error: ${err.message}`;
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.querySelector('span').textContent = '🚀 Publish Now';
+      }
+    }
+  });
+}
+initNarratePublishing();
+
 load();loadModels();updateScript();loadHistory();
 const resultVideo=$('#narratePreview');if(resultVideo){resultVideo.muted=false;resultVideo.volume=1;}

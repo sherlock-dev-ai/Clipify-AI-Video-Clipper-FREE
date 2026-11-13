@@ -529,23 +529,21 @@ def _is_youtube_url(value: str) -> bool:
 
 def _yt_dlp_command() -> list[str] | None:
     """Locate yt-dlp without tying the video pipeline to a global Python."""
-    bundled = ROOT / "yt-dlp.exe"
-    if bundled.is_file():
-        return [str(bundled)]
-    binary = shutil.which("yt-dlp") or shutil.which("yt-dlp.exe")
-    if binary:
-        return [binary]
     runtime = runtime_python()
     if runtime is not None:
-        runtime_scripts_exe = runtime.parent / "yt-dlp.exe"
-        if runtime_scripts_exe.is_file():
-            return [str(runtime_scripts_exe)]
         return [str(runtime), "-m", "yt_dlp"]
     try:
         import yt_dlp  # noqa: F401
         return [sys.executable, "-m", "yt_dlp"]
     except ImportError:
-        return None
+        pass
+    binary = shutil.which("yt-dlp") or shutil.which("yt-dlp.exe")
+    if binary:
+        return [binary]
+    bundled = ROOT / "yt-dlp.exe"
+    if bundled.is_file():
+        return [str(bundled)]
+    return None
 
 
 

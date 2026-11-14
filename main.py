@@ -5374,8 +5374,10 @@ def create_candidate_clip_finder():
     """Limit generated Qwen candidates to the job's requested Short duration range."""
     from clipsai import ClipFinder
 
-    minimum = max(5, min(60, int(MIN_CLIP_DURATION)))
-    maximum = max(minimum, min(60, int(MAX_CLIP_DURATION)))
+    minimum = max(5, min(59, int(MIN_CLIP_DURATION)))
+    maximum = max(minimum + 1, min(60, int(MAX_CLIP_DURATION)))
+    if maximum <= minimum:
+        maximum = minimum + 1
     return ClipFinder(
         min_clip_duration=minimum,
         max_clip_duration=maximum,

@@ -1769,8 +1769,8 @@ def start():
         max_duration = max(25, min(60, int(data.get("max_duration", 60))))
     except (TypeError, ValueError):
         max_duration = 60
-    if max_duration < min_duration:
-        max_duration = min_duration
+    if max_duration <= min_duration:
+        max_duration = min_duration + 1
 
     # A source shorter than the requested minimum can never yield a clip, and
     # the pipeline then fails with "No final captioned Shorts were produced."
@@ -1784,8 +1784,8 @@ def start():
         if sources:
             source_seconds = _media_duration_seconds(str(sources[0]))
             if source_seconds and source_seconds < min_duration:
-                fitted_max = max(5, int(source_seconds))
-                fitted_min = max(5, min(fitted_max, int(source_seconds * 0.6)))
+                fitted_max = max(6, int(source_seconds))
+                fitted_min = max(5, min(fitted_max - 1, int(source_seconds * 0.6)))
                 if (fitted_min, fitted_max) != (min_duration, max_duration):
                     emit(job_id, "log", f"[Setup] Source is {source_seconds:.0f}s long; "
                                         f"clip length adjusted from {min_duration}-{max_duration}s "

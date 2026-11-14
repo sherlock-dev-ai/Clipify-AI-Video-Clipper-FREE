@@ -1542,16 +1542,30 @@ def import_youtube():
             ffmpeg_path = _ffmpeg_path()
             output_template = str(input_dir / "youtube.%(ext)s")
             command = [*yt_dlp_cmd, "--no-playlist", "--no-warnings", "--newline", "--progress",
-                       "--progress-template", "download:%(progress._percent_str)s|%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress.speed)s|%(progress.eta)s",
+                       "--progress-template", "download:[clip-prog] %(progress._percent_str)s|%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress.speed)s|%(progress.eta)s",
                        "--restrict-filenames", "--merge-output-format", "mp4", "--max-filesize", "4G",
                        "--socket-timeout", "20", "--retries", "3", "--fragment-retries", "3",
-                       "-f", "bestvideo[height<=1080]+bestaudio/best[height<=1080][ext=mp4]/best",
+                       "--concurrent-fragments", "4",
+                       "-f", "bestvideo[height<=1080][protocol^=http]+bestaudio[protocol^=http]/bestvideo[height<=1080]+bestaudio/best[height<=1080][protocol^=http]/best[height<=1080]/best",
                        "--ffmpeg-location", str(Path(ffmpeg_path).parent),
                        "-o", output_template, source_url]
             proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                     text=True, encoding="utf-8", errors="replace", bufsize=1,
                                      creationflags=_hidden_creationflags())
             assert proc.stdout is not None
+
+            def _fmt_size(n: float | int) -> str:
+                try:
+                    val = float(n)
+                    for unit in ("B", "KB", "MB", "GB"):
+                        if val < 1024.0:
+                            return f"{val:.1f} {unit}"
+                        val /= 1024.0
+                    return f"{val:.1f} TB"
+                except (TypeError, ValueError):
+                    return ""
+
+            stream_count = 0
             for raw in proc.stdout:
                 line = raw.strip()
                 if not line:
@@ -1560,28 +1574,84 @@ def import_youtube():
                     job = jobs.get(job_id)
                     if not job:
                         return
-                    if line.startswith("[download]") or line.startswith("download:"):
-                        fields = line.split("|", 4) if line.startswith("download:") else []
-                        pct_match = re.search(r"(\d+(?:\.\d+)?)%", line)
-                        pct = float(pct_match.group(1)) if pct_match else 0.0
-                        if len(fields) >= 3:
+                    lower = line.lower()
+                    if "[clip-prog]" in line:
+                        payload = line.split("[clip-prog]", 1)[1].strip()
+                        parts = [p.strip() for p in payload.split("|")]
+                        pct = 0.0
+                        pct_m = re.search(r"(\d+(?:\.\d+)?)%", parts[0]) if parts else None
+                        if pct_m:
+                            pct = float(pct_m.group(1))
+
+                        info_items: list[str] = []
+                        if len(parts) >= 3:
                             try:
-                                downloaded = int(fields[1])
-                                total = int(fields[2])
-                                if total > 0:
-                                    pct = downloaded * 100 / total
+                                dl_bytes = int(parts[1])
+                                tot_bytes = int(parts[2])
+                                if tot_bytes > 0:
+                                    pct = (dl_bytes * 100.0) / tot_bytes
+                                    info_items.append(f"{_fmt_size(dl_bytes)} / {_fmt_size(tot_bytes)}")
+                                elif dl_bytes > 0:
+                                    info_items.append(_fmt_size(dl_bytes))
                             except (TypeError, ValueError):
                                 pass
-                        job["progress"] = max(job["progress"], max(0, min(99, int(pct))))
-                        job["stage"] = "Downloading video"
-                        job["detail"] = line
-                    elif line.startswith("[Merger]") or "merging" in line.lower():
-                        job["progress"] = max(job["progress"], 98)
+                        if len(parts) >= 4 and parts[3] not in ("NA", ""):
+                            try:
+                                spd = float(parts[3])
+                                info_items.append(f"{_fmt_size(spd)}/s")
+                            except (TypeError, ValueError):
+                                pass
+                        if len(parts) >= 5 and parts[4] not in ("NA", ""):
+                            try:
+                                eta_val = int(float(parts[4]))
+                                m, s = divmod(eta_val, 60)
+                                info_items.append(f"ETA {m:02d}:{s:02d}")
+                            except (TypeError, ValueError):
+                                pass
+
+                        if stream_count <= 1:
+                            scaled = int(min(85, max(1, pct * 0.85)))
+                            stage_lbl = "Downloading video"
+                        else:
+                            scaled = int(min(96, max(85, 85 + pct * 0.11)))
+                            stage_lbl = "Downloading audio"
+
+                        job["progress"] = max(job["progress"], scaled)
+                        job["stage"] = stage_lbl
+                        summary_info = " · ".join(info_items)
+                        extra = f" ({summary_info})" if info_items else f" ({pct:.1f}%)"
+                        job["detail"] = f"{stage_lbl}{extra}"
+
+                    elif "destination:" in lower:
+                        stream_count += 1
+                        dest_file = line.split(":", 1)[1].strip() if ":" in line else line
+                        dest_name = Path(dest_file).name
+                        if stream_count <= 1:
+                            job["progress"] = max(job["progress"], 1)
+                            job["stage"] = "Downloading video"
+                            job["detail"] = f"Connecting video stream ({dest_name})…"
+                        else:
+                            job["progress"] = max(job["progress"], 85)
+                            job["stage"] = "Downloading audio"
+                            job["detail"] = f"Connecting audio stream ({dest_name})…"
+
+                    elif "[merger]" in lower or "merging" in lower:
+                        job["progress"] = max(job["progress"], 97)
                         job["stage"] = "Finalizing download"
-                        job["detail"] = "Merging video and audio…"
-                    elif "destination:" in line.lower():
+                        job["detail"] = "Merging video and audio streams…"
+
+                    elif line.startswith("[download]") and "%" in line:
+                        pct_m = re.search(r"(\d+(?:\.\d+)?)%", line)
+                        if pct_m:
+                            pct = float(pct_m.group(1))
+                            if stream_count <= 1:
+                                scaled = int(min(85, max(1, pct * 0.85)))
+                            else:
+                                scaled = int(min(96, max(85, 85 + pct * 0.11)))
+                            job["progress"] = max(job["progress"], scaled)
                         job["detail"] = line
-                    job["events"].append({"kind":"log", "message":line})
+
+                    job["events"].append({"kind": "log", "message": line})
             return_code = proc.wait()
             videos = []
             ffprobe = Path(ffmpeg_path).with_name("ffprobe.exe")

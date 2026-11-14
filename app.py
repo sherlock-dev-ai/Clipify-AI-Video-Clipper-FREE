@@ -1824,8 +1824,19 @@ def start():
                 return jsonify({"error": "Job not found."}), 404
         if job["status"] == "running":
             return jsonify({"error": "This job is already running."}), 409
-        job.update({"mode": mode, "clips": clips, "model": model, "font": font,
-                    "min_duration": min_duration, "max_duration": max_duration})
+        if job["status"] == "downloading":
+            return jsonify({"error": "Video is still downloading from YouTube. Please wait."}), 400
+        job.update({
+            "mode": mode, "clips": clips, "model": model, "font": font,
+            "min_duration": min_duration, "max_duration": max_duration,
+            "status": "running",
+            "progress": 2,
+            "stage": "Starting Clipify AI",
+            "detail": "Launching the local pipeline…",
+            "stage_started": __import__("time").time(),
+            "events": [],
+            "outputs": [],
+        })
     branding_raw = data.get("branding") if isinstance(data.get("branding"), dict) else {}
     branding = {
         "logo_enabled": bool(branding_raw.get("logo_enabled", branding_raw.get("watermark_enabled", False))),

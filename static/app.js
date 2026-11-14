@@ -205,10 +205,12 @@ async function waitForYouTubeDownload(jobId){
         if(state.youtubePoll)clearInterval(state.youtubePoll);
         state.youtubePoll=null;
 
+        state.jobId=jobId;
         state.source={
           name:d.filename,
           size:0,
-          origin:'youtube'
+          origin:'youtube',
+          jobId:jobId
         };
 
         nameEl.textContent=d.filename;
@@ -234,7 +236,11 @@ async function waitForYouTubeDownload(jobId){
         youtubeImport.disabled=false;
         youtubeImport.textContent='Import video';
 
-        create.disabled=!state.modelsAvailable;
+        if(!state.modelsAvailable){
+          try{await loadOptions();}catch{}
+        }
+
+        create.disabled=false;
 
         if(track)track.hidden=true;
 
@@ -1106,25 +1112,46 @@ function selectedBranding(){
 
 async function start(){
 
+  if(!state.source && youtubeUrl && youtubeUrl.value.trim()){
+    const trimmedUrl = youtubeUrl.value.trim();
+    if(trimmedUrl.includes('youtube.com/') || trimmedUrl.includes('youtu.be/')){
+      addLog('[YouTube] Importing video link before generating…');
+      await importYouTube();
+      if(!state.source){
+        create.disabled=false;
+        return;
+      }
+    }
+  }
+
   if(!state.source){
     alert('Choose a video first.');
     return;
   }
 
   if(!state.modelsAvailable){
-    alert('No local Ollama model is available.');
-    return;
+    try{await loadOptions();}catch{}
+    if(!state.modelsAvailable){
+      alert('Local AI model is not ready. Please select a model or verify Ollama is running.');
+      return;
+    }
   }
 
   try{
     if(!state.jobId){
-      const uploadForm=new FormData();
-      uploadForm.append('video',state.source);
-      const uploadResponse=await fetch('/api/upload',{method:'POST',body:uploadForm});
-      const uploadData=await uploadResponse.json();
-      if(!uploadResponse.ok) throw Error(uploadData.error||'Could not upload the video.');
-      state.jobId=uploadData.job_id;
-      addLog(`[Upload] Video ready as project ${state.jobId}`);
+      if(state.source && state.source.origin === 'youtube' && state.source.jobId){
+        state.jobId = state.source.jobId;
+      }else if(state.source instanceof File){
+        const uploadForm=new FormData();
+        uploadForm.append('video',state.source);
+        const uploadResponse=await fetch('/api/upload',{method:'POST',body:uploadForm});
+        const uploadData=await uploadResponse.json();
+        if(!uploadResponse.ok) throw Error(uploadData.error||'Could not upload the video.');
+        state.jobId=uploadData.job_id;
+        addLog(`[Upload] Video ready as project ${state.jobId}`);
+      }else{
+        throw Error('Could not find video project. Please re-select or re-import the video.');
+      }
     }
 
     if(state.logoFile){

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import json
 import os
 import queue
@@ -9,19 +10,29 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
+import traceback
+import urllib.request
 import uuid
 import warnings
+import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit, urlunsplit
 from windows_process import clear_ffmpeg_report_environment, install_hidden_subprocess_defaults
 
-import traceback
+# Early application root fallback for unhandled exceptions during bootstrap
+ROOT = Path(__file__).resolve().parent
+
 def _log_unhandled_exception(exc_type, exc_value, exc_traceback):
-    with open(os.path.join(ROOT, "app_crash.log"), "a", encoding="utf-8") as f:
-        f.write(f"\n--- CRASH AT {datetime.now()} ---\n")
-        traceback.print_exception(exc_type, exc_value, exc_traceback, file=f)
+    try:
+        log_dir = str(ROOT) if "ROOT" in globals() else str(Path(__file__).resolve().parent)
+        with open(os.path.join(log_dir, "app_crash.log"), "a", encoding="utf-8") as f:
+            f.write(f"\n--- CRASH AT {datetime.now()} ---\n")
+            traceback.print_exception(exc_type, exc_value, exc_traceback, file=f)
+    except Exception:
+        pass
 sys.excepthook = _log_unhandled_exception
 
 # Safeguard against headless GUI runs where stdio handles may be None or invalid

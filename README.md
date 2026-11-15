@@ -39,7 +39,7 @@ The clipping and narration workflows are separate parts of the desktop applicati
 
 **[Open Clipify AI Releases](https://github.com/sherlock-dev-ai/Clipify-AI/releases)** to see installers published for this project.
 
-The verified preview installer candidate is **Clipify AI 2.0.0 for Windows x64**. Its release asset is not attached yet:
+The verified preview installer candidate is **Clipify AI 3.0.0 for Windows x64**. Its release asset is not attached yet:
 
 | File | Size | SHA-256 |
 |:--|--:|:--|

@@ -27,7 +27,7 @@ def fake_url_for(endpoint, filename=None, **kwargs):
     return f"static/{filename or ''}"
 
 env = jinja2.Environment(loader=jinja2.FileSystemLoader(src_templates))
-env.globals["url_for"] = fake_url_for
+getattr(env, "globals")["url_for"] = fake_url_for  # type: ignore
 
 # Premium Native Android Mobile CSS: Obsidian Dark Theme, Single-Column Fluid Layout, Zero Text Squishing
 mobile_css = """

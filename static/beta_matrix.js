@@ -1,11 +1,12 @@
 /**
- * Clipify AI - Interactive ASCII Dot Matrix Background for Beta Testing Lab
+ * Clipify AI - Interactive Matrix Symbol Background for Beta Testing Lab
  * Features:
- * - Fluid grid of delicate, crisp matrix dots spanning the entire width (left and right)
- * - Random dots across the entire width highlight, cycle through ASCII symbols (!@#$% 0 1), and smoothly vanish back to dots
- * - "CLIPIFY" text emerges dynamically at random positions across the grid with shimmering ASCII glyphs
- * - Interactive mouse repulsion with smooth spring physics
- * - Auto-pauses when user leaves #beta to ensure 0% idle CPU overhead
+ * - Fluid grid of delicate ASCII symbols spanning 100% width and height (left to right)
+ * - Exact 1:1 pixel-accurate mouse repulsion & dynamic halo animation wherever cursor moves
+ * - Random symbols highlighted pulsing & shifting across the entire workspace (!@#$% 0 1)
+ * - Periodic Clipify Mascot Cat Logo glowing in purple/cyan aura at random places and vanishing
+ * - Dynamic "CLIPIFY" ASCII block typography shimmering and spawning at random locations
+ * - Auto-pauses when tab is inactive to guarantee 0% idle CPU overhead
  */
 (function () {
   'use strict';
@@ -69,10 +70,6 @@
   };
 
   const WORD = ['C', 'L', 'I', 'P', 'I', 'F', 'Y'];
-  const ASCII_SYMBOLS = ['■', '◆', '▲', '▼', '●', '#', '%', '&', 'X', 'Q', 'G', '6', 'N', 'A', '8', '0', '$', '*', '+', 'W', 'M', 'K'];
-  const GLITCH_SYMBOLS = ['!', '@', '#', '$', '%', '^', '&', '*', '0', '1', '7', '8', 'X', 'Q', '?', '~'];
-
-  // Build 2D relative pixel map for "CLIPIFY" (letter width 5, gap 1)
   const WORD_MAP = [];
   let currentOffsetCol = 0;
   WORD.forEach((letter) => {
@@ -90,6 +87,38 @@
   const WORD_TOTAL_COLS = currentOffsetCol; // ~42 cols
   const WORD_TOTAL_ROWS = 7;
 
+  // Clipify Mascot Logo (Cat Face with Crown & Whiskers)
+  const LOGO_OFFSETS = [
+    // Left Ear
+    [-6, -6], [-5, -7], [-4, -6], [-4, -5],
+    // Right Ear
+    [4, -5], [4, -6], [5, -7], [6, -6],
+    // Crown Peaks in Center
+    [-2, -7], [-1, -6], [0, -8], [1, -6], [2, -7],
+    [-2, -5], [-1, -5], [0, -5], [1, -5], [2, -5],
+    // Head Top Outline
+    [-3, -4], [-2, -4], [-1, -4], [0, -4], [1, -4], [2, -4], [3, -4],
+    // Cheeks Outline
+    [-7, -3], [-6, -3], [6, -3], [7, -3],
+    [-7, -2], [-6, -2], [6, -2], [7, -2],
+    [-7, -1], [-6, -1], [6, -1], [7, -1],
+    [-7, 0], [7, 0],
+    [-7, 1], [-6, 1], [6, 1], [7, 1],
+    // Cute Eyes
+    [-3, -1], [-3, 0], [3, -1], [3, 0],
+    // Cute Nose
+    [0, 1],
+    // Whiskers Left
+    [-9, -1], [-8, -1], [-10, 1], [-9, 1], [-8, 1],
+    // Whiskers Right
+    [8, -1], [9, -1], [8, 1], [9, 1], [10, 1],
+    // Chin Bottom
+    [-5, 3], [-4, 4], [-3, 4], [-2, 4], [-1, 4], [0, 4], [1, 4], [2, 4], [3, 4], [4, 4], [5, 3]
+  ];
+
+  const SYMBOLS = ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '0', '1', 'X', 'Q', 'G', 'N', 'A', '8', '?', '/', '\\', '|', '~', ':', ';', '.'];
+  const LOGO_SYMBOLS = ['✦', '★', '●', '■', '◆', '▲', '▼', '#', '%', '&', '8', '0'];
+
   let canvas = null;
   let ctx = null;
   let betaSection = null;
@@ -100,12 +129,13 @@
   let height = 0;
   let cols = 0;
   let rows = 0;
-  const SPACING = 16; // Balanced matrix spacing
+  const SPACING = 16;
 
   let grid = [];
+  let gridMap = {};
   let mouse = { x: -9999, y: -9999, active: false };
 
-  // Text animation state
+  // "CLIPIFY" word state
   let textState = {
     startCol: 4,
     startRow: 4,
@@ -118,10 +148,14 @@
     charOverrides: {}
   };
 
-  // Dynamic glitching symbol nodes
-  let glitches = [];
+  // Mascot Logo spawns
+  let logoSpawns = [];
+  let lastLogoSpawn = Date.now() - 1500;
 
-  function pickRandomPosition() {
+  // Dynamic glitching/highlighted symbols
+  let highlights = [];
+
+  function pickRandomTextPosition() {
     const maxCol = Math.max(2, cols - WORD_TOTAL_COLS - 2);
     const maxRow = Math.max(2, rows - WORD_TOTAL_ROWS - 2);
     textState.startCol = Math.floor(2 + Math.random() * maxCol);
@@ -130,107 +164,115 @@
     textState.phase = 'fadeIn';
     textState.timer = 0;
 
-    // Randomize initial ASCII symbol assignments
     textState.charOverrides = {};
     WORD_MAP.forEach((pt, idx) => {
-      textState.charOverrides[idx] = ASCII_SYMBOLS[Math.floor(Math.random() * ASCII_SYMBOLS.length)];
+      textState.charOverrides[idx] = LOGO_SYMBOLS[Math.floor(Math.random() * LOGO_SYMBOLS.length)];
     });
+  }
+
+  function spawnLogoInstance() {
+    if (cols < 26 || rows < 20) return;
+    // Choose random center covering left, right, or middle bands
+    const centerC = Math.floor(12 + Math.random() * (cols - 24));
+    const centerR = Math.floor(10 + Math.random() * (rows - 20));
+
+    const points = [];
+    for (const [dx, dy] of LOGO_OFFSETS) {
+      const pt = gridMap[`${centerC + dx},${centerR + dy}`];
+      if (pt) {
+        points.push({
+          pt: pt,
+          char: LOGO_SYMBOLS[Math.floor(Math.random() * LOGO_SYMBOLS.length)],
+          cycleTimer: Math.random() * 0.2
+        });
+      }
+    }
+
+    if (points.length > 15) {
+      logoSpawns.push({
+        centerC,
+        centerR,
+        points,
+        alpha: 0,
+        targetAlpha: 0.95,
+        phase: 'in', // 'in', 'hold', 'out'
+        timer: 0,
+        holdDuration: 2.5 + Math.random() * 1.5
+      });
+    }
+  }
+
+  function spawnHighlights() {
+    if (highlights.length < 45 && Math.random() < 0.45) {
+      const randPt = grid[Math.floor(Math.random() * grid.length)];
+      if (randPt) {
+        highlights.push({
+          pt: randPt,
+          char: SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)],
+          alpha: 0.25,
+          targetAlpha: 0.85 + Math.random() * 0.15,
+          phase: 'in',
+          timer: 0,
+          life: 1.2 + Math.random() * 1.8,
+          cycleTimer: 0
+        });
+      }
+    }
   }
 
   function resize() {
     if (!canvas || !betaSection) return;
+    const rect = betaSection.getBoundingClientRect();
     const parent = betaSection.parentElement || document.body;
-    width = canvas.width = Math.max(window.innerWidth, betaSection.offsetWidth || 0, betaSection.scrollWidth || 0, parent.clientWidth || 0);
-    height = canvas.height = Math.max(window.innerHeight, betaSection.offsetHeight || 0, betaSection.scrollHeight || 0, 800);
+
+    // Expand width across the entire container and viewport
+    width = canvas.width = Math.round(Math.max(window.innerWidth, betaSection.offsetWidth || 0, rect.width || 0, parent.clientWidth || 0, 1200));
+    height = canvas.height = Math.round(Math.max(window.innerHeight, betaSection.offsetHeight || 0, rect.height || 0, betaSection.scrollHeight || 0, 900));
 
     cols = Math.floor(width / SPACING);
     rows = Math.floor(height / SPACING);
 
-    // Initialize full point grid spanning entire width & height
     grid = [];
+    gridMap = {};
+
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const bx = c * SPACING + SPACING / 2;
         const by = r * SPACING + SPACING / 2;
-        grid.push({
+        const sym = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+        const pt = {
           col: c,
           row: r,
           baseX: bx,
           baseY: by,
           x: bx,
           y: by,
-          vx: 0,
-          vy: 0
-        });
+          vx: (Math.random() - 0.5) * 0.25,
+          vy: (Math.random() - 0.5) * 0.25,
+          char: sym,
+          baseAlpha: 0.16 + Math.random() * 0.12,
+          alpha: 0.16 + Math.random() * 0.12,
+          charTimer: Math.random() * 2.0
+        };
+        grid.push(pt);
+        gridMap[`${c},${r}`] = pt;
       }
     }
 
-    glitches = [];
-    pickRandomPosition();
-  }
-
-  function updateGlitches(dt) {
-    // Spawn new glitches across the entire width
-    if (glitches.length < 40 && Math.random() < 0.35) {
-      const randCol = Math.floor(Math.random() * cols);
-      const randRow = Math.floor(Math.random() * rows);
-      const key = `${randCol},${randRow}`;
-      if (!glitches.some(g => g.key === key)) {
-        glitches.push({
-          key: key,
-          col: randCol,
-          row: randRow,
-          char: GLITCH_SYMBOLS[Math.floor(Math.random() * GLITCH_SYMBOLS.length)],
-          alpha: 0,
-          maxAlpha: 0.85 + Math.random() * 0.15,
-          phase: 'in', // 'in', 'hold', 'out'
-          timer: 0,
-          life: 1.5 + Math.random() * 2.0,
-          cycleTimer: 0,
-          cycleInterval: 0.08 + Math.random() * 0.08
-        });
-      }
-    }
-
-    // Update active glitches
-    for (let i = glitches.length - 1; i >= 0; i--) {
-      const g = glitches[i];
-      g.timer += dt;
-      g.cycleTimer += dt;
-
-      // Constantly switch between symbols like !@#$% 0 1
-      if (g.cycleTimer >= g.cycleInterval) {
-        g.cycleTimer = 0;
-        g.char = GLITCH_SYMBOLS[Math.floor(Math.random() * GLITCH_SYMBOLS.length)];
-      }
-
-      if (g.phase === 'in') {
-        g.alpha += dt * 3.0;
-        if (g.alpha >= g.maxAlpha) {
-          g.alpha = g.maxAlpha;
-          g.phase = 'hold';
-        }
-      } else if (g.phase === 'hold') {
-        if (g.timer >= g.life) {
-          g.phase = 'out';
-        }
-      } else if (g.phase === 'out') {
-        g.alpha -= dt * 2.0;
-        if (g.alpha <= 0) {
-          glitches.splice(i, 1);
-        }
-      }
-    }
+    highlights = [];
+    logoSpawns = [];
+    pickRandomTextPosition();
+    spawnLogoInstance();
   }
 
   function render(time) {
     if (!running || !ctx) return;
 
     ctx.clearRect(0, 0, width, height);
-
     const dt = 0.016;
-    textState.timer += dt;
 
+    // 1. Text animation timer & phases
+    textState.timer += dt;
     if (textState.phase === 'fadeIn') {
       textState.alpha += dt * textState.fadeSpeed;
       if (textState.alpha >= 1) {
@@ -247,95 +289,176 @@
       textState.alpha -= dt * textState.fadeSpeed;
       if (textState.alpha <= 0) {
         textState.alpha = 0;
-        pickRandomPosition();
+        pickRandomTextPosition();
       }
     }
 
-    // Occasional symbol shimmer inside "CLIPIFY"
+    // Occasional symbol shift in "CLIPIFY"
     if (Math.random() < 0.25) {
       const randIdx = Math.floor(Math.random() * WORD_MAP.length);
-      textState.charOverrides[randIdx] = ASCII_SYMBOLS[Math.floor(Math.random() * ASCII_SYMBOLS.length)];
+      textState.charOverrides[randIdx] = LOGO_SYMBOLS[Math.floor(Math.random() * LOGO_SYMBOLS.length)];
     }
 
-    updateGlitches(dt);
+    // 2. Spawn mascot logo periodically
+    const now = Date.now();
+    if (logoSpawns.length < 2 && (now - lastLogoSpawn) > 3200) {
+      spawnLogoInstance();
+      lastLogoSpawn = now;
+    }
 
-    // Fast lookup maps
-    const activeTextCoords = new Map();
-    if (textState.alpha > 0.02) {
-      WORD_MAP.forEach((pt, idx) => {
-        const c = textState.startCol + pt.relCol;
-        const r = textState.startRow + pt.relRow;
-        if (c >= 0 && c < cols && r >= 0 && r < rows) {
-          activeTextCoords.set(`${c},${r}`, {
-            char: textState.charOverrides[idx] || '#',
-            alpha: textState.alpha
-          });
+    // 3. Spawn individual highlights
+    spawnHighlights();
+
+    // 4. Update highlights
+    for (let j = highlights.length - 1; j >= 0; j--) {
+      const h = highlights[j];
+      h.timer += dt;
+      h.cycleTimer += dt;
+      if (h.cycleTimer > 0.10) {
+        h.cycleTimer = 0;
+        h.char = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+      }
+
+      if (h.phase === 'in') {
+        h.alpha += 0.06;
+        if (h.alpha >= h.targetAlpha) {
+          h.alpha = h.targetAlpha;
+          h.phase = 'hold';
         }
-      });
+      } else if (h.phase === 'hold') {
+        if (h.timer >= h.life) {
+          h.phase = 'out';
+        }
+      } else if (h.phase === 'out') {
+        h.alpha -= 0.04;
+        if (h.alpha <= 0) {
+          highlights.splice(j, 1);
+        }
+      }
     }
 
-    const activeGlitchMap = new Map();
-    glitches.forEach((g) => {
-      activeGlitchMap.set(g.key, g);
-    });
+    // 5. Update mascot logo spawns
+    for (let m = logoSpawns.length - 1; m >= 0; m--) {
+      const l = logoSpawns[m];
+      l.timer += dt;
+      if (l.phase === 'in') {
+        l.alpha += 0.045;
+        if (l.alpha >= l.targetAlpha) {
+          l.alpha = l.targetAlpha;
+          l.phase = 'hold';
+          l.timer = 0;
+        }
+      } else if (l.phase === 'hold') {
+        if (l.timer >= l.holdDuration) {
+          l.phase = 'out';
+        }
+      } else if (l.phase === 'out') {
+        l.alpha -= 0.035;
+        if (l.alpha <= 0) {
+          logoSpawns.splice(m, 1);
+        }
+      }
+    }
 
-    ctx.font = '10px "Courier New", monospace, monospace';
+    // Setup rendering context
+    ctx.font = '11px "Courier New", monospace, monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    const repelRadius = 90;
+    const repelRadius = 110;
     const repelRadiusSq = repelRadius * repelRadius;
 
-    // Physics step and rendering for every grid point across entire section
+    // 6. Physics step and render background moving symbols
     for (let i = 0; i < grid.length; i++) {
       const pt = grid[i];
 
-      // Mouse repulsion physics
+      // Slow constant drift
+      pt.x += pt.vx;
+      pt.y += pt.vy;
+      if (Math.abs(pt.x - pt.baseX) > 8) pt.vx *= -1;
+      if (Math.abs(pt.y - pt.baseY) > 8) pt.vy *= -1;
+
+      // Mouse repulsion physics (pixel-accurate)
       if (mouse.active) {
         const dx = pt.x - mouse.x;
         const dy = pt.y - mouse.y;
         const dSq = dx * dx + dy * dy;
         if (dSq < repelRadiusSq && dSq > 0.001) {
           const dist = Math.sqrt(dSq);
-          const force = (1 - dist / repelRadius) * 14;
-          pt.vx += (dx / dist) * force * 0.45;
-          pt.vy += (dy / dist) * force * 0.45;
+          const force = (1 - dist / repelRadius) * 16;
+          pt.x += (dx / dist) * force * 0.45;
+          pt.y += (dy / dist) * force * 0.45;
+          pt.alpha = Math.min(0.75, pt.baseAlpha + (1 - dist / repelRadius) * 0.55);
+        } else {
+          pt.alpha += (pt.baseAlpha - pt.alpha) * 0.05;
+        }
+      } else {
+        pt.alpha += (pt.baseAlpha - pt.alpha) * 0.05;
+      }
+
+      // Spring back to base
+      pt.x += (pt.baseX - pt.x) * 0.05;
+      pt.y += (pt.baseY - pt.y) * 0.05;
+
+      // Occasional symbol shift
+      pt.charTimer += dt;
+      if (pt.charTimer > 2.8) {
+        pt.charTimer = 0;
+        if (Math.random() < 0.25) {
+          pt.char = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
         }
       }
 
-      // Spring back to base position
-      pt.vx += (pt.baseX - pt.x) * 0.12;
-      pt.vy += (pt.baseY - pt.y) * 0.12;
-      pt.vx *= 0.76;
-      pt.vy *= 0.76;
-      pt.x += pt.vx;
-      pt.y += pt.vy;
+      ctx.fillStyle = `rgba(255, 255, 255, ${pt.alpha.toFixed(2)})`;
+      ctx.fillText(pt.char, pt.x, pt.y);
+    }
 
-      const coordKey = `${pt.col},${pt.row}`;
-      const textChar = activeTextCoords.get(coordKey);
-      const glitch = activeGlitchMap.get(coordKey);
+    // 7. Render dynamic individual highlighted symbols
+    for (let j = 0; j < highlights.length; j++) {
+      const h = highlights[j];
+      ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, h.alpha).toFixed(2)})`;
+      ctx.shadowColor = 'rgba(255, 255, 255, 0.85)';
+      ctx.shadowBlur = 6;
+      ctx.fillText(h.char, h.pt.x, h.pt.y);
+      ctx.shadowBlur = 0;
+    }
 
-      if (textChar) {
-        // Render bright glowing ASCII symbol for "CLIPIFY"
-        ctx.fillStyle = `rgba(240, 248, 255, ${textChar.alpha.toFixed(2)})`;
-        ctx.shadowColor = 'rgba(160, 220, 255, 0.75)';
-        ctx.shadowBlur = 5;
-        ctx.fillText(textChar.char, pt.x, pt.y);
-        ctx.shadowBlur = 0;
-      } else if (glitch && glitch.alpha > 0.02) {
-        // Render highlighted symbol switching between !@#$% 0 1
-        ctx.fillStyle = `rgba(255, 255, 255, ${glitch.alpha.toFixed(2)})`;
-        ctx.shadowColor = 'rgba(255, 255, 255, 0.85)';
-        ctx.shadowBlur = 6;
-        ctx.fillText(glitch.char, pt.x, pt.y);
-        ctx.shadowBlur = 0;
-      } else {
-        // Render delicate, clearly visible matrix background dot (bumped from 0.10 to 0.32)
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.32)';
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 1.25, 0, Math.PI * 2);
-        ctx.fill();
+    // 8. Render Mascot Logo Formations with purple/cyan aura
+    ctx.font = 'bold 12px "Courier New", monospace';
+    ctx.shadowColor = 'rgba(168, 85, 247, 0.95)';
+    ctx.shadowBlur = 12;
+    for (let m = 0; m < logoSpawns.length; m++) {
+      const l = logoSpawns[m];
+      const a = Math.max(0, l.alpha);
+      if (a < 0.02) continue;
+      for (const item of l.points) {
+        item.cycleTimer += dt;
+        if (item.cycleTimer > 0.18) {
+          item.cycleTimer = 0;
+          item.char = LOGO_SYMBOLS[Math.floor(Math.random() * LOGO_SYMBOLS.length)];
+        }
+        ctx.fillStyle = `rgba(235, 215, 255, ${a.toFixed(2)})`;
+        ctx.fillText(item.char, item.pt.x, item.pt.y);
       }
+    }
+    ctx.shadowBlur = 0;
+
+    // 9. Render "CLIPIFY" word formation
+    if (textState.alpha > 0.02) {
+      ctx.font = 'bold 12px "Courier New", monospace';
+      ctx.shadowColor = 'rgba(160, 220, 255, 0.85)';
+      ctx.shadowBlur = 8;
+      WORD_MAP.forEach((pt, idx) => {
+        const c = textState.startCol + pt.relCol;
+        const r = textState.startRow + pt.relRow;
+        const targetPt = gridMap[`${c},${r}`];
+        if (targetPt) {
+          const ch = textState.charOverrides[idx] || '#';
+          ctx.fillStyle = `rgba(240, 248, 255, ${textState.alpha.toFixed(2)})`;
+          ctx.fillText(ch, targetPt.x, targetPt.y);
+        }
+      });
+      ctx.shadowBlur = 0;
     }
 
     animId = requestAnimationFrame(render);
@@ -363,12 +486,14 @@
 
     ctx = canvas.getContext('2d');
 
-    // Track mouse coordinates over #beta
+    // 1:1 Pixel-Accurate Mouse Event Tracking
     betaSection.addEventListener('mousemove', (e) => {
       const rect = canvas.getBoundingClientRect();
-      mouse.x = e.clientX - rect.left;
-      mouse.y = e.clientY - rect.top;
-      mouse.active = true;
+      if (rect.width > 0 && rect.height > 0) {
+        mouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
+        mouse.y = (e.clientY - rect.top) * (canvas.height / rect.height);
+        mouse.active = true;
+      }
     });
 
     betaSection.addEventListener('mouseleave', () => {
@@ -379,7 +504,6 @@
       if (running) resize();
     });
 
-    // Check visibility on navigation
     function checkVisibility() {
       const isVisible = betaSection.classList.contains('visible') ||
         (window.location.hash || '').toLowerCase().includes('beta');

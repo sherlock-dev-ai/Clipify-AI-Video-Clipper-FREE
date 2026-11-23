@@ -4009,11 +4009,19 @@ div[id*="monica-action"] {
 
 #beta {
   position: relative;
+  max-width: 100% !important;
+  width: 100% !important;
 }
 
 #beta > *:not(.beta-matrix-canvas) {
   position: relative;
   z-index: 1;
+}
+
+#beta .beta-card {
+  background: rgba(12, 12, 15, 0.82) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
 }
 
 .galaxy-hud-actions {

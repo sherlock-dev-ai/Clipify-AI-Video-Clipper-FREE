@@ -1199,7 +1199,7 @@ def _font_path_for_editor(font_name: str) -> str | None:
 
 def _ffmpeg_filter_path(path_value: str) -> str:
     """Escape a Windows path for use inside an FFmpeg filter option."""
-    value = os.path.abspath(str(path_value)).replace("\\", "/")
+    value = os.path.abspath(path_value).replace("\\", "/")
     value = value.replace(":", "\\:")
     value = value.replace("'", "\\'")
     return value
@@ -1428,7 +1428,7 @@ def apply_branding_to_file(input_video: str, output_video: str, branding: dict[s
 def _is_cuda_available() -> bool:
     try:
         import torch
-        return bool(torch.cuda.is_available())
+        return torch.cuda.is_available()
     except Exception:
         return False
 
@@ -1486,9 +1486,9 @@ job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, ma
         "CLIPPEDAI_INPUT_DIR": str(input_dir),
         "CLIPPEDAI_OUTPUT_DIR": str(output_dir),
         "CLIPPEDAI_MODE": mode,
-        "CLIPPEDAI_UPSCALE_QUALITY": str(upscale_quality),
+        "CLIPPEDAI_UPSCALE_QUALITY": upscale_quality,
         "OLLAMA_MODEL": model,
-        "OLLAMA_URL": str(OLLAMA_RUNTIME_BASE_URL or _ollama_base_url()),
+        "OLLAMA_URL": OLLAMA_RUNTIME_BASE_URL or _ollama_base_url(),
         "CLIPPEDAI_FONT": font,
         "MIN_CLIP_DURATION": str(min_duration),
         "MAX_CLIP_DURATION": str(max_duration),
@@ -1967,7 +1967,7 @@ def _generate_thumbnail_file(video_path: Path, thumb_path: Path) -> bool:
 
         # Extract 1 frame at 1s into video for an accurate preview
         cmd = [
-            str(ff), "-y", "-ss", "1", "-i", str(video_path),
+            ff, "-y", "-ss", "1", "-i", str(video_path),
             "-vframes", "1",
             "-vf", "scale=360:640:force_original_aspect_ratio=decrease",
             "-q:v", "4",
@@ -2855,7 +2855,7 @@ def import_youtube():
                 a_src = max(audio_only_files, key=lambda p: p.stat().st_size)
                 merged_dest = input_dir / f"youtube_merged_{job_id}.mp4"
                 mux_cmd = [
-                    str(ffmpeg_path), "-y", "-i", str(v_src), "-i", str(a_src),
+                    ffmpeg_path, "-y", "-i", str(v_src), "-i", str(a_src),
                     "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
                     "-movflags", "+faststart", str(merged_dest)
                 ]
@@ -2875,7 +2875,7 @@ def import_youtube():
                 a_src = max(audio_only_files, key=lambda p: p.stat().st_size)
                 synth_dest = input_dir / f"youtube_audio_synth_{job_id}.mp4"
                 synth_cmd = [
-                    str(ffmpeg_path), "-y",
+                    ffmpeg_path, "-y",
                     "-f", "lavfi", "-i", "color=c=black:s=1280x720:r=30",
                     "-i", str(a_src),
                     "-c:v", "libx264", "-tune", "stillimage", "-pix_fmt", "yuv420p",
@@ -3150,7 +3150,7 @@ def start():
     models, model_error = _discover_ollama_models()
     if not models:
         model = ""
-    elif not model or str(model).lower() in ("heuristic", "builtin", "none", ""):
+    elif not model or model.lower() in ("heuristic", "builtin", "none", ""):
         model = ""
     elif models and model not in models:
         model = _default_model(models)
@@ -3500,7 +3500,7 @@ def _resolve_publish_video(job_id: str, filename: str, title: str = "") -> tuple
     if not filename:
         return None, None
 
-    clean_filename = str(filename).split("?")[0].split("#")[0].strip()
+    clean_filename = filename.split("?")[0].split("#")[0].strip()
     direct = Path(clean_filename)
     if direct.is_file():
         meta = direct.parent / f"{direct.stem}.json"
@@ -4296,8 +4296,8 @@ def open_output_folder():
     target_dir: Path | None = None
 
     # 1. If explicit job_id is provided, check its output folder first
-    if job_id:
-        safe_job = _safe_job_directory(str(job_id).strip())
+    if job_id and isinstance(job_id, str):
+        safe_job = _safe_job_directory(job_id.strip())
         if safe_job:
             cand = safe_job / "output"
             if cand.exists() and cand.is_dir():
@@ -4708,6 +4708,7 @@ def updater_apply():
         import zipfile
 
         # Check if a dedicated fast update asset exists in latest release
+        rel_data: dict[str, Any] = {}
         update_url = None
         try:
             rel_req = urllib.request.Request(
@@ -4763,7 +4764,7 @@ def updater_apply():
 
         # Record latest version in version.json
         try:
-            latest_v = (rel_data.get("tag_name") or "v5.0.0").strip() if "rel_data" in locals() and rel_data else "v5.0.0"
+            latest_v = (rel_data.get("tag_name") or "v5.0.0").strip() if rel_data else "v5.0.0"
             with open(ROOT / "version.json", "w", encoding="utf-8") as vf:
                 json.dump({"version": latest_v, "updated_at": __import__("time").time()}, vf, indent=2)
         except Exception:

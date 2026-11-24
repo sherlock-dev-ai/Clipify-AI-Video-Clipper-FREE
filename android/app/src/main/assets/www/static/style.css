@@ -110,20 +110,41 @@ select {
   left: 0;
   bottom: 0;
   width: 220px;
-  padding: 28px 18px 22px;
+  padding: 20px 14px 14px;
   border-right: 1px solid var(--line);
-  background: rgba(8, 12, 16, 0.9);
+  background: rgba(8, 12, 16, 0.92);
   backdrop-filter: blur(18px);
   z-index: 2147483648 !important;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 8px 32px;
+  padding: 0 6px 18px;
 }
 
 .brand-mark {
@@ -304,8 +325,8 @@ select {
   justify-content: center;
   gap: 8px;
   overflow: hidden;
-  margin: 0 2px 22px;
-  min-height: 40px;
+  margin: 0 2px 14px;
+  min-height: 36px;
   border: 1px solid #27272a;
   border-radius: 10px;
   background: #121215;
@@ -327,14 +348,14 @@ select {
 
 nav {
   display: grid;
-  gap: 8px;
+  gap: 5px;
 }
 
 nav a {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 42px;
+  min-height: 38px;
   padding: 0 10px;
   color: var(--muted);
   text-decoration: none;
@@ -568,7 +589,7 @@ nav a.active {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px 0 8px;
+  padding: 8px 0 2px;
   border: none !important;
   background: transparent !important;
   box-shadow: none !important;

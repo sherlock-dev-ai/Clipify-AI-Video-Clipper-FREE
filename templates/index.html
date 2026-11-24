@@ -11,6 +11,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='model_hub.css', v='4.0.12') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='tour.css', v='4.0.12.3') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='cache_manager.css', v='4.0.12') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='trending.css', v='5.0.2') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='caption_playground.css', v='5.0.2') }}">
 </head>
 
 <body>
@@ -25,9 +27,9 @@
       <div class="brand-copy">
         <div class="brand-title-wrap">
           <b>Clipify AI</b>
-          <span class="cool-version-badge" id="topBrandVersionBadge" title="Clipify AI v5.0.0 · Click for updates & release info">
+          <span class="cool-version-badge" id="topBrandVersionBadge" title="Clipify AI v5.0.1 · Click for updates & release info">
             <span class="version-dot"></span>
-            <span class="version-num">v5.0.0</span>
+            <span class="version-num">v5.0.1</span>
             <span class="version-shimmer-sweep"></span>
           </span>
         </div>
@@ -79,6 +81,14 @@
         </svg>
         <span>Instant Clipping</span> <span class="nav-beta-tag">BETA</span>
       </a>
+      <a href="#trending" data-nav="trending" id="navTrendingLink" title="Discover live broadcasts & trending gameplay across YouTube, Twitch & Kick">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+          <polyline points="17 6 23 6 23 12"></polyline>
+        </svg>
+        <span>Trending</span> <span class="nav-trending-pill" style="margin-left:auto;background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:0.68rem;padding:1px 6px;border-radius:10px;font-weight:700;">LIVE</span>
+      </a>
 
       <div class="sidebar-nav-divider"></div>
 
@@ -102,7 +112,7 @@
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
         </svg>
-        <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v5.0.0</span>
+        <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v5.0.1</span>
       </a>
       <a href="#cache" id="navClearCacheLink" title="Clear transcription cache & imported YouTube videos">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -138,6 +148,17 @@
         </svg>
         <span>Promoters</span>
         <span class="nav-promoter-pill">Spotlight</span>
+      </a>
+      <a href="#campaigns" id="navCampaignsLink" class="nav-campaigns-link"
+        title="Clipper Monetization & Bounties — Campaigns">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 11v3a1 1 0 0 0 1 1h2l4 4V5L6 9H4a1 1 0 0 0-1 1z"></path>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+        </svg>
+        <span>Campaigns</span>
+        <span class="nav-campaigns-pill">Bounties</span>
       </a>
     </nav>
     <div class="side-spacer"></div>
@@ -432,6 +453,7 @@
                     title="Auto-search PC for installed Ollama models" style="display:none;">🔍 Search PC</button></div>
               </label><label>Caption font<select id="fontSelect">
                   <option selected>Montserrat Extra Bold</option>
+                  <option value="none">🚫 No Captions (Clean Footage)</option>
                   <option>Arial</option>
                   <option>Arial Black</option>
                   <option>Segoe UI</option>
@@ -1292,32 +1314,137 @@
                 the preview or adjust this slider to resize top/bottom screen</small>
             </div>
 
-            <!-- Premium Captions Toggle -->
+            <!-- Captions & Language Controls in Beta Lab -->
             <div
               style="margin-top:14px;padding:12px 14px;border:1px solid rgba(255,255,255,0.1);border-radius:12px;background:rgba(255,255,255,0.02);">
-              <label class="toggle-row"><input type="checkbox" id="betaPremiumCaptions" checked><span
-                  class="switch"></span><b>✨ Premium Captions (Scale Pop & Action Cues)</b></label>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
-                <label>Placement
-                  <select id="betaCaptionPreset">
-                    <option value="center_seam" selected>Center Seam (48%-52%)</option>
-                    <option value="lower_safe">Lower Safe Band (72%-82%)</option>
-                    <option value="top_safe">Top Safe Band</option>
-                  </select>
-                </label>
-                <label>Accent Color
-                  <select id="betaCaptionAccent">
-                    <option value="gold_yellow" selected>Gold Yellow</option>
-                    <option value="lime_green">Lime Green</option>
-                    <option value="cyan_sky">Cyan Sky</option>
-                    <option value="coral_red">Coral Red</option>
-                    <option value="pink_lavender">Pink Lavender</option>
-                  </select>
-                </label>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <label class="toggle-row" style="margin:0;"><input type="checkbox" id="betaCaptionsToggle" checked><span
+                    class="switch"></span><b>💬 Subtitle Captions</b></label>
+                <b id="betaCaptionsBadge"
+                  style="font-size:0.75rem;color:#4ade80;background:rgba(74,222,128,0.1);padding:2px 8px;border-radius:6px;border:1px solid rgba(74,222,128,0.2);">ENABLED</b>
               </div>
-              <div style="margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.05);">
-                <label class="toggle-row compact"><input type="checkbox" id="betaSituationalCues" checked><span
-                    class="switch"></span><b>Situational Action Cues (*ACTION CUE*)</b></label>
+
+              <div id="betaCaptionsSettingsContainer">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+                  <label>Audio Language
+                    <select id="betaLanguageSelect">
+                      <option value="auto" selected>🌐 Auto-Detect</option>
+                      <option value="en">English (en)</option>
+                      <option value="hi">Hindi (हिन्दी)</option>
+                      <option value="es">Spanish (Español)</option>
+                      <option value="fr">French (Français)</option>
+                      <option value="de">German (Deutsch)</option>
+                      <option value="pt">Portuguese (Português)</option>
+                      <option value="ja">Japanese (日本語)</option>
+                      <option value="ko">Korean (한국어)</option>
+                      <option value="zh">Chinese (中文)</option>
+                      <option value="ru">Russian (Русский)</option>
+                      <option value="ar">Arabic (العربية)</option>
+                      <option value="it">Italian (Italiano)</option>
+                      <option value="id">Indonesian (Bahasa Indonesia)</option>
+                      <option value="tr">Turkish (Türkçe)</option>
+                      <option value="nl">Dutch (Nederlands)</option>
+                      <option value="pl">Polish (Polski)</option>
+                      <option value="vi">Vietnamese (Tiếng Việt)</option>
+                    </select>
+                  </label>
+                  <label>Placement
+                    <select id="betaCaptionPreset">
+                      <option value="center_seam" selected>Center Seam (48%-52%)</option>
+                      <option value="lower_safe">Lower Safe Band (72%-82%)</option>
+                      <option value="top_safe">Top Safe Band</option>
+                    </select>
+                  </label>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+                  <label>Accent Color
+                    <select id="betaCaptionAccent">
+                      <option value="gold_yellow" selected>Gold Yellow</option>
+                      <option value="lime_green">Lime Green</option>
+                      <option value="cyan_sky">Cyan Sky</option>
+                      <option value="coral_red">Coral Red</option>
+                      <option value="pink_lavender">Pink Lavender</option>
+                    </select>
+                  </label>
+                  <div style="display:flex;align-items:center;padding-top:14px;">
+                    <label class="toggle-row compact" style="margin:0;"><input type="checkbox" id="betaPremiumCaptions" checked><span
+                        class="switch"></span><b style="font-size:0.75rem;">Scale Pop Animation</b></label>
+                  </div>
+                </div>
+                <div style="margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.05);">
+                  <label class="toggle-row compact"><input type="checkbox" id="betaSituationalCues" checked><span
+                      class="switch"></span><b>Situational Action Cues (*ACTION CUE*)</b></label>
+                </div>
+
+                <!-- Caption Style Designs Showcase & Mouse Playground -->
+                <div class="caption-studio-panel">
+                  <div class="caption-studio-head">
+                    <div class="caption-studio-title">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="4"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="14" y2="13"/><line x1="7" y1="17" x2="11" y2="17"/></svg>
+                      <span>Caption Designs &amp; Position Playground</span>
+                    </div>
+                    <span class="caption-studio-badge">DRAG &amp; RESIZE WITH MOUSE</span>
+                  </div>
+
+                  <!-- 1. All Caption Designs Showcase -->
+                  <div style="display:flex;flex-direction:column;gap:6px;">
+                    <span style="font-size:0.75rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.04em;font-weight:700;">Choose Caption Design (Live Preview)</span>
+                    <div class="caption-styles-grid" id="captionStylesGrid">
+                      <!-- Rendered dynamically by caption_playground.js -->
+                    </div>
+                  </div>
+
+                  <!-- 2. Interactive 9:16 Phone Canvas & Mouse Adjusters -->
+                  <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">
+                    <span style="font-size:0.75rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.04em;font-weight:700;">Interactive 9:16 Stage · Drag Position &amp; Scale with Mouse</span>
+                    <div class="caption-stage-container">
+                      <!-- Phone Mockup Stage -->
+                      <div class="caption-phone-stage" id="captionPhoneStage" title="Click &amp; Drag caption with mouse to move vertically">
+                        <div class="caption-stage-guide caption-guide-top"><span class="caption-guide-label">Top Safe</span></div>
+                        <div class="caption-stage-guide caption-guide-center"><span class="caption-guide-label">Center Seam</span></div>
+                        <div class="caption-stage-guide caption-guide-lower"><span class="caption-guide-label">Lower Safe</span></div>
+
+                        <!-- Draggable / Resizable Caption Box -->
+                        <div class="caption-drag-box" id="captionDragBox" style="top:75%;">
+                          <span class="caption-pos-tag" id="captionPosTag">Y: 75% · Lower Safe</span>
+                          <div class="caption-drag-text cap-style-gold" id="captionDragText">
+                            MAKE EVERY CLIP <span class="cap-word-pop">VIRAL</span> TODAY
+                          </div>
+                          <div class="caption-resize-corner" id="captionResizeCorner" title="Drag corner or scroll mouse wheel to resize"></div>
+                        </div>
+                      </div>
+
+                      <!-- Beside-Stage Controls -->
+                      <div class="caption-stage-controls">
+                        <div class="caption-control-group">
+                          <label>Vertical Position <span>Mouse Drag Enabled</span></label>
+                          <div class="caption-pos-quick-row">
+                            <button type="button" class="caption-btn-pill caption-pos-pill" data-pos="top">Top (25%)</button>
+                            <button type="button" class="caption-btn-pill caption-pos-pill" data-pos="center">Center (50%)</button>
+                            <button type="button" class="caption-btn-pill caption-pos-pill active" data-pos="lower">Lower Safe (75%)</button>
+                            <button type="button" class="caption-btn-pill caption-pos-pill" data-pos="bottom">Bottom (84%)</button>
+                          </div>
+                        </div>
+
+                        <div class="caption-control-group">
+                          <label>Caption Size <span id="captionSizeBadge" class="caption-size-badge">44px</span></label>
+                          <div class="caption-size-row">
+                            <button type="button" class="caption-btn-step" id="captionSizeDec" title="Decrease font size">-</button>
+                            <input type="range" class="caption-size-slider" id="captionSizeSlider" min="24" max="76" value="44">
+                            <button type="button" class="caption-btn-step" id="captionSizeInc" title="Increase font size">+</button>
+                          </div>
+                          <div class="caption-pos-quick-row" style="margin-top:4px;">
+                            <button type="button" class="caption-btn-pill caption-size-preset-pill" data-size="32">Small (32px)</button>
+                            <button type="button" class="caption-btn-pill caption-size-preset-pill active" data-size="44">Medium (44px)</button>
+                            <button type="button" class="caption-btn-pill caption-size-preset-pill" data-size="56">Large (56px)</button>
+                            <button type="button" class="caption-btn-pill caption-size-preset-pill" data-size="68">Extra Large (68px)</button>
+                          </div>
+                          <small style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-top:2px;">Tip: You can also hover over the caption and scroll your mouse wheel to resize!</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1650,6 +1777,111 @@
         </div>
       </div>
     </section>
+
+    <!-- ==========================================================================
+         Trending Live Broadcasts & Gameplay Section (YouTube, Twitch, Kick)
+         ========================================================================== -->
+    <section class="page-section" id="trending" style="display:none;">
+      <div class="trending-container">
+        <!-- Top Hero Header -->
+        <header class="trending-header">
+          <div class="trending-hero-wrap">
+            <div>
+              <span class="eyebrow" style="color:#ffffff;display:flex;align-items:center;gap:6px;font-size:0.72rem;letter-spacing:0.08em;font-weight:700;">
+                <span class="trending-live-dot" style="margin-right:2px;"></span> LIVE DISCOVERY &amp; VIRAL CURATION
+              </span>
+              <h1>Trending Streams &amp; Gameplay</h1>
+              <p>Explore current live broadcasts and trending gaming clips across YouTube, Twitch &amp; Kick. Instant one-click clipping straight into Live Studio or Create Studio.</p>
+            </div>
+
+            <!-- Top 3 Platform Switcher (YouTube, Twitch, Kick) -->
+            <div class="trending-platform-bar" role="tablist">
+              <button type="button" class="trending-tab-btn active" data-platform="youtube" role="tab" aria-selected="true">
+                <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                <span>YouTube</span>
+              </button>
+              <button type="button" class="trending-tab-btn" data-platform="twitch" role="tab" aria-selected="false">
+                <svg viewBox="0 0 24 24"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></svg>
+                <span>Twitch</span>
+              </button>
+              <button type="button" class="trending-tab-btn" data-platform="kick" role="tab" aria-selected="false">
+                <svg viewBox="0 0 24 24"><path d="M3 3h4.8v6.4L13.8 3h6L12.9 10.8 20.4 21h-6.2l-6.4-8.8V21H3z"/></svg>
+                <span>Kick</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Search & Filter Bar -->
+          <div class="trending-toolbar">
+            <div class="trending-search-wrap">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" class="trending-search-input" id="trendingSearchInput" placeholder="Search live streams, game titles or creators (e.g. GTA 6, Valorant, Speed, Kai)..." autocomplete="off" spellcheck="false">
+            </div>
+
+            <div class="trending-quick-chips">
+              <button type="button" class="trending-chip-btn active" data-tag="all">All</button>
+              <button type="button" class="trending-chip-btn" data-tag="GTA">GTA VI / V</button>
+              <button type="button" class="trending-chip-btn" data-tag="Valorant">Valorant</button>
+              <button type="button" class="trending-chip-btn" data-tag="Minecraft">Minecraft</button>
+              <button type="button" class="trending-chip-btn" data-tag="Fortnite">Fortnite</button>
+              <button type="button" class="trending-chip-btn" data-tag="Call of Duty">Call of Duty</button>
+              <button type="button" class="trending-chip-btn" data-tag="Just Chatting">Just Chatting</button>
+            </div>
+
+            <button type="button" class="trending-refresh-btn" id="trendingRefreshBtn" title="Refresh live streams">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+              <span>Refresh</span>
+            </button>
+          </div>
+        </header>
+
+        <!-- YouTube Dual View (1. Live Streams + 2. Trending Gameplay) -->
+        <div id="trendingYtView" style="display:flex;flex-direction:column;gap:32px;">
+          <!-- Section 1: Current Live Streams -->
+          <div class="trending-section-block">
+            <div class="trending-section-title-wrap">
+              <h3 class="trending-section-title">
+                <span class="trending-live-dot"></span> Current Live Streams
+              </h3>
+              <span class="trending-stream-count">Side-to-Side Stream Cockpit</span>
+            </div>
+            <div class="trending-cards-grid" id="trendingYtLiveGrid">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Section 2: Trending Gameplay Videos -->
+          <div class="trending-section-block">
+            <div class="trending-section-title-wrap">
+              <h3 class="trending-section-title">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+                Trending Gameplay Videos
+              </h3>
+              <span class="trending-stream-count">High-CTR Clip Candidates</span>
+            </div>
+            <div class="trending-cards-grid" id="trendingYtVideosGrid">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Generic View (Twitch & Kick Streams) -->
+        <div id="trendingGenericView" style="display:none;flex-direction:column;gap:24px;">
+          <div class="trending-section-block">
+            <div class="trending-section-title-wrap">
+              <h3 class="trending-section-title" id="trendingGenericTitle">
+                <span class="trending-live-dot" style="background:#9146FF;box-shadow:0 0 10px #9146FF;"></span> Top Live Broadcasts
+              </h3>
+              <span class="trending-stream-count">Real-time Stream Directory</span>
+            </div>
+            <div class="trending-cards-grid" id="trendingGenericStreamsGrid">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <div id="publishModal" class="modal-overlay"
       style="display:none;position:fixed;inset:0;background:rgba(5,8,13,0.85);backdrop-filter:blur(10px);z-index:9999;align-items:center;justify-content:center;padding:20px;">
       <div class="modal-card panel"
@@ -2011,11 +2243,14 @@
   <script src="{{ url_for('static', filename='forest_game.js', v='4.0.12') }}"></script>
   <script src="{{ url_for('static', filename='updater.js', v='4.0.12.5') }}"></script>
   <script src="{{ url_for('static', filename='model_hub.js', v='4.0.12') }}"></script>
+  <script src="{{ url_for('static', filename='android_bridge.js', v='4.0.12.3') }}"></script>
   <script src="{{ url_for('static', filename='app.js', v='4.0.12.3') }}"></script>
   <script src="{{ url_for('static', filename='beta_matrix.js', v='4.0.12.3') }}"></script>
   <script src="{{ url_for('static', filename='tour.js', v='4.0.12.3') }}"></script>
   <script src="{{ url_for('static', filename='cache_manager.js', v='4.0.12') }}"></script>
   <script src="{{ url_for('static', filename='clippy.js', v='4.0.12.3') }}"></script>
+  <script src="{{ url_for('static', filename='trending.js', v='5.0.2') }}"></script>
+  <script src="{{ url_for('static', filename='caption_playground.js', v='5.0.2') }}"></script>
   <script>
     if (window.location.search.includes('open_support=1') || window.location.hash.includes('support')) {
       window.addEventListener('load', () => setTimeout(() => window.showSupportModal && window.showSupportModal(), 300));

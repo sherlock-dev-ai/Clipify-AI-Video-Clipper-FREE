@@ -476,6 +476,61 @@ def _is_pipeline_noise(text: str) -> bool:
 _PROGRESS_CLIP_CONTEXT: dict[str, int] = {"cur": 1, "total": 1}
 
 
+def _get_hardware_status_lines() -> list[str]:
+    """Returns diagnostic log lines describing active GPU and hardware acceleration."""
+    lines = []
+    gpu_found = False
+    try:
+        import pynvml
+        pynvml.nvmlInit()
+        count = pynvml.nvmlDeviceGetCount()
+        for i in range(count):
+            h = pynvml.nvmlDeviceGetHandleByIndex(i)
+            name = pynvml.nvmlDeviceGetName(h)
+            mem = pynvml.nvmlDeviceGetMemoryInfo(h)
+            tot = mem.total / (1024**3)
+            free = mem.free / (1024**3)
+            used = mem.used / (1024**3)
+            lines.append(f"[Hardware] GPU {i}: {name} ({tot:.1f} GB VRAM | {free:.1f} GB free | {used:.1f} GB in use)")
+            gpu_found = True
+    except Exception:
+        pass
+
+    if not gpu_found:
+        try:
+            smi = subprocess.check_output(
+                ["nvidia-smi", "--query-gpu=gpu_name,memory.total,memory.free,memory.used", "--format=csv,noheader,nounits"],
+                text=True, creationflags=_hidden_creationflags() if sys.platform == "win32" else 0
+            ).strip()
+            for i, l in enumerate(smi.splitlines()):
+                parts = [p.strip() for p in l.split(',')]
+                if len(parts) >= 4:
+                    name, tot, free, used = parts[0], float(parts[1])/1024, float(parts[2])/1024, float(parts[3])/1024
+                    lines.append(f"[Hardware] GPU {i}: {name} ({tot:.1f} GB VRAM | {free:.1f} GB free | {used:.1f} GB in use)")
+                    gpu_found = True
+        except Exception:
+            pass
+
+    if not gpu_found:
+        lines.append("[Hardware] GPU: Integrated Graphics / CPU Compute Mode")
+
+    has_ct2_cuda = False
+    try:
+        _ensure_cuda_dlls()
+        import ctranslate2
+        has_ct2_cuda = ctranslate2.get_cuda_device_count() > 0
+    except Exception:
+        pass
+
+    if has_ct2_cuda:
+        lines.append("[Hardware] CUDA Acceleration: ACTIVE (WhisperX & CTranslate2 running on GPU 0 float16)")
+    else:
+        lines.append("[Hardware] Acceleration: Standard CPU Engine")
+
+    lines.append("[Hardware] Alignment Stage: Phoneme matcher (Wav2Vec2) runs with multi-threaded CPU to reserve VRAM for Ollama LLM")
+    return lines
+
+
 def progress_for_line(line: str, current: int, current_stage: str = "") -> tuple[int, str, str]:
     """Translate real pipeline log lines into smooth stage progress.
 
@@ -499,6 +554,13 @@ def progress_for_line(line: str, current: int, current_stage: str = "") -> tuple
         return max(current, 25), "Loading cached transcription", "Using the saved WhisperX transcript."
     if "transcription completed" in low or "successfully loaded existing transcription" in low:
         return max(current, 30), "Transcription ready", "Transcript loaded successfully."
+    if "alignment progress" in low:
+        m = re.search(r"progress:\s*([\d\.]+)%", low)
+        if m:
+            pct = float(m.group(1))
+            scaled = 30 + int((pct / 100.0) * 4)
+            return max(current, min(34, scaled)), "Aligning word timestamps", f"Aligning word timestamps: {pct:.0f}% (phoneme matching)"
+        return max(current, 30), "Aligning word timestamps", text
     if "[align]" in low or "aligning word" in low:
         return max(current, 30), "Aligning word timestamps", "Aligning word timestamps with speech (phoneme matching)…"
     if "speech recognition in progress" in low or "transcription progress" in low:
@@ -1489,7 +1551,7 @@ def _pipeline_command(input_dir: Path) -> list[str]:
 
 
 def run_job(
-job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, max_duration: int, branding: dict[str, Any], split_screen: bool = False, fast_whisper: bool = True, gaming_split: bool = True, split_ratio: int = 50, upscale_quality: str = "high") -> None:
+job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, max_duration: int, branding: dict[str, Any], split_screen: bool = False, fast_whisper: bool = True, gaming_split: bool = True, split_ratio: int = 50, upscale_quality: str = "high", language: str = "auto", disable_captions: bool = False) -> None:
     with jobs_lock:
         job = jobs[job_id]
         job["status"] = "running"
@@ -1546,8 +1608,11 @@ job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, ma
         "CLIPPEDAI_TEXT_Y": str(branding.get("text_y", 75)),
         "CLIPPEDAI_PREMIUM_CAPTIONS": "1" if branding.get("premium_captions", True) else "0",
         "CLIPPEDAI_SITUATIONAL_CUES": "1" if branding.get("situational_cues", True) else "0",
-        "CLIPPEDAI_CAPTION_PRESET": str(branding.get("caption_preset", "center_seam" if (gaming_split or split_screen) else "lower_safe")),
-        "CLIPPEDAI_CAPTION_ACCENT": str(branding.get("caption_accent", "gold_yellow")),
+        "CLIPPEDAI_CAPTION_PRESET": str(branding.get("caption_preset", data.get("caption_preset", "center_seam" if (gaming_split or split_screen) else "lower_safe"))),
+        "CLIPPEDAI_CAPTION_ACCENT": str(branding.get("caption_accent", data.get("caption_accent", "gold_yellow"))),
+        "CLIPPEDAI_CAPTION_MARGIN_V": str(branding.get("caption_margin_v", data.get("caption_margin_v", "920" if (gaming_split or split_screen) else "300"))),
+        "CLIPPEDAI_CAPTION_FONT_SIZE": str(branding.get("caption_font_size", data.get("caption_font_size", "48"))),
+        "CLIPPEDAI_CAPTION_Y_PCT": str(branding.get("caption_y_pct", data.get("caption_y_pct", "0"))),
         "CLIPPEDAI_WATERMARK_TEXT_ENABLED": "1" if branding.get("watermark_text_enabled") else "0",
         "CLIPPEDAI_WATERMARK_TEXT": str(branding.get("watermark_text", "")),
         "CLIPPEDAI_WATERMARK_TEXT_POSITION": str(branding.get("watermark_text_position", "center")),
@@ -1567,8 +1632,9 @@ job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, ma
         "KMP_DUPLICATE_LIB_OK": "TRUE",
         "OMP_STACKSIZE": "64M",
         "KMP_STACKSIZE": "64M",
+        "DISABLE_CAPTIONS": "1" if (disable_captions or font == "none" or branding.get("disable_captions") or not branding.get("captions_enabled", True)) else "0",
         "WHISPERX_THREADS": os.getenv("WHISPERX_THREADS", str(max(4, os.cpu_count() or 4)) if fast_whisper else "4"),
-        "WHISPERX_LANGUAGE": (os.getenv("WHISPERX_LANGUAGE") or "en").strip().lower() or "en",
+        "WHISPERX_LANGUAGE": (language if language != "auto" else (branding.get("language") if branding.get("language") != "auto" else (os.getenv("WHISPERX_LANGUAGE") or "auto"))).strip().lower(),
         "OMP_NUM_THREADS": str(max(4, os.cpu_count() or 4)) if fast_whisper else "4",
         "MKL_NUM_THREADS": str(max(4, os.cpu_count() or 4)) if fast_whisper else "4",
         "OPENBLAS_NUM_THREADS": str(max(4, os.cpu_count() or 4)) if fast_whisper else "4",
@@ -1601,6 +1667,8 @@ job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, ma
     cmd = [*_pipeline_command(input_dir), "--auto", "--clips", str(clips),
            "--min-duration", str(min_duration), "--max-duration", str(max_duration)]
     emit(job_id, "log", f"Starting {mode} mode with {model or 'built-in heuristic AI'}; captions: {font}…")
+    for hw_msg in _get_hardware_status_lines():
+        emit(job_id, "log", hw_msg)
 
     heartbeat_stop = threading.Event()
     def heartbeat() -> None:
@@ -1660,6 +1728,17 @@ job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, ma
                             detail = f"{last_detail.split(' · ')[0]} · {m}m {s}s elapsed"
                         else:
                             detail = f"Transcribing audio ({m}m {s}s elapsed · analyzing speech)"
+                elif stage == "Aligning word timestamps":
+                    align_pct = job.get("alignment_progress")
+                    m, s = divmod(elapsed, 60)
+                    if align_pct is not None:
+                        align_pct = float(align_pct)
+                        step_prog = min(34, 30 + int((align_pct / 100.0) * 4))
+                        cur_prog = max(cur_prog, step_prog)
+                        job["progress"] = cur_prog
+                        detail = f"Aligning word timestamps: {align_pct:.0f}% (phoneme matching · stage time {elapsed}s)"
+                    else:
+                        detail = f"Aligning word timestamps with speech ({m}m {s}s elapsed · phoneme matching)"
                 job["detail"] = detail
             emit(job_id, "progress", {
                 "progress": job.get("progress", 0),
@@ -1700,6 +1779,12 @@ job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, ma
                     with jobs_lock:
                         if job_id in jobs:
                             jobs[job_id]["speech_progress"] = float(m_prog.group(1))
+            if "alignment progress:" in line.lower():
+                m_align = re.search(r"alignment progress:\s*([\d\.]+)%", line.lower())
+                if m_align:
+                    with jobs_lock:
+                        if job_id in jobs:
+                            jobs[job_id]["alignment_progress"] = float(m_align.group(1))
             progress, stage, detail = progress_for_line(line, progress, stage)
             with jobs_lock:
                 if job_id in jobs:
@@ -1757,6 +1842,36 @@ def narrate_page():
 @app.get("/live")
 def live_studio_page():
     return render_template("live.html")
+
+
+@app.get("/api/trending/<platform>")
+def api_trending(platform: str):
+    """
+    Fetch trending live broadcasts and gameplay videos for YouTube, Twitch, and Kick.
+    Supports ?q=<query> for live search across streams and gaming content.
+    """
+    q = request.args.get("q", "").strip()
+    try:
+        import trending_service
+        plat = platform.lower().strip()
+        if plat == "youtube":
+            data = trending_service.get_youtube_trending(q)
+        elif plat == "twitch":
+            data = trending_service.get_twitch_trending(q)
+        elif plat == "kick":
+            data = trending_service.get_kick_trending(q)
+        else:
+            return jsonify({"error": f"Unknown platform '{platform}'", "live_streams": [], "gameplay_videos": []}), 400
+        return jsonify(data)
+    except Exception as ex:
+        logger.exception("Error in /api/trending/%s: %s", platform, ex)
+        return jsonify({
+            "platform": platform,
+            "error": str(ex),
+            "live_streams": [],
+            "gameplay_videos": []
+        }), 500
+
 
 
 def _get_live_studio_mgr():
@@ -2727,11 +2842,12 @@ def import_youtube():
             ffmpeg_path = _ffmpeg_path()
             output_template = str(input_dir / "youtube.%(ext)s")
             command = [*yt_dlp_cmd, "--no-playlist", "--no-warnings", "--newline", "--progress",
-                       "--extractor-args", "youtube:player_client=android,ios,mweb",
+                       "--format-sort", "res:1080,fps,vbr",
                        "--progress-template", "download:[clip-prog] %(progress._percent_str)s|%(progress.downloaded_bytes)s|%(progress.total_bytes|progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s",
-                       "--restrict-filenames", "--merge-output-format", "mp4", "--max-filesize", "4G",
-                       "--socket-timeout", "20", "--retries", "3", "--fragment-retries", "3",
-                       "-f", "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/18/bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo[height<=480]+bestaudio/best[height<=480]/best",
+                       "--restrict-filenames", "--merge-output-format", "mp4", "--max-filesize", "8G",
+                       "--socket-timeout", "30", "--retries", "5", "--fragment-retries", "5",
+                       "--concurrent-fragments", "4",
+                       "-f", "bestvideo[height<=1080]+bestaudio/bestvideo+bestaudio/best",
                        "--ffmpeg-location", str(Path(ffmpeg_path).parent)]
             cookie_candidates = [
                 ROOT / "cookies.txt",
@@ -3063,7 +3179,7 @@ def start():
         model = ""
     elif models and model not in models:
         model = _default_model(models)
-    allowed_fonts = ["Montserrat Extra Bold", "Arial", "Arial Black", "Segoe UI", "Segoe UI Black", "Impact", "Tahoma", "Trebuchet MS", "Verdana", "Calibri", "Aptos", "Comic Sans MS", "Georgia"]
+    allowed_fonts = ["Montserrat Extra Bold", "Arial", "Arial Black", "Segoe UI", "Segoe UI Black", "Impact", "Tahoma", "Trebuchet MS", "Verdana", "Calibri", "Aptos", "Comic Sans MS", "Georgia", "none"]
     if font not in allowed_fonts:
         font = "Montserrat Extra Bold"
     with jobs_lock:
@@ -3154,6 +3270,18 @@ def start():
         branding["logo_position"] = "top-right"
     if branding["text_position"] not in BRANDING_POSITIONS:
         branding["text_position"] = "bottom-center"
+    disable_captions = bool(
+        str(data.get("disable_captions", data.get("disableCaptions", "0"))).strip().lower() in {"1", "true", "yes", "on"}
+        or font == "none"
+        or str(data.get("captions_enabled", data.get("captionsEnabled", "1"))).strip().lower() in {"0", "false", "no", "off"}
+        or branding_raw.get("disable_captions")
+        or branding_raw.get("captions_enabled") is False
+    )
+    language = str(data.get("language") or data.get("caption_language") or branding_raw.get("language") or "auto").strip().lower()
+    branding["disable_captions"] = disable_captions
+    branding["captions_enabled"] = not disable_captions
+    branding["language"] = language
+
     branding["upscale_quality"] = str(branding_raw.get("upscale_quality", data.get("upscale_quality", "high"))).strip().lower()
     try:
         split_ratio = max(30, min(70, int(data.get("split_ratio", data.get("splitRatio", 50)))))
@@ -3169,8 +3297,10 @@ def start():
         jobs[job_id]["split_ratio"] = split_ratio
         jobs[job_id]["fast_whisper"] = fast_whisper
         jobs[job_id]["upscale_quality"] = upscale_quality
-    threading.Thread(target=run_job, args=(job_id, mode, clips, model, font, min_duration, max_duration, branding, split_screen, fast_whisper, gaming_split, split_ratio, upscale_quality), daemon=True).start()
-    return jsonify({"ok": True, "job_id": job_id, "model": model, "font": font, "min_duration": min_duration, "max_duration": max_duration, "branding": branding, "split_screen": split_screen, "gaming_split": gaming_split, "split_ratio": split_ratio, "fast_whisper": fast_whisper, "upscale_quality": upscale_quality})
+        jobs[job_id]["disable_captions"] = disable_captions
+        jobs[job_id]["language"] = language
+    threading.Thread(target=run_job, args=(job_id, mode, clips, model, font, min_duration, max_duration, branding, split_screen, fast_whisper, gaming_split, split_ratio, upscale_quality, language, disable_captions), daemon=True).start()
+    return jsonify({"ok": True, "job_id": job_id, "model": model, "font": font, "min_duration": min_duration, "max_duration": max_duration, "branding": branding, "split_screen": split_screen, "gaming_split": gaming_split, "split_ratio": split_ratio, "fast_whisper": fast_whisper, "upscale_quality": upscale_quality, "disable_captions": disable_captions, "language": language})
 
 
 
@@ -4737,6 +4867,84 @@ def sync_project():
     except Exception as exc:
         return jsonify({"error": f"Failed to sync project: {exc}"}), 500
 
+@app.route("/api/open-input-folder", methods=["GET", "POST"])
+def open_input_folder():
+    """Opens the local input / source video folder in Windows File Explorer (or default system file manager)."""
+    data = {}
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+    elif request.args:
+        data = request.args.to_dict()
+
+    job_id = data.get("jobId") or data.get("job_id")
+    target_dir: Path | None = None
+
+    # 1. If explicit job_id is provided, check its input folder first
+    if job_id:
+        safe_job = _safe_job_directory(str(job_id).strip())
+        if safe_job:
+            cand = safe_job / "input"
+            if cand.exists() and cand.is_dir():
+                target_dir = cand
+            elif safe_job.exists():
+                target_dir = safe_job
+
+    # 2. Check top-level input directory
+    if not target_dir:
+        cand = (ROOT / "input").resolve()
+        if cand.exists():
+            target_dir = cand
+
+    if not target_dir:
+        cand = (USER_DATA_DIR / "input").resolve()
+        if cand.exists():
+            target_dir = cand
+
+    # 3. Check most recent job with input files
+    if not target_dir and JOBS.exists():
+        try:
+            for d in sorted(JOBS.iterdir(), key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True):
+                if d.is_dir() and not d.name.startswith("."):
+                    cand = d / "input"
+                    if cand.exists() and cand.is_dir() and any(cand.iterdir()):
+                        target_dir = cand.resolve()
+                        break
+        except Exception:
+            pass
+
+    # 4. Fallback: ensure ROOT / "input" exists
+    if not target_dir:
+        target_dir = (ROOT / "input").resolve()
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+    opened = False
+    error_msg = None
+    try:
+        target_str = str(target_dir)
+        if sys.platform == "win32":
+            try:
+                os.startfile(target_str)
+                opened = True
+            except Exception:
+                subprocess.Popen(["explorer.exe", target_str])
+                opened = True
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", target_str])
+            opened = True
+        else:
+            subprocess.Popen(["xdg-open", target_str])
+            opened = True
+    except Exception as exc:
+        error_msg = str(exc)
+
+    return jsonify({
+        "ok": True,
+        "opened": opened,
+        "path": str(target_dir),
+        "error": error_msg
+    })
+
+
 @app.route("/api/open-output-folder", methods=["GET", "POST"])
 def open_output_folder():
     """Opens the local output folder in Windows File Explorer (or default system file manager)."""
@@ -5003,7 +5211,7 @@ def cache_clear():
         "message": f"Successfully cleared {formatted} of disk space ({yt_deleted} YouTube video(s) and {cache_deleted} cache file(s) removed)."
     })
 
-APP_VERSION = "v5.0.0"
+APP_VERSION = "v5.0.1"
 try:
     _v_file = ROOT / "version.json"
     if _v_file.exists():
@@ -5176,10 +5384,29 @@ def updater_apply():
             time.sleep(0.5)
             os._exit(0)
 
+    # 1. Prioritize dedicated fast update release asset (update-v*.zip)
+    update_url = None
+    rel_data: dict[str, Any] = {}
+    try:
+        rel_req = urllib.request.Request(
+            f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
+            headers={"User-Agent": "ClipifyAI-Updater", "Accept": "application/vnd.github.v3+json"}
+        )
+        with _urlopen_with_ssl_fallback(rel_req, timeout=8.0) as rel_resp:
+            if rel_resp.status == 200:
+                rel_data = json.loads(rel_resp.read().decode("utf-8", errors="replace"))
+                for asset in rel_data.get("assets", []):
+                    aname = asset.get("name", "").lower()
+                    if "update" in aname and aname.endswith(".zip"):
+                        update_url = asset.get("browser_download_url")
+                        break
+    except Exception:
+        pass
+
     is_git = (ROOT / ".git").is_dir()
     git_bin = shutil.which("git") or shutil.which("git.exe") or "git"
 
-    if is_git:
+    if is_git and not update_url:
         try:
             # Determine current branch
             branch_cmd = _run_hidden([git_bin, "branch", "--show-current"], cwd=str(ROOT), timeout=10, check=False)
@@ -5211,29 +5438,10 @@ def updater_apply():
         except Exception as exc:
             return jsonify({"ok": False, "error": str(exc)}), 500
 
-    # Standalone installation: download lightweight source archive from GitHub
+    # Standalone or asset package update: download lightweight source archive from GitHub
     try:
         import tempfile
         import zipfile
-
-        # Check if a dedicated fast update asset exists in latest release
-        update_url = None
-        rel_data: dict[str, Any] = {}
-        try:
-            rel_req = urllib.request.Request(
-                f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
-                headers={"User-Agent": "ClipifyAI-Updater", "Accept": "application/vnd.github.v3+json"}
-            )
-            with _urlopen_with_ssl_fallback(rel_req, timeout=8.0) as rel_resp:
-                if rel_resp.status == 200:
-                    rel_data = json.loads(rel_resp.read().decode("utf-8", errors="replace"))
-                    for asset in rel_data.get("assets", []):
-                        aname = asset.get("name", "").lower()
-                        if "update" in aname and aname.endswith(".zip"):
-                            update_url = asset.get("browser_download_url")
-                            break
-        except Exception:
-            pass
 
         zip_url = update_url or f"https://github.com/{GITHUB_REPO}/archive/refs/heads/feature/cross-platform.zip"
 
@@ -5716,7 +5924,7 @@ Key In-App Features & Knowledge:
    - Creator spotlight modal celebrating top promoters, viral creators, and community supporters.
 
 10. Update Manager ([NAVIGATE:update]):
-   - 1-click in-place updater directly from GitHub releases to Clipify AI v5.0.0.
+   - 1-click in-place updater directly from GitHub releases to Clipify AI v5.0.1.
 
 11. Forest Runner Mascot & Mini-Game:
    - Interactive creature mascot card on the sidebar ("need help?") triggering the Instagram community link or the playable retro Forest Runner game.
@@ -5727,8 +5935,24 @@ Key In-App Features & Knowledge:
    - Creator contact: `@sherlock.fy`.
    - Star on GitHub.
 
+13. Clipper Campaigns & Bounties ([NAVIGATE:campaigns]):
+   - Built-in directory of the top 10 platforms for streamer & podcast clippers to earn bounties and monetize viral clips.
+   - Top Platforms Ranked:
+     1. **Content Rewards**: Top overall pick for podcasts, YouTubers, streamers, and gaming. Available in India + International.
+     2. **Vyro**: Huge creator ecosystem (MrBeast ecosystem, shows, podcasts). Worldwide / India supported.
+     3. **Clipster**: Streamers, music, gaming, and influencers. Worldwide without country blocks.
+     4. **Clipping.net**: Influencer & creator podcasts.
+     5. **Vues**: Brands, creators, and social media campaigns.
+     6. **Clip**: Streamers, sports, film, TV, music.
+     7. **Wondeed**: Creator and influencer clipping (International payouts).
+     8. **ClipAffiliates**: Creator affiliate clipping.
+     9. **ClipGrow**: India-focused clipping campaigns.
+     10. **ClipConnect India**: India-dedicated social-media and podcast campaigns.
+   - For users asking "which is the best campaign" or asking how to monetize, recommend **Content Rewards** and **Vyro** as the top choices, explain that Content Rewards pays per view milestones, and direct them to `#campaigns` by using `[NAVIGATE:campaigns]`.
+
 Navigation Action Tags:
 When recommending or directing a user to a specific feature, always include the matching navigation tag on its own line:
+- [NAVIGATE:campaigns] -> For Clipper Campaigns & Bounties Directory
 - [NAVIGATE:instant] -> For Instant Clipping, fast 9:16 shorts, split screen, generate another clip
 - [NAVIGATE:live] -> For Live Studio, OBS, RTMP stream clipping
 - [NAVIGATE:narrate] -> For Narration Studio, AI voiceovers, Kokoro
@@ -5736,7 +5960,7 @@ When recommending or directing a user to a specific feature, always include the 
 - [NAVIGATE:create] -> For Create Shorts, YouTube import, full AI highlight detection
 - [NAVIGATE:editor] -> For Editor, video trimming, watermarks, branding
 - [NAVIGATE:models] -> For Models & Engine Hub, Ollama, Whisper
-- [NAVIGATE:update] -> For Update Manager, v5.0.0, checking updates
+- [NAVIGATE:update] -> For Update Manager, v5.0.1, checking updates
 - [NAVIGATE:promoters] -> For Promoters Spotlight
 - [NAVIGATE:support] -> For Support Us, GitHub star, Instagram
 """
@@ -5785,6 +6009,31 @@ def _clippy_builtin_fallback(user_query: str) -> str:
             "Check out their channels and see how you can get featured in our creator spotlight!"
         )
 
+    # Clipper Campaigns & Bounties
+    if any(k in q for k in ("campaign", "bount", "monetiz", "earn", "platform", "vyro", "content reward", "clipster", "payout", "paid")):
+        return (
+            "[NAVIGATE:campaigns]\n"
+            "I've opened the **Clipper Campaigns & Bounties Directory** for you! 💰\n\n"
+            "Here are the best platforms for streamer & podcast clippers to earn bounties:\n"
+            "- 🏆 **Content Rewards** (#1 Pick): Active clipping campaigns for podcasts, top YouTubers, and gaming. Fully open to **India + International** clippers!\n"
+            "- 🥈 **Vyro** (#2 Pick): Major creator network (including MrBeast ecosystem & top podcasts). High payouts and global reach.\n"
+            "- 🥉 **Clipster** (#3 Pick): Streamers, music, and esports clipping with worldwide access and no country blocks.\n"
+            "- 🇮🇳 **ClipGrow & ClipConnect India**: Great dedicated platforms for India-focused creator campaigns.\n\n"
+            "You can click on any platform in the **Campaigns** tab on the left menu to visit their official website and apply!"
+        )
+
+    # Conversational follow-ups and queries
+    if q in ("huh", "what", "what?", "huh?", "idk", "why", "help me", "confused", "pardon", "?"):
+        return (
+            "No worries! I'm here to help. You can tell me what you'd like to do:\n"
+            "- ⚡ **Create fast 9:16 vertical clips** from YouTube links or local videos (`#instant`)\n"
+            "- 💰 **Find clipper bounties & campaigns** to earn from your clips (`#campaigns`)\n"
+            "- 🎙️ **Generate voiceover stories** with gameplay backgrounds (`#narrate`)\n"
+            "- 🔴 **Clip live streams** from OBS in real-time (`#live`)\n"
+            "- ✍️ **Add custom draggable text overlays** (`#beta`)\n\n"
+            "What kind of clip are you looking to create?"
+        )
+
     # Models & Engine Hub
     if any(k in q for k in ("model", "models", "engine", "ollama", "whisper", "qwen", "llama")):
         return (
@@ -5814,14 +6063,17 @@ def _clippy_builtin_fallback(user_query: str) -> str:
             "or connects you directly with the community on Instagram!"
         )
 
-    # Updates and Version Info (v5.0.0)
+    # Updates and Version Info (v5.0.1)
     if any(k in q for k in ("update", "version", "what's new", "whats new", "latest", "upgrade", "changelog", "patch", "v5")):
         return (
             "[NAVIGATE:update]\n"
-            "You are currently running **Clipify AI v5.0.0**! 🚀\n\n"
-            "**What's new in v5.0.0:**\n"
-            "- ⚡ **Instant Clipping (#instant)**: Ultra-fast isolated pipeline, 9:16 Split Screen presets, Kinetic Subtitle Captions, multi-clip counts, and 'Generate Another Clip' diversification.\n"
+            "You are currently running **Clipify AI v5.0.1**! 🚀\n\n"
+            "**What's new in v5.0.1:**\n"
+            "- 📐 **1:1 Video-Ratio Preview Scaling**: Text overlays in Preview, Editor, and Beta Lab scale mathematically proportional to the video frame aspect ratio, matching FFmpeg exports exactly.\n"
+            "- 🎛️ **In-Preview Resize & Controls**: Direct on-overlay quick controls pill (`−`, live `%` badge, `+`, move handle) plus a corner drag-handle (`⤡`) and mouse wheel scrolling to resize text on the fly.\n"
+            "- ⚡ **Instant Clipping (#instant)**: Isolated video ingestion, Split Screen presets, Kinetic Captions, multi-clip limits, and 'Generate Another Clip' diversification.\n"
             "- 🚀 **CUDA 12 GPU Acceleration**: Auto NVIDIA GPU detection with CTranslate2 float16 & NVENC encoding; zero CPU transcription delays.\n"
+            "- 👾 **Dynamic ASCII Matrix Updater**: Themed Update Modal with animated 'CLIPIFY' 5x7 block typography, mascot constellation, and cyber particle waves.\n"
             "- 🌟 **Promoters Spotlight (#promoters)**: Creator showcase modal for top community supporters.\n"
             "- 🖤 **Obsidian Monochrome Theme**: Unified black & white design system across Create, Live Studio, and Narration Studio.\n"
             "- 🤖 **Intelligent Clippy AI**: Deep-link in-app navigation (`[NAVIGATE:...]`) and full feature knowledge.\n"
@@ -5891,8 +6143,9 @@ def _clippy_builtin_fallback(user_query: str) -> str:
         return "You're very welcome! Let me know if you need any other help creating your clips."
 
     return (
-        "I'm here to help you get the most out of Clipify AI v5.0.0! "
+        "I'm here to help you get the most out of Clipify AI v5.0.1! "
         "You can ask me how to use **Instant Clipping** (with Split Screen & 'Generate Another Clip'), "
+        "adjust text overlays in the **Editor** with the new in-preview resize handles, "
         "enable **GPU acceleration**, clip live OBS streams in **Live Studio**, create voiceovers in **Narration Studio**, "
         "or join our **Instagram Creator Community**. "
         "You can also click **App Guide** on the left menu anytime for an interactive tour!"
@@ -5950,17 +6203,37 @@ def clippy_chat():
                     "model": fastest_model,
                     "messages": messages,
                     "stream": False,
-                    "options": {"temperature": 0.4, "num_predict": 350}
+                    "think": False,
+                    "options": {"temperature": 0.4, "num_predict": 1024}
                 }).encode("utf-8"),
                 headers={"Content-Type": "application/json"}
             )
-            with urllib.request.urlopen(chat_req, timeout=9.0) as resp:
+            with urllib.request.urlopen(chat_req, timeout=35.0) as resp:
                 if resp.status == 200:
                     chat_res = json.loads(resp.read().decode("utf-8", errors="replace"))
-                    msg = chat_res.get("message", {}).get("content", "").strip()
+                    msg = (chat_res.get("message", {}).get("content") or "").strip()
+                    if msg:
+                        import re
+                        if '</think>' in msg:
+                            msg = msg.split('</think>', 1)[1].strip()
+                        cleaned = re.sub(r'(?i)<think>.*?</think>', '', msg, flags=re.DOTALL).strip()
+                        # Clean any leftover internal monologue / chain-of-thought preamble
+                        while cleaned and (cleaned.lower().startswith("okay,") or cleaned.lower().startswith("thinking") or cleaned.lower().startswith("hmm,") or cleaned.lower().startswith("let me ")):
+                            parts = cleaned.split("\n\n", 1)
+                            if len(parts) > 1 and len(parts[1].strip()) > 15:
+                                cleaned = parts[1].strip()
+                            else:
+                                break
+                        if cleaned:
+                            msg = cleaned
+                    if not msg:
+                        # If model only populated internal reasoning and exhausted tokens, use high-accuracy knowledge fallback
+                        msg = _clippy_builtin_fallback(message)
                     if msg:
                         low_m = message.lower()
-                        if any(k in low_m for k in ("instant", "fast clip", "quick clip", "instant clipping", "generate another")) and "[NAVIGATE:" not in msg:
+                        if any(k in low_m for k in ("campaign", "bount", "monetiz", "earn", "vyro", "content reward")) and "[NAVIGATE:" not in msg:
+                            msg = f"[NAVIGATE:campaigns]\n{msg}\n\n*Tip: Check the **Campaigns** tab on the left menu to view all 10 platforms!*"
+                        elif any(k in low_m for k in ("instant", "fast clip", "quick clip", "instant clipping", "generate another")) and "[NAVIGATE:" not in msg:
                             msg = f"[NAVIGATE:instant]\n{msg}\n\n*Tip: Click **App Guide** on the left menu for a step-by-step walkthrough!*"
                         elif any(k in low_m for k in ("live", "obs", "rtmp", "stream")) and "[NAVIGATE:" not in msg:
                             msg = f"[NAVIGATE:live]\n{msg}\n\n*Tip: Click **App Guide** on the left menu for a step-by-step walkthrough!*"

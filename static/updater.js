@@ -22,8 +22,8 @@
     let updateState = {
       checked: false,
       updateAvailable: false,
-      latestVersion: 'v5.0.0',
-      currentVersion: 'v5.0.0',
+      latestVersion: 'v5.0.1',
+      currentVersion: 'v5.0.1',
       releaseUrl: 'https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases',
       releaseName: '',
       notes: '',
@@ -51,8 +51,8 @@
         updateState = {
           checked: true,
           updateAvailable: !!data.update_available,
-          latestVersion: data.latest_version || 'v5.0.0',
-          currentVersion: data.current_version || 'v5.0.0',
+          latestVersion: data.latest_version || 'v5.0.1',
+          currentVersion: data.current_version || 'v5.0.1',
           releaseUrl: data.release_url || updateState.releaseUrl,
           releaseName: data.release_name || '',
           notes: data.body || '',
@@ -60,10 +60,10 @@
           gitBehind: !!data.git_behind
         };
 
-        if (badge) badge.textContent = data.current_version || 'v5.0.0';
-        if (navVersionTag) navVersionTag.textContent = data.current_version || 'v5.0.0';
+        if (badge) badge.textContent = data.current_version || 'v5.0.1';
+        if (navVersionTag) navVersionTag.textContent = data.current_version || 'v5.0.1';
         const topBadgeNum = document.querySelector('#topBrandVersionBadge .version-num');
-        if (topBadgeNum) topBadgeNum.textContent = data.current_version || 'v5.0.0';
+        if (topBadgeNum) topBadgeNum.textContent = data.current_version || 'v5.0.1';
 
         if (updateState.updateAvailable) {
           if (card) card.classList.add('has-update');
@@ -83,11 +83,11 @@
         } else {
           if (card) card.classList.remove('has-update');
           if (navVersionTag) {
-            navVersionTag.textContent = data.current_version || 'v5.0.0';
+            navVersionTag.textContent = data.current_version || 'v5.0.1';
             navVersionTag.style.background = '';
             navVersionTag.style.color = '';
           }
-          if (badge) badge.textContent = data.current_version || 'v5.0.0';
+          if (badge) badge.textContent = data.current_version || 'v5.0.1';
           if (statusMsg) statusMsg.textContent = 'Up to date ✓';
           if (btn) {
             btn.innerHTML = '<span class="btn-update-icon">↻</span> Update';
@@ -187,7 +187,7 @@
           actionRow.style.display = 'flex';
           actionRow.style.gap = '10px';
           actionRow.innerHTML = `
-            <a href="https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/tag/v5.0.0" target="_blank" class="btn-restart-retry" style="text-align:center;text-decoration:none;background:#22c55e;color:#000;font-weight:700;">Download v5.0.0 Installer →</a>
+            <a href="https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/tag/v5.0.1" target="_blank" class="btn-restart-retry" style="text-align:center;text-decoration:none;background:#22c55e;color:#000;font-weight:700;">Download v5.0.1 Installer →</a>
             <button type="button" class="btn-restart-retry" id="btnRestartForceReload">Retry / Reload</button>
           `;
           document.getElementById('btnRestartForceReload')?.addEventListener('click', () => window.location.reload());

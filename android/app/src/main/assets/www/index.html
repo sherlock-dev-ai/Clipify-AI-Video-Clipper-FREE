@@ -3,1264 +3,16 @@
 
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Clipify AI</title>
-  <link rel="icon" type="image/png" href="static/icon.png">
-  <link rel="stylesheet" href="static/style.css">
-  <link rel="stylesheet" href="static/studio.css">
-  <link rel="stylesheet" href="static/model_hub.css">
-  <link rel="stylesheet" href="static/tour.css">
-  <link rel="stylesheet" href="static/cache_manager.css">
-
-<style id="mobile-responsive-styles">
-/* ===================================================
-   CLIPIFY AI — PREMIUM OBSIDIAN ANDROID DESIGN SYSTEM
-   Single-column fluid flow, zero horizontal overflow,
-   crisp system typography, liquid smooth touch UX
-   =================================================== */
-
-:root {
-  --mobile-bg: #09090b;
-  --mobile-surface: #121215;
-  --mobile-surface-elevated: #18181c;
-  --mobile-surface-hover: #222228;
-  --mobile-border: rgba(255, 255, 255, 0.08);
-  --mobile-border-active: rgba(255, 255, 255, 0.28);
-  --mobile-primary: #ffffff;
-  --mobile-primary-text: #09090b;
-  --mobile-brand: #818cf8;
-  --mobile-text: #fafafa;
-  --mobile-text-muted: #a1a1aa;
-  --mobile-text-dim: #71717a;
-  --mobile-radius: 14px;
-}
-
-/* UNIVERSAL BOX SIZING & CRISP SYSTEM TYPOGRAPHY */
-*, *::before, *::after {
-  box-sizing: border-box !important;
-  max-width: 100% !important;
-  -webkit-tap-highlight-color: transparent !important;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif !important;
-}
-
-html {
-  width: 100% !important;
-  max-width: 100vw !important;
-  height: 100% !important;
-  overflow-y: scroll !important;
-  overflow-x: hidden !important;
-  -webkit-overflow-scrolling: touch !important;
-  overscroll-behavior-y: auto !important;
-  background-color: var(--mobile-bg) !important;
-}
-
-body {
-  background-color: var(--mobile-bg) !important;
-  color: var(--mobile-text) !important;
-  font-size: 14px !important;
-  line-height: 1.45 !important;
-  margin: 0 !important;
-  padding: 0 0 96px 0 !important;
-  width: 100% !important;
-  max-width: 100vw !important;
-  min-height: 100% !important;
-  height: auto !important;
-  overflow-y: visible !important;
-  overflow-x: hidden !important;
-  position: relative !important;
-  -webkit-font-smoothing: antialiased !important;
-  overscroll-behavior-y: auto !important;
-}
-
-/* REMOVE DESKTOP-ONLY BACKGROUND DECORATIONS & CLUTTER */
-.aurora, .aurora-one, .aurora-two, .aurora-three, .noise, canvas#forest-world, .hero-orbit, body:before,
-.sidebar, .narrate-sidebar, .sidebar-github, .sidebar-tour-btn, .side-card, .narrate-brand, .back-link,
-.top-bar-desktop, .brand, .topbar, .topbar-actions, .top-actions, .github-watermark, .hero-top-row, 
-.studio-hero, .hero-chip, .hero-metrics, .typewriter-headline, .typewriter-cursor, .living-title, .eyebrow,
-#openInput, #openOutput, #openOutput2, .btn-github-pill, .sidebar-creature-card, .side-spacer,
-.status-pill, .nav-promoters-link, .hero-btn-row, .workflow, .beta-drag-badge, .desktop-only {
-  display: none !important;
-}
-
-/* UNIVERSAL CRISP SYSTEM TYPOGRAPHY (ZERO COMIC/CURSIVE FONT) */
-*, *::before, *::after, em, strong, b, i, p, span, h1, h2, h3, h4, h5, h6, label, button, input, select, textarea {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", "Helvetica Neue", sans-serif !important;
-  font-style: normal !important;
-  box-sizing: border-box !important;
-}
-
-/* 100% FLUID SINGLE-COLUMN WORKSPACE WRAPPERS */
-.main, 
-.app, 
-.workspace, 
-.narrate-shell, 
-.live-shell,
-.page-section, 
-.workspace-grid, 
-.left-column, 
-.preview-column, 
-.narrate-grid, 
-.live-main,
-.live-grid,
-.live-left,
-.live-right,
-#betaClipperWorkspace,
-.beta-workspace-layout,
-.beta-controls-col,
-.preview-column-card {
-  display: flex !important;
-  flex-direction: column !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-  grid-template-columns: 1fr !important;
-  margin: 0 !important;
-  padding: 8px 12px 0 12px !important;
-  height: auto !important;
-  overflow-y: visible !important;
-  overflow-x: hidden !important;
-  box-sizing: border-box !important;
-  gap: 14px !important;
-}
-
-/* SECTION HEADERS */
-.narrate-top, .live-top-bar, .section-page-head {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: flex-start !important;
-  gap: 4px !important;
-  margin: 0 0 12px 0 !important;
-  padding: 0 !important;
-  border: none !important;
-  width: 100% !important;
-}
-
-.narrate-top h1, .live-top-bar h1, .section-page-head h1 {
-  font-size: 1.45rem !important;
-  font-weight: 800 !important;
-  letter-spacing: -0.02em !important;
-  color: #ffffff !important;
-  line-height: 1.2 !important;
-  margin: 2px 0 4px 0 !important;
-}
-
-.kicker {
-  font-size: 0.72rem !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.05em !important;
-  color: #818cf8 !important;
-  text-transform: uppercase !important;
-  white-space: normal !important;
-  word-break: break-word !important;
-}
-
-/* CARDS & PANELS */
-.panel, 
-.card, 
-.hero-panel, 
-.upload-card, 
-.preview-container, 
-.script-panel, 
-.voice-panel, 
-.clip-panel, 
-.style-panel, 
-.progress-panel,
-.history-panel,
-.editing-mode-strip,
-.studio-hero,
-.beta-card {
-  background: var(--mobile-surface) !important;
-  border: 1px solid var(--mobile-border) !important;
-  border-radius: var(--mobile-radius) !important;
-  padding: 14px 12px !important;
-  margin: 0 0 12px 0 !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-  box-sizing: border-box !important;
-}
-
-.panel-head, .card-head, .section-head, .mode-strip-head {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: flex-start !important;
-  gap: 2px !important;
-  margin-bottom: 10px !important;
-  width: 100% !important;
-}
-
-.panel-head h2, .card-head h2, .section-head h2, .mode-strip-head h2 {
-  font-size: 1.05rem !important;
-  font-weight: 700 !important;
-  color: #ffffff !important;
-  margin: 0 !important;
-}
-
-/* 2-COLUMN TOUCH GRID FOR EDITING MODES */
-.mode-grid, .top-mode-grid {
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  gap: 8px !important;
-  margin-bottom: 12px !important;
-  width: 100% !important;
-}
-
-.mode-card {
-  min-width: 0 !important;
-  width: 100% !important;
-  background: #141418 !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 12px !important;
-  padding: 10px 8px !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: flex-start !important;
-  gap: 4px !important;
-  cursor: pointer !important;
-  text-align: left !important;
-  transition: transform 0.15s ease, border-color 0.15s ease !important;
-}
-
-.mode-card:active {
-  transform: scale(0.97) !important;
-}
-
-.mode-card.selected, .mode-card.active {
-  border-color: rgba(255, 255, 255, 0.45) !important;
-  background: rgba(255, 255, 255, 0.07) !important;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25) !important;
-}
-
-.mode-card .mode-icon, .mode-card .icon {
-  font-size: 1.25rem !important;
-}
-
-.mode-card .mode-name, .mode-card .name {
-  font-size: 0.86rem !important;
-  font-weight: 700 !important;
-  color: #ffffff !important;
-}
-
-.mode-card .mode-desc, .mode-card .desc {
-  font-size: 0.68rem !important;
-  color: var(--mobile-text-muted) !important;
-  line-height: 1.25 !important;
-  display: -webkit-box !important;
-  -webkit-line-clamp: 2 !important;
-  -webkit-box-orient: vertical !important;
-  overflow: hidden !important;
-}
-
-/* VIDEO SOURCE SECTION (Dropzone & YouTube stacked) */
-.source-options, .two, .two-column, .split-grid, .brand-grid, .control-grid, .control-grid.three, .duration-row, .text-grid, .text-style-row {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 10px !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-}
-
-.source-options > *, .two > *, .control-grid > *, .duration-row > * {
-  width: 100% !important;
-  min-width: 0 !important;
-}
-
-.dropzone, .upload-box, .drop-area, .beta-upload-drop {
-  width: 100% !important;
-  background: rgba(255, 255, 255, 0.03) !important;
-  border: 1.5px dashed rgba(255, 255, 255, 0.22) !important;
-  border-radius: 14px !important;
-  padding: 20px 14px !important;
-  text-align: center !important;
-  cursor: pointer !important;
-  transition: all 0.2s ease !important;
-}
-
-.dropzone:active, .beta-upload-drop:active {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border-color: rgba(255, 255, 255, 0.45) !important;
-}
-
-.youtube-import {
-  width: 100% !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 14px !important;
-  padding: 14px !important;
-  background: #141418 !important;
-}
-
-.youtube-input-row {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 8px !important;
-  margin-top: 10px !important;
-  width: 100% !important;
-}
-
-.youtube-input-row input, #betaYtUrl, #youtubeUrl {
-  width: 100% !important;
-  min-width: 0 !important;
-  background: #09090b !important;
-  border: 1px solid rgba(255, 255, 255, 0.14) !important;
-  color: #fafafa !important;
-  padding: 12px 14px !important;
-  border-radius: 10px !important;
-  font-size: 14px !important;
-}
-
-.youtube-input-row button, #youtubeImport, #betaYtImportBtn {
-  width: 100% !important;
-  min-height: 44px !important;
-  background: rgba(255, 255, 255, 0.08) !important;
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
-  color: #ffffff !important;
-  font-weight: 600 !important;
-  border-radius: 10px !important;
-  cursor: pointer !important;
-}
-
-/* ALL FORM CONTROLS & INPUTS */
-input[type="text"], input[type="url"], input[type="number"], select, textarea {
-  width: 100% !important;
-  min-width: 0 !important;
-  background: #141418 !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  color: #ffffff !important;
-  padding: 11px 12px !important;
-  border-radius: 10px !important;
-  box-sizing: border-box !important;
-  font-size: 14px !important;
-}
-
-/* CLEAN MODERN SWITCHES */
-.toggle-row {
-  display: flex !important;
-  align-items: center !important;
-  gap: 10px !important;
-  margin: 6px 0 !important;
-  cursor: pointer !important;
-}
-
-.toggle-row input[type="checkbox"] {
-  accent-color: #818cf8 !important;
-  width: 18px !important;
-  height: 18px !important;
-  cursor: pointer !important;
-}
-
-/* CRISP OBSIDIAN PRIMARY BUTTONS (Liquid smooth tap response) */
-.btn-primary, 
-.primary, 
-.hero-btn, 
-.generate-button, 
-#generateNarrate, 
-#createBtn,
-#btnStartClip,
-#btnConnectStream,
-#betaApplyTextBtn,
-.big-clip-btn {
-  width: 100% !important;
-  min-height: 48px !important;
-  background: #ffffff !important;
-  color: #09090b !important;
-  font-size: 0.96rem !important;
-  font-weight: 700 !important;
-  border: none !important;
-  border-radius: 12px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 8px !important;
-  box-shadow: 0 4px 18px rgba(255, 255, 255, 0.12) !important;
-  cursor: pointer !important;
-  margin-top: 8px !important;
-  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease !important;
-}
-
-.btn-primary:active, #createBtn:active, #generateNarrate:active, #betaApplyTextBtn:active {
-  transform: scale(0.97) !important;
-}
-
-.btn-primary:disabled, #createBtn:disabled, #generateNarrate:disabled, #betaApplyTextBtn:disabled {
-  opacity: 0.4 !important;
-  cursor: not-allowed !important;
-  box-shadow: none !important;
-}
-
-.ghost, .quiet, .secondary, .accent-outline, .clip-source-btn, #betaResetTextBtn {
-  min-height: 42px !important;
-  padding: 8px 12px !important;
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  color: #e5e7eb !important;
-  font-weight: 600 !important;
-  border-radius: 10px !important;
-}
-
-/* BETA TEXT EDITOR PANEL (Embedded naturally inline, never floating awkwardly) */
-#betaTextEditorPanel {
-  position: static !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  margin-top: 14px !important;
-  background: #141418 !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 14px !important;
-  padding: 14px !important;
-  box-sizing: border-box !important;
-}
-
-/* SCRIPT ACTIONS IN NARRATE */
-.script-actions {
-  display: grid !important;
-  grid-template-columns: repeat(2, 1fr) !important;
-  gap: 8px !important;
-  margin-top: 10px !important;
-  width: 100% !important;
-}
-
-.script-actions button {
-  width: 100% !important;
-  min-height: 42px !important;
-}
-
-/* VOICE CARDS & FILTERS */
-.voice-filters {
-  display: flex !important;
-  overflow-x: auto !important;
-  gap: 6px !important;
-  padding-bottom: 6px !important;
-  margin-bottom: 10px !important;
-  -webkit-overflow-scrolling: touch !important;
-}
-
-.voice-filter {
-  flex-shrink: 0 !important;
-  padding: 6px 12px !important;
-  border-radius: 20px !important;
-  font-size: 0.78rem !important;
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  color: #fafafa !important;
-}
-
-.voice-grid {
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  gap: 8px !important;
-  width: 100% !important;
-}
-
-.voice-card {
-  min-width: 0 !important;
-  background: #141418 !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 10px !important;
-  padding: 10px 8px !important;
-  text-align: left !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 4px !important;
-}
-
-.voice-card.selected {
-  border-color: rgba(255, 255, 255, 0.4) !important;
-  background: rgba(255, 255, 255, 0.08) !important;
-}
-
-.voice-card strong {
-  font-size: 0.85rem !important;
-  color: #ffffff !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-}
-
-.voice-card small {
-  font-size: 0.68rem !important;
-  color: var(--mobile-text-muted) !important;
-}
-
-/* HORIZONTAL SCROLL SHELVES */
-.clip-grid, .clips-shelf, .horizontal-shelf, .history-grid, .live-source-grid {
-  display: flex !important;
-  flex-direction: row !important;
-  overflow-x: auto !important;
-  gap: 10px !important;
-  padding-bottom: 8px !important;
-  width: 100% !important;
-  -webkit-overflow-scrolling: touch !important;
-}
-
-.clip-card, .history-card, .live-source-card {
-  flex: 0 0 140px !important;
-  max-width: 140px !important;
-  min-width: 140px !important;
-  background: #141418 !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 10px !important;
-  padding: 8px !important;
-  cursor: pointer !important;
-}
-
-/* RESPONSIVE VIDEO PREVIEW */
-video, .preview-frame {
-  width: 100% !important;
-  max-width: 100% !important;
-  border-radius: 12px !important;
-  background: #000000 !important;
-}
-
-/* MODALS */
-.modal-overlay, .tour-overlay {
-  backdrop-filter: blur(8px) !important;
-  background: rgba(0, 0, 0, 0.88) !important;
-  z-index: 9999 !important;
-}
-
-.modal-card, .tour-card {
-  width: calc(100vw - 24px) !important;
-  max-width: 380px !important;
-  border-radius: 16px !important;
-  margin: 0 auto !important;
-  background: var(--mobile-surface-elevated) !important;
-  border: 1px solid var(--mobile-border-active) !important;
-}
-
-/* SINGLE COLUMN FORM & PREVENT TEXT SQUISHING */
-div[style*="grid-template-columns:1fr 1fr"],
-div[style*="grid-template-columns: 1fr 1fr"] {
-  display: flex !important;
-  flex-direction: column !important;
-  width: 100% !important;
-  gap: 10px !important;
-}
-
-select, input[type="text"], input[type="url"], input[type="number"], .beta-upload-drop {
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-  box-sizing: border-box !important;
-}
-
-select {
-  height: 44px !important;
-  border-radius: 10px !important;
-  background: #141418 !important;
-  border: 1px solid #27272a !important;
-  color: #ffffff !important;
-  font-size: 13.5px !important;
-  padding: 0 12px !important;
-}
-
-#betaTextEditorPanel {
-  position: static !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  margin-top: 14px !important;
-  border: 1px solid #27272a !important;
-  border-radius: 14px !important;
-  background: #141418 !important;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
-  box-sizing: border-box !important;
-}
-
-#betaApplyTextBtn {
-  background: linear-gradient(135deg, #9333ea, #6366f1) !important;
-  color: #ffffff !important;
-  border: none !important;
-  box-shadow: 0 4px 16px rgba(147, 51, 234, 0.4) !important;
-  border-radius: 12px !important;
-  font-weight: 700 !important;
-  min-height: 48px !important;
-  font-size: 14px !important;
-}
-
-#betaResetTextBtn {
-  background: #1f1f26 !important;
-  border: 1px solid #33333f !important;
-  color: #a1a1aa !important;
-  border-radius: 12px !important;
-  min-height: 48px !important;
-}
-
-/* CLIPPY AI DRAWER & THEMED OBSIDIAN STYLING (ZERO GREEN) */
-.clippy-toggle-btn {
-  top: 18% !important;
-  right: 0 !important;
-  width: 28px !important;
-  height: 48px !important;
-  z-index: 99998 !important;
-  border-radius: 12px 0 0 12px !important;
-  background: rgba(18, 18, 22, 0.96) !important;
-  border: 1px solid rgba(255, 255, 255, 0.14) !important;
-  border-right: none !important;
-  box-shadow: -4px 6px 20px rgba(0, 0, 0, 0.6) !important;
-}
-
-.clippy-drawer {
-  width: 100vw !important;
-  max-width: 100vw !important;
-  right: 0 !important;
-  top: 0 !important;
-  height: 100vh !important;
-  max-height: 100vh !important;
-  border-radius: 0 !important;
-  z-index: 999999 !important;
-  background: rgba(12, 12, 16, 0.98) !important;
-  border-left: none !important;
-}
-
-.clippy-model-badge,
-#clippyModelBadge {
-  background: rgba(155, 92, 255, 0.12) !important;
-  border: 1px solid rgba(155, 92, 255, 0.35) !important;
-  color: #c084fc !important;
-}
-
-.clippy-badge-dot {
-  background: #a855f7 !important;
-  box-shadow: 0 0 8px #a855f7 !important;
-}
-
-.clippy-welcome-bubble {
-  border: 1px solid #27272a !important;
-  background: #141418 !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
-}
-
-.clippy-chip {
-  background: #18181f !important;
-  border: 1px solid #2e2e38 !important;
-  color: #e4e4e7 !important;
-  border-radius: 12px !important;
-  padding: 8px 12px !important;
-  font-size: 12px !important;
-}
-
-.clippy-chip:hover, .clippy-chip:active {
-  background: rgba(155, 92, 255, 0.2) !important;
-  border-color: #9B5CFF !important;
-  color: #ffffff !important;
-}
-
-.clippy-input-bar {
-  background: #121216 !important;
-  border: 1.5px solid #27272a !important;
-  border-radius: 16px !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
-}
-
-.clippy-input-bar:focus-within {
-  border-color: #9B5CFF !important;
-  box-shadow: 0 0 0 3px rgba(155, 92, 255, 0.2) !important;
-}
-
-.clippy-messages {
-  padding: 12px 14px 100px 14px !important;
-}
-
-.clippy-footer {
-  padding: 10px 14px 24px 14px !important;
-}
-
-.clippy-icon-btn svg {
-  stroke: #a1a1aa !important;
-  display: block !important;
-}
-
-.clippy-send-btn {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  background: #9B5CFF !important;
-  color: #ffffff !important;
-  border-radius: 50% !important;
-  width: 36px !important;
-  height: 36px !important;
-  border: none !important;
-}
-
-.clippy-send-btn svg {
-  stroke: #ffffff !important;
-  display: block !important;
-}
-
-.clippy-avatar-img {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  border-radius: 8px !important;
-}
-
-/* ABSOLUTE FINAL OVERRIDE: HIDE DESKTOP HERO & SQUISHED LANDING ELEMENTS */
-.topbar,
-.living-title,
-.eyebrow,
-.typewriter-headline,
-.typewriter-cursor,
-.studio-hero,
-.hero-chip,
-.hero-metrics,
-.workflow,
-.top-actions,
-.github-watermark,
-.btn-github-pill,
-.sidebar,
-.hero-top-row {
-  display: none !important;
-}
-</style>
-
-
-<script>
-window.isAndroidApp = true;
-window.TOUR_STORAGE_KEY = 'clipify_tour_shown';
-window.SUPPORT_STORAGE_KEY = 'clipify_support_shown';
-
-// Mark tour and modal shown so they never block user on launch
-localStorage.setItem(window.TOUR_STORAGE_KEY, 'true');
-localStorage.setItem(window.SUPPORT_STORAGE_KEY, 'true');
-
-// Default backend URL when connected via USB (adb reverse tcp:5000 tcp:5000) or local LAN
-window.CLIPPY_DESKTOP_URL = localStorage.getItem('clipify_desktop_url') || 'http://127.0.0.1:5000';
-
-// Native Mobile EventSource Mock for Android WebView
-window.EventSource = function(url) {
-  const urlStr = String(url || '');
-  console.log('[MobileEventSource] Initialized for:', urlStr);
-  const listeners = { message: [], error: [], open: [] };
-  let closed = false;
-
-  const instance = {
-    url: urlStr,
-    readyState: 1,
-    onmessage: null,
-    onerror: null,
-    onopen: null,
-    addEventListener(type, cb) {
-      if (listeners[type]) listeners[type].push(cb);
-    },
-    removeEventListener(type, cb) {
-      if (listeners[type]) listeners[type] = listeners[type].filter(f => f !== cb);
-    },
-    close() {
-      closed = true;
-      instance.readyState = 2;
-      if (timer) clearInterval(timer);
-    }
-  };
-
-  const dispatch = (type, data) => {
-    if (closed) return;
-    const evt = { data: typeof data === 'string' ? data : JSON.stringify(data) };
-    if (type === 'message' && typeof instance.onmessage === 'function') {
-      try { instance.onmessage(evt); } catch (e) { console.error(e); }
-    }
-    if (listeners[type]) {
-      listeners[type].forEach(cb => {
-        try { cb(evt); } catch (e) { console.error(e); }
-      });
-    }
-  };
-
-  setTimeout(() => {
-    if (closed) return;
-    if (typeof instance.onopen === 'function') instance.onopen({});
-    dispatch('message', { kind: 'status', status: 'running', progress: 10, stage: 'Starting Clipify AI', detail: 'Running mobile GPU neural engine…' });
-    dispatch('message', { kind: 'log', message: '[AI Engine] Initialized 9:16 vertical subject framing.' });
-  }, 100);
-
-  let curProg = 10;
-  const timer = setInterval(() => {
-    if (closed) { clearInterval(timer); return; }
-    const job = window._activeMobileRenderJob;
-    if (job) {
-      curProg = Math.max(curProg, job.progress || 0);
-    } else {
-      curProg += 18;
-    }
-
-    if (curProg < 100) {
-      const stage = curProg < 35 ? 'Smart framing & motion tracking…'
-                  : curProg < 70 ? 'Analyzing speech & generating kinetic subtitles…'
-                  : 'Encoding 1080x1920 vertical Shorts…';
-      dispatch('message', {
-        kind: 'progress',
-        progress: curProg,
-        stage: stage,
-        detail: 'Processing vertical frame (' + curProg + '%)'
-      });
-      if (curProg === 35 || curProg === 70) {
-        dispatch('message', { kind: 'log', message: '[Pipeline] ' + stage });
-      }
-    } else {
-      clearInterval(timer);
-      closed = true;
-      instance.readyState = 2;
-      dispatch('message', {
-        kind: 'complete',
-        pipeline: true,
-        progress: 100,
-        stage: 'Finished rendering all Shorts!',
-        outputs: ['short_1.mp4', 'short_2.mp4']
-      });
-      dispatch('message', {
-        kind: 'status',
-        status: 'done',
-        progress: 100,
-        outputs: ['short_1.mp4', 'short_2.mp4']
-      });
-    }
-  }, 500);
-
-  return instance;
-};
-
-// Native API Fetch Interceptor for Android
-const originalFetch = window.fetch;
-window.fetch = async function(url, options = {}) {
-  const urlStr = String(url);
-
-  // If this is an API call, route through native AndroidBridge to communicate with desktop server
-  if (urlStr.startsWith('/api/') || urlStr.includes('/api/')) {
-    let endpoint = urlStr;
-    if (endpoint.includes('/api/')) {
-      endpoint = '/api/' + endpoint.split('/api/')[1];
-    }
-
-    if (window.AndroidBridge && window.AndroidBridge.callApi) {
-      try {
-        const method = (options.method || 'GET').toUpperCase();
-        let body = null;
-        if (options.body) {
-          body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
-        }
-        const headers = options.headers ? JSON.stringify(options.headers) : '{}';
-        const rawResult = window.AndroidBridge.callApi(method, endpoint, body, headers);
-        if (rawResult) {
-          const parsed = JSON.parse(rawResult);
-          if (parsed.status !== 503) {
-            return new Response(parsed.body, {
-              status: parsed.status,
-              statusText: parsed.ok ? 'OK' : 'Error',
-              headers: { 'Content-Type': 'application/json' }
-            });
-          }
-        }
-      } catch (err) {
-        console.warn('[ClipifyBridge] Native callApi exception:', err);
-      }
-    }
-
-    // Direct HTTP fetch fallback to desktop server
-    try {
-      const fullUrl = urlStr.startsWith('http') ? urlStr : (window.CLIPPY_DESKTOP_URL + endpoint);
-      const directResp = await originalFetch(fullUrl, options);
-      if (directResp.status !== 0 && directResp.status !== 403) {
-        return directResp;
-      }
-    } catch (_) {}
-
-    // Offline / fallback response handlers
-    if (endpoint.includes('/api/import-youtube')) {
-      let reqUrl = '';
-      try {
-        const b = typeof options.body === 'string' ? JSON.parse(options.body) : (options.body || {});
-        reqUrl = b.url || '';
-      } catch (_) {}
-      const jId = 'mobile_yt_' + Date.now();
-      window._activeMobileYtJob = {
-        job_id: jId,
-        id: jId,
-        filename: 'YouTube_Video_' + Math.floor(Math.random() * 899 + 100) + '.mp4',
-        status: 'downloading',
-        progress: 10,
-        stage: 'Connecting to YouTube…',
-        detail: 'Downloading 720p stream…',
-        events: []
-      };
-      let prog = 10;
-      const progTimer = setInterval(() => {
-        prog += 18;
-        if (!window._activeMobileYtJob) { clearInterval(progTimer); return; }
-        if (prog < 100) {
-          window._activeMobileYtJob.progress = prog;
-          window._activeMobileYtJob.stage = prog < 55 ? 'Downloading stream… (' + prog + '%)' : 'Remuxing MP4… (' + prog + '%)';
-          window._activeMobileYtJob.detail = prog + '% complete';
-        } else {
-          clearInterval(progTimer);
-          window._activeMobileYtJob.progress = 100;
-          window._activeMobileYtJob.status = 'uploaded';
-          window._activeMobileYtJob.stage = 'Download complete. Video ready.';
-          window._activeMobileYtJob.detail = 'Video ready to clip.';
-        }
-      }, 600);
-
-      if (window.AndroidBridge && window.AndroidBridge.startYouTubeClip && reqUrl) {
-        try { window.AndroidBridge.startYouTubeClip(reqUrl, 'viral'); } catch (_) {}
-      }
-
-      return new Response(JSON.stringify({
-        ok: true,
-        job_id: jId,
-        filename: window._activeMobileYtJob.filename,
-        message: 'Download started.'
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (endpoint.includes('/api/status/')) {
-      const parts = endpoint.split('/api/status/');
-      const rawId = parts[1] || '';
-      const reqId = rawId.split('?')[0].trim();
-      if (window._activeMobileYtJob && (reqId === window._activeMobileYtJob.job_id || reqId.startsWith('mobile_yt_'))) {
-        return new Response(JSON.stringify(window._activeMobileYtJob), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-      if (window._activeMobileRenderJob && (reqId === window._activeMobileRenderJob.job_id || reqId.startsWith('mobile_job_'))) {
-        return new Response(JSON.stringify(window._activeMobileRenderJob), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-      return new Response(JSON.stringify({
-        ok: true,
-        status: 'uploaded',
-        progress: 100,
-        stage: 'Video ready',
-        filename: 'clipify_video.mp4',
-        outputs: ['short_1.mp4', 'short_2.mp4']
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (endpoint.includes('/api/metadata/')) {
-      return new Response(JSON.stringify({
-        title: 'Viral Gaming Short ⚡',
-        description: 'Created with Clipify AI on mobile #Shorts #Viral',
-        hashtags: ['#Shorts', '#Viral', '#ClipifyAI', '#Gaming'],
-        tags: ['shorts', 'viral', 'ai', 'clipify']
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (endpoint.includes('/api/start')) {
-      const rId = 'mobile_job_' + Date.now();
-      window._activeMobileRenderJob = {
-        job_id: rId,
-        id: rId,
-        status: 'running',
-        progress: 15,
-        stage: 'Starting Clipify AI',
-        detail: 'Framing 9:16 vertical viewport…',
-        outputs: []
-      };
-      let rProg = 15;
-      const rTimer = setInterval(() => {
-        rProg += 20;
-        if (!window._activeMobileRenderJob) { clearInterval(rTimer); return; }
-        if (rProg < 100) {
-          window._activeMobileRenderJob.progress = rProg;
-          window._activeMobileRenderJob.stage = rProg < 50 ? 'Smart subject tracking… (' + rProg + '%)' : 'Adding kinetic captions… (' + rProg + '%)';
-        } else {
-          clearInterval(rTimer);
-          window._activeMobileRenderJob.progress = 100;
-          window._activeMobileRenderJob.status = 'done';
-          window._activeMobileRenderJob.stage = 'Done';
-          window._activeMobileRenderJob.detail = 'Created 2 vertical Shorts.';
-          window._activeMobileRenderJob.outputs = ['short_1.mp4', 'short_2.mp4'];
-        }
-      }, 700);
-
-      return new Response(JSON.stringify({
-        ok: true,
-        job_id: rId,
-        message: 'Started clipping pipeline.'
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (endpoint.includes('/api/clippy/model')) {
-      return new Response(JSON.stringify({ ok: true, model: "qwen3:4b (Fastest Local AI)", speed: "Instant" }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (endpoint.includes('/api/clippy/chat')) {
-      let prompt = "";
-      try {
-        const b = JSON.parse(options.body || "{}");
-        prompt = (b.message || "").toLowerCase();
-      } catch (_) {}
-      let reply = "Hey! I'm your Clipify AI assistant. You can import any video from your device or YouTube to create vertical 9:16 Shorts with smart framing and captions!";
-      if (prompt.includes("game") || prompt.includes("rock")) {
-        reply = "Rock, paper, scissors! 🎲 I pick Rock! What did you throw?";
-      } else if (prompt.includes("live")) {
-        reply = "Live Studio detects exciting moments in gaming and live streams and clips them automatically!";
-      } else if (prompt.includes("narrat")) {
-        reply = "Narration Studio lets you generate AI scripts and pair them with gameplay background clips!";
-      }
-      return new Response(JSON.stringify({ ok: true, reply: reply, model: "qwen3:4b (Local AI)" }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (endpoint.includes('/api/models/ollama/download-status')) {
-      const dl = window._mobileModelDlState || { ok: true, active: false, percent: 100, status: "Completed successfully!" };
-      return new Response(JSON.stringify(dl), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (endpoint.includes('/api/models/ollama/download')) {
-      let mName = "qwen2.5:3b";
-      try {
-        const b = JSON.parse(options.body || "{}");
-        if (b.model) mName = b.model;
-      } catch (_) {}
-      window._mobileModelDlState = { ok: true, active: true, model: mName, progress: 0, percent: 0, status: "Pulling model layers..." };
-      let step = 0;
-      const sim = setInterval(() => {
-        step++;
-        if (step === 1) {
-          window._mobileModelDlState = { ok: true, active: true, model: mName, progress: 35, percent: 35, status: "Downloading layers (35%)..." };
-        } else if (step === 2) {
-          window._mobileModelDlState = { ok: true, active: true, model: mName, progress: 75, percent: 75, status: "Verifying checksums (75%)..." };
-        } else {
-          clearInterval(sim);
-          window._mobileModelDlState = { ok: true, active: false, model: mName, progress: 100, percent: 100, status: "Completed successfully!" };
-        }
-      }, 1000);
-
-      return new Response(JSON.stringify({ ok: true, message: "Download started." }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (endpoint.includes('/api/models')) {
-      return new Response(JSON.stringify({
-        ok: true,
-        models: ['qwen3:4b (Fastest Local AI)', 'deepseek-r1:8b', 'Built-in Heuristic AI'],
-        active_model: 'qwen3:4b (Fastest Local AI)'
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-  }
-
-  // Standard fetch for local assets
-  try {
-    return await originalFetch(url, options);
-  } catch (e) {
-    return new Response(JSON.stringify({ ok: false, error: 'Offline' }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-};
-
-// Polling Helper for Job Progress
-window.startAndroidJobPolling = function(jobId, onProgress, onComplete, onError) {
-  let interval = setInterval(async () => {
-    try {
-      const res = await fetch('/api/status/' + jobId);
-      if (res.ok) {
-        const data = await res.json();
-        if (onProgress) onProgress(data);
-        if (data.status === 'done' || data.status === 'complete' || (data.progress >= 100 && data.outputs && data.outputs.length)) {
-          clearInterval(interval);
-          if (onComplete) onComplete(data);
-        } else if (data.status === 'error') {
-          clearInterval(interval);
-          if (onError) onError(data.detail || data.error || 'Pipeline stopped');
-        }
-      }
-    } catch (_) {}
-  }, 1000);
-  return interval;
-};
-
-// Auto wire DOM elements on load
-window.addEventListener('DOMContentLoaded', () => {
-  console.log('[ClipifyAI Android] Native Bridge active.');
-
-  // Wire video pickers to Android file chooser
-  const pickers = document.querySelectorAll(
-    'input[type="file"], .dropzone, .upload-box, .drop-area, #videoInput, [data-picker="video"], .upload-custom, #betaDropZone'
-  );
-  pickers.forEach(el => {
-    el.addEventListener('click', (e) => {
-      if (window.AndroidBridge && window.AndroidBridge.pickVideo) {
-        e.preventDefault();
-        window.AndroidBridge.pickVideo();
-      }
-    });
-  });
-
-  // Wire YouTube import button to real backend import with live progress tracking
-  const ytButtons = document.querySelectorAll('#youtubeImport, #importYoutube, #btnImportYt, .btn-import-url, #betaYtImportBtn');
-  ytButtons.forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      const input = document.querySelector('#youtubeUrl, #videoUrlInput, input[name="youtube_url"], #betaYtUrl');
-      const url = input ? input.value.trim() : '';
-      if (!url) {
-        if (window.AndroidBridge && window.AndroidBridge.showToast) {
-          window.AndroidBridge.showToast('Please enter a YouTube video URL');
-        } else {
-          alert('Please enter a YouTube video URL');
-        }
-        return;
-      }
-
-      btn.disabled = true;
-      btn.textContent = 'Connecting…';
-      if (window.AndroidBridge && window.AndroidBridge.showToast) {
-        window.AndroidBridge.showToast('Connecting to YouTube video...');
-      }
-
-      try {
-        const res = await fetch('/api/import-youtube', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: url })
-        });
-        const data = await res.json();
-        if (data.ok && data.job_id) {
-          const jobId = data.job_id;
-          window.ClipifyCurrentJobId = jobId;
-          const jobInput = document.getElementById('jobId') || document.getElementById('currentJobId');
-          if (jobInput) jobInput.value = jobId;
-
-          // Poll /api/status/${jobId} with live percentage progress
-          let pollCount = 0;
-          const pollTimer = setInterval(async () => {
-            pollCount++;
-            try {
-              const sr = await fetch('/api/status/' + jobId, { cache: 'no-store' });
-              if (sr.ok) {
-                const sd = await sr.json();
-                const pct = Math.max(0, Math.min(100, Number(sd.progress) || 0));
-                btn.textContent = `${pct}% Downloading…`;
-
-                if (sd.status === 'uploaded' || sd.status === 'done' || pct >= 100) {
-                  clearInterval(pollTimer);
-                  btn.disabled = false;
-                  btn.textContent = 'Fetch Link';
-                  const vidName = sd.filename || 'youtube_video.mp4';
-                  if (window.state) {
-                    window.state.jobId = jobId;
-                    window.state.source = { name: vidName, size: 0, origin: 'youtube', jobId: jobId };
-                  }
-                  if (window.betaState) {
-                    window.betaState.jobId = jobId;
-                    window.betaState.sourceFile = { name: vidName, size: 0 };
-                  }
-                  const createBtn = document.getElementById('createBtn') || document.getElementById('btnStartClip');
-                  if (createBtn) createBtn.disabled = false;
-                  const dropText = document.querySelector('.dropzone strong, .drop-title, #betaSourceName');
-                  if (dropText) dropText.textContent = vidName;
-                  const dropSub = document.querySelector('.dropzone small, .drop-subtitle, #betaSourceMeta');
-                  if (dropSub) dropSub.textContent = 'Ready to generate vertical 9:16 Short';
-                  if (window.showToast) window.showToast('YouTube video downloaded! Ready to generate.', 'success');
-                  if (window.AndroidBridge && window.AndroidBridge.showToast) {
-                    window.AndroidBridge.showToast('YouTube video ready! Click Generate Short.');
-                  }
-                } else if (sd.status === 'error') {
-                  clearInterval(pollTimer);
-                  btn.disabled = false;
-                  btn.textContent = 'Fetch Link';
-                  const msg = sd.detail || sd.error || 'YouTube download failed';
-                  if (window.showToast) window.showToast(msg, 'warn');
-                  if (window.AndroidBridge && window.AndroidBridge.showToast) {
-                    window.AndroidBridge.showToast(msg);
-                  }
-                }
-              }
-            } catch (_) {}
-            if (pollCount > 300) clearInterval(pollTimer);
-          }, 1200);
-        } else {
-          throw new Error(data.error || 'Import failed');
-        }
-      } catch (err) {
-        btn.disabled = false;
-        btn.textContent = 'Fetch Link';
-        if (window.AndroidBridge && window.AndroidBridge.showToast) {
-          window.AndroidBridge.showToast('Notice: ' + err.message);
-        }
-      }
-    });
-  });
-
-  // External Links
-  document.querySelectorAll('a[href^="http"]').forEach(a => {
-    a.addEventListener('click', (e) => {
-      if (window.AndroidBridge && window.AndroidBridge.openBrowser) {
-        e.preventDefault();
-        window.AndroidBridge.openBrowser(a.href);
-      }
-    });
-  });
-});
-
-// Callback when Android native layer selects a video
-function onAndroidVideoSelected(uri, filename, duration) {
-  console.log('[ClipifyAI Android] Video selected:', filename);
-  const dropText = document.querySelector('.dropzone strong, .drop-title, #betaSourceName');
-  if (dropText) dropText.textContent = filename;
-  const dropSub = document.querySelector('.dropzone small, .drop-subtitle, #betaSourceMeta');
-  if (dropSub) dropSub.textContent = 'Ready to generate vertical 9:16 Short';
-  const info = document.getElementById('betaSourceInfo');
-  if (info) info.style.display = 'flex';
-  const createBtn = document.getElementById('createBtn') || document.getElementById('btnStartClip');
-  if (createBtn) {
-    createBtn.disabled = false;
-  }
-
-  // Populate state.source in global state so start() does not abort
-  if (window.state) {
-    window.state.source = {
-      name: filename,
-      size: 1024 * 1024 * 25,
-      uri: uri,
-      origin: 'android_native'
-    };
-    window.state.jobId = null;
-  }
-  if (window.betaState) {
-    window.betaState.sourceFile = {
-      name: filename,
-      size: 1024 * 1024 * 25,
-      uri: uri
-    };
-    window.betaState.jobId = null;
-  }
-
-  if (window.AndroidBridge && window.AndroidBridge.showToast) {
-    window.AndroidBridge.showToast('Selected: ' + filename);
-  }
-}
-</script>
-
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icon.png', v='4.0.12') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='4.0.12.3') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='studio.css', v='4.0.12') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='model_hub.css', v='4.0.12') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='tour.css', v='4.0.12.3') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='cache_manager.css', v='4.0.12') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='trending.css', v='5.0.2') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='caption_playground.css', v='5.0.2') }}">
 </head>
 
 <body>
@@ -1270,14 +22,14 @@ function onAndroidVideoSelected(uri, filename, duration) {
   <div class="noise"></div>
   <aside class="sidebar">
     <div class="brand">
-      <img class="brand-mark" src="static/icon.png" alt=""
+      <img class="brand-mark" src="{{ url_for('static', filename='icon.png', v='20261018-3') }}" alt=""
         aria-hidden="true">
       <div class="brand-copy">
         <div class="brand-title-wrap">
           <b>Clipify AI</b>
-          <span class="cool-version-badge" id="topBrandVersionBadge" title="Clipify AI v5.0.0 · Click for updates & release info">
+          <span class="cool-version-badge" id="topBrandVersionBadge" title="Clipify AI v5.0.1 · Click for updates & release info">
             <span class="version-dot"></span>
-            <span class="version-num">v5.0.0</span>
+            <span class="version-num">v5.0.1</span>
             <span class="version-shimmer-sweep"></span>
           </span>
         </div>
@@ -1329,6 +81,14 @@ function onAndroidVideoSelected(uri, filename, duration) {
         </svg>
         <span>Instant Clipping</span> <span class="nav-beta-tag">BETA</span>
       </a>
+      <a href="#trending" data-nav="trending" id="navTrendingLink" title="Discover live broadcasts & trending gameplay across YouTube, Twitch & Kick">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+          <polyline points="17 6 23 6 23 12"></polyline>
+        </svg>
+        <span>Trending</span> <span class="nav-trending-pill" style="margin-left:auto;background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:0.68rem;padding:1px 6px;border-radius:10px;font-weight:700;">LIVE</span>
+      </a>
 
       <div class="sidebar-nav-divider"></div>
 
@@ -1352,7 +112,7 @@ function onAndroidVideoSelected(uri, filename, duration) {
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
         </svg>
-        <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v5.0.0</span>
+        <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v5.0.1</span>
       </a>
       <a href="#cache" id="navClearCacheLink" title="Clear transcription cache & imported YouTube videos">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -1388,6 +148,17 @@ function onAndroidVideoSelected(uri, filename, duration) {
         </svg>
         <span>Promoters</span>
         <span class="nav-promoter-pill">Spotlight</span>
+      </a>
+      <a href="#campaigns" id="navCampaignsLink" class="nav-campaigns-link"
+        title="Clipper Monetization & Bounties — Campaigns">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 11v3a1 1 0 0 0 1 1h2l4 4V5L6 9H4a1 1 0 0 0-1 1z"></path>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+        </svg>
+        <span>Campaigns</span>
+        <span class="nav-campaigns-pill">Bounties</span>
       </a>
     </nav>
     <div class="side-spacer"></div>
@@ -1619,28 +390,10 @@ function onAndroidVideoSelected(uri, filename, duration) {
             <h2>Choose the way your Short should feel</h2>
           </div><span class="mode-strip-note">AI adapts the edit to your content</span>
         </div>
-        <div class="mode-grid top-mode-grid"><button
-            class="mode-card " data-mode="gaming"><span
-              class="mode-icon">🎮</span><span class="mode-name">Gaming</span><span
-              class="mode-desc">Gameplay + facecam reactions with stable smart framing</span></button><button
-            class="mode-card selected" data-mode="viral"><span
-              class="mode-icon">✦</span><span class="mode-name">Viral</span><span
-              class="mode-desc">Hooks, curiosity, surprise & payoff</span></button><button
-            class="mode-card " data-mode="funny"><span
-              class="mode-icon">😂</span><span class="mode-name">Funny</span><span
-              class="mode-desc">Punchlines, reactions & comedic timing</span></button><button
-            class="mode-card " data-mode="dramatic"><span
-              class="mode-icon">⚡</span><span class="mode-name">Dramatic</span><span
-              class="mode-desc">Tension, reveals & emotional moments</span></button><button
-            class="mode-card " data-mode="educational"><span
-              class="mode-icon">◈</span><span class="mode-name">Educational</span><span
-              class="mode-desc">Facts, explanations & takeaways</span></button><button
-            class="mode-card " data-mode="story"><span
-              class="mode-icon">◉</span><span class="mode-name">Story</span><span
-              class="mode-desc">Setup → escalation → payoff</span></button><button
-            class="mode-card " data-mode="meme"><span
-              class="mode-icon">💀</span><span class="mode-name">Meme</span><span
-              class="mode-desc">Chaotic, absurd & reaction-heavy</span></button></div>
+        <div class="mode-grid top-mode-grid">{% for key, mode in modes.items() %}<button
+            class="mode-card {% if key == 'viral' %}selected{% endif %}" data-mode="{{ key }}"><span
+              class="mode-icon">{{ mode.icon }}</span><span class="mode-name">{{ mode.name }}</span><span
+              class="mode-desc">{{ mode.description }}</span></button>{% endfor %}</div>
       </div>
       <div class="workspace-grid">
         <div class="left-column">
@@ -1700,6 +453,7 @@ function onAndroidVideoSelected(uri, filename, duration) {
                     title="Auto-search PC for installed Ollama models" style="display:none;">🔍 Search PC</button></div>
               </label><label>Caption font<select id="fontSelect">
                   <option selected>Montserrat Extra Bold</option>
+                  <option value="none">🚫 No Captions (Clean Footage)</option>
                   <option>Arial</option>
                   <option>Arial Black</option>
                   <option>Segoe UI</option>
@@ -1884,16 +638,10 @@ function onAndroidVideoSelected(uri, filename, duration) {
                     class="ghost" type="button" id="clearLogo">Remove</button></div>
                 <label>Logo image / folder<input id="logoPath" value=""
                     placeholder="Uploaded logo or local folder path"></label>
-                <div class="two"><label>Position<select id="logoPosition"><option value="top-left" >Top Left
-                      </option><option value="top-center" >Top Center
-                      </option><option value="top-right" selected>Top Right
-                      </option><option value="center-left" >Center Left
-                      </option><option value="center" >Center
-                      </option><option value="center-right" >Center Right
-                      </option><option value="bottom-left" >Bottom Left
-                      </option><option value="bottom-center" >Bottom Center
-                      </option><option value="bottom-right" >Bottom Right
-                      </option><option value="custom">
+                <div class="two"><label>Position<select id="logoPosition">{% for p in
+                      ['top-left','top-center','top-right','center-left','center','center-right','bottom-left','bottom-center','bottom-right']
+                      %}<option value="{{p}}" {% if p=='top-right' %}selected{% endif %}>{{p|replace('-',' ')|title}}
+                      </option>{% endfor %}<option value="custom">
                         Custom / Drag in Preview</option></select></label><label>Margin<input id="logoMargin"
                       type="number" min="0" max="250" value="40"></label></div>
                 <div class="slider-row"><label>Logo size <output id="logoSizeOut">8%</output></label><input
@@ -1969,9 +717,11 @@ function onAndroidVideoSelected(uri, filename, duration) {
                 Overlay</b></label>
             <div class="text-grid">
               <label>Text<textarea id="overlayText" maxlength="100" placeholder="e.g. THAT'S CRAZY!"></textarea></label>
-              <div class="text-controls"><label>Position<select id="textPosition"><option value="top-left">Top Left</option><option value="top-center">Top Center</option><option value="top-right">Top Right</option><option value="center-left">Center Left</option><option value="center">Center</option><option value="center-right">Center Right</option><option value="bottom-left">Bottom Left</option><option value="bottom-center">Bottom Center</option><option value="bottom-right">Bottom Right</option><option value="custom">
+              <div class="text-controls"><label>Position<select id="textPosition">{% for p in
+                    ['top-left','top-center','top-right','center-left','center','center-right','bottom-left','bottom-center','bottom-right']
+                    %}<option value="{{p}}">{{p|replace('-',' ')|title}}</option>{% endfor %}<option value="custom">
                       Custom / Drag in Preview</option></select></label><label>Size<input id="textSize" type="number"
-                    min="3" max="12" value="6"> %</label><label>Margin<input id="textMargin" type="number" min="20"
+                    min="2" max="25" value="6"> %</label><label>Margin<input id="textMargin" type="number" min="20"
                     max="500" value="110"> px</label></div>
             </div>
             <div class="text-style-row"><label>Text color<input id="textColor" type="color"
@@ -1999,7 +749,16 @@ function onAndroidVideoSelected(uri, filename, duration) {
                 <img id="previewLogoImg" alt="" style="display:none;">
                 <span id="previewLogoPlaceholder" class="preview-logo-placeholder" style="display:none;">Logo</span>
               </div>
-              <div class="preview-text draggable-overlay" id="previewText">Your text</div>
+              <div class="preview-text draggable-overlay" id="previewText" data-x="50" data-y="75">
+                <span class="editor-text-content" id="previewTextContent">Your text</span>
+                <div class="overlay-quick-controls" id="previewTextControls">
+                  <button type="button" class="ctrl-btn-size" id="previewTextSizeDec" title="Decrease font size (−)">−</button>
+                  <span class="ctrl-size-badge" id="previewTextSizeBadge">6%</span>
+                  <button type="button" class="ctrl-btn-size" id="previewTextSizeInc" title="Increase font size (+)">+</button>
+                  <span class="ctrl-drag-icon" title="Drag to move">✥</span>
+                </div>
+                <div class="overlay-resize-handle" id="previewTextResizeHandle" title="Drag corner to resize text">⤡</div>
+              </div>
               <div class="preview-watermark-overlay" id="previewWatermark"
                 style="display:none;position:absolute;pointer-events:none;z-index:4;font-family:inherit;font-weight:900;text-shadow:0 2px 8px rgba(0,0,0,0.6);white-space:nowrap;">
               </div>
@@ -2109,7 +868,16 @@ function onAndroidVideoSelected(uri, filename, duration) {
               <img id="editorLogoImg" alt="" style="display:none;">
               <span id="editorLogoPlaceholder" class="preview-logo-placeholder" style="display:none;">Logo</span>
             </div>
-            <div id="editorText" class="editor-overlay editor-text">Your text</div>
+            <div id="editorText" class="editor-overlay editor-text" data-x="50" data-y="75">
+              <span class="editor-text-content" id="editorTextContent">Your text</span>
+              <div class="overlay-quick-controls" id="editorTextControls">
+                <button type="button" class="ctrl-btn-size" id="editorTextSizeDec" title="Decrease font size (−)">−</button>
+                <span class="ctrl-size-badge" id="editorTextSizeBadge">6%</span>
+                <button type="button" class="ctrl-btn-size" id="editorTextSizeInc" title="Increase font size (+)">+</button>
+                <span class="ctrl-drag-icon" title="Drag to move">✥</span>
+              </div>
+              <div class="overlay-resize-handle" id="editorTextResizeHandle" title="Drag corner to resize text">⤡</div>
+            </div>
             <div id="editorDragHint">Drag logo/text · changes are applied to the exported edit</div>
           </div>
           <div id="reviewEmpty" class="empty-state">Select a generated Short from Projects or Create.</div>
@@ -2154,34 +922,12 @@ function onAndroidVideoSelected(uri, filename, duration) {
             <div class="two">
               <label>Position
                 <select id="editorLogoPosition">
-                  
-                  <option value="top-left" >Top Left
+                  {% for p in
+                  ['top-left','top-center','top-right','center-left','center','center-right','bottom-left','bottom-center','bottom-right']
+                  %}
+                  <option value="{{ p }}" {% if p=='top-right' %}selected{% endif %}>{{ p|replace('-', ' ')|title }}
                   </option>
-                  
-                  <option value="top-center" >Top Center
-                  </option>
-                  
-                  <option value="top-right" selected>Top Right
-                  </option>
-                  
-                  <option value="center-left" >Center Left
-                  </option>
-                  
-                  <option value="center" >Center
-                  </option>
-                  
-                  <option value="center-right" >Center Right
-                  </option>
-                  
-                  <option value="bottom-left" >Bottom Left
-                  </option>
-                  
-                  <option value="bottom-center" >Bottom Center
-                  </option>
-                  
-                  <option value="bottom-right" >Bottom Right
-                  </option>
-                  
+                  {% endfor %}
                   <option value="custom">Custom / Drag in Preview</option>
                 </select>
               </label>
@@ -2203,8 +949,8 @@ function onAndroidVideoSelected(uri, filename, duration) {
                   value="0.22"></label>
             </div><label class="toggle-row"><input type="checkbox" id="editorTextEnabled"><span
                 class="switch"></span><b>Text</b></label><textarea id="editorTextValue" maxlength="100"
-              placeholder="Text overlay"></textarea><label>Text size<input id="editorTextSize" type="number" min="3"
-                max="12" value="6"></label><label>Text color<input id="editorTextColor" type="color"
+              placeholder="Text overlay"></textarea><label>Text size<input id="editorTextSize" type="number" min="2"
+                max="25" value="6"></label><label>Text color<input id="editorTextColor" type="color"
                 value="#FFFFFF"></label><label class="toggle-row compact"><input type="checkbox" id="editorTextBg"
                 checked><span class="switch"></span><b>Text
                 background</b></label><label>BG color<input id="editorTextBgColor" type="color" value="#000000"></label>
@@ -2568,32 +1314,137 @@ function onAndroidVideoSelected(uri, filename, duration) {
                 the preview or adjust this slider to resize top/bottom screen</small>
             </div>
 
-            <!-- Premium Captions Toggle -->
+            <!-- Captions & Language Controls in Beta Lab -->
             <div
               style="margin-top:14px;padding:12px 14px;border:1px solid rgba(255,255,255,0.1);border-radius:12px;background:rgba(255,255,255,0.02);">
-              <label class="toggle-row"><input type="checkbox" id="betaPremiumCaptions" checked><span
-                  class="switch"></span><b>✨ Premium Captions (Scale Pop & Action Cues)</b></label>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
-                <label>Placement
-                  <select id="betaCaptionPreset">
-                    <option value="center_seam" selected>Center Seam (48%-52%)</option>
-                    <option value="lower_safe">Lower Safe Band (72%-82%)</option>
-                    <option value="top_safe">Top Safe Band</option>
-                  </select>
-                </label>
-                <label>Accent Color
-                  <select id="betaCaptionAccent">
-                    <option value="gold_yellow" selected>Gold Yellow</option>
-                    <option value="lime_green">Lime Green</option>
-                    <option value="cyan_sky">Cyan Sky</option>
-                    <option value="coral_red">Coral Red</option>
-                    <option value="pink_lavender">Pink Lavender</option>
-                  </select>
-                </label>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <label class="toggle-row" style="margin:0;"><input type="checkbox" id="betaCaptionsToggle" checked><span
+                    class="switch"></span><b>💬 Subtitle Captions</b></label>
+                <b id="betaCaptionsBadge"
+                  style="font-size:0.75rem;color:#4ade80;background:rgba(74,222,128,0.1);padding:2px 8px;border-radius:6px;border:1px solid rgba(74,222,128,0.2);">ENABLED</b>
               </div>
-              <div style="margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.05);">
-                <label class="toggle-row compact"><input type="checkbox" id="betaSituationalCues" checked><span
-                    class="switch"></span><b>Situational Action Cues (*ACTION CUE*)</b></label>
+
+              <div id="betaCaptionsSettingsContainer">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+                  <label>Audio Language
+                    <select id="betaLanguageSelect">
+                      <option value="auto" selected>🌐 Auto-Detect</option>
+                      <option value="en">English (en)</option>
+                      <option value="hi">Hindi (हिन्दी)</option>
+                      <option value="es">Spanish (Español)</option>
+                      <option value="fr">French (Français)</option>
+                      <option value="de">German (Deutsch)</option>
+                      <option value="pt">Portuguese (Português)</option>
+                      <option value="ja">Japanese (日本語)</option>
+                      <option value="ko">Korean (한국어)</option>
+                      <option value="zh">Chinese (中文)</option>
+                      <option value="ru">Russian (Русский)</option>
+                      <option value="ar">Arabic (العربية)</option>
+                      <option value="it">Italian (Italiano)</option>
+                      <option value="id">Indonesian (Bahasa Indonesia)</option>
+                      <option value="tr">Turkish (Türkçe)</option>
+                      <option value="nl">Dutch (Nederlands)</option>
+                      <option value="pl">Polish (Polski)</option>
+                      <option value="vi">Vietnamese (Tiếng Việt)</option>
+                    </select>
+                  </label>
+                  <label>Placement
+                    <select id="betaCaptionPreset">
+                      <option value="center_seam" selected>Center Seam (48%-52%)</option>
+                      <option value="lower_safe">Lower Safe Band (72%-82%)</option>
+                      <option value="top_safe">Top Safe Band</option>
+                    </select>
+                  </label>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+                  <label>Accent Color
+                    <select id="betaCaptionAccent">
+                      <option value="gold_yellow" selected>Gold Yellow</option>
+                      <option value="lime_green">Lime Green</option>
+                      <option value="cyan_sky">Cyan Sky</option>
+                      <option value="coral_red">Coral Red</option>
+                      <option value="pink_lavender">Pink Lavender</option>
+                    </select>
+                  </label>
+                  <div style="display:flex;align-items:center;padding-top:14px;">
+                    <label class="toggle-row compact" style="margin:0;"><input type="checkbox" id="betaPremiumCaptions" checked><span
+                        class="switch"></span><b style="font-size:0.75rem;">Scale Pop Animation</b></label>
+                  </div>
+                </div>
+                <div style="margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.05);">
+                  <label class="toggle-row compact"><input type="checkbox" id="betaSituationalCues" checked><span
+                      class="switch"></span><b>Situational Action Cues (*ACTION CUE*)</b></label>
+                </div>
+
+                <!-- Caption Style Designs Showcase & Mouse Playground -->
+                <div class="caption-studio-panel">
+                  <div class="caption-studio-head">
+                    <div class="caption-studio-title">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="4"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="14" y2="13"/><line x1="7" y1="17" x2="11" y2="17"/></svg>
+                      <span>Caption Designs &amp; Position Playground</span>
+                    </div>
+                    <span class="caption-studio-badge">DRAG &amp; RESIZE WITH MOUSE</span>
+                  </div>
+
+                  <!-- 1. All Caption Designs Showcase -->
+                  <div style="display:flex;flex-direction:column;gap:6px;">
+                    <span style="font-size:0.75rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.04em;font-weight:700;">Choose Caption Design (Live Preview)</span>
+                    <div class="caption-styles-grid" id="captionStylesGrid">
+                      <!-- Rendered dynamically by caption_playground.js -->
+                    </div>
+                  </div>
+
+                  <!-- 2. Interactive 9:16 Phone Canvas & Mouse Adjusters -->
+                  <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">
+                    <span style="font-size:0.75rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.04em;font-weight:700;">Interactive 9:16 Stage · Drag Position &amp; Scale with Mouse</span>
+                    <div class="caption-stage-container">
+                      <!-- Phone Mockup Stage -->
+                      <div class="caption-phone-stage" id="captionPhoneStage" title="Click &amp; Drag caption with mouse to move vertically">
+                        <div class="caption-stage-guide caption-guide-top"><span class="caption-guide-label">Top Safe</span></div>
+                        <div class="caption-stage-guide caption-guide-center"><span class="caption-guide-label">Center Seam</span></div>
+                        <div class="caption-stage-guide caption-guide-lower"><span class="caption-guide-label">Lower Safe</span></div>
+
+                        <!-- Draggable / Resizable Caption Box -->
+                        <div class="caption-drag-box" id="captionDragBox" style="top:75%;">
+                          <span class="caption-pos-tag" id="captionPosTag">Y: 75% · Lower Safe</span>
+                          <div class="caption-drag-text cap-style-gold" id="captionDragText">
+                            MAKE EVERY CLIP <span class="cap-word-pop">VIRAL</span> TODAY
+                          </div>
+                          <div class="caption-resize-corner" id="captionResizeCorner" title="Drag corner or scroll mouse wheel to resize"></div>
+                        </div>
+                      </div>
+
+                      <!-- Beside-Stage Controls -->
+                      <div class="caption-stage-controls">
+                        <div class="caption-control-group">
+                          <label>Vertical Position <span>Mouse Drag Enabled</span></label>
+                          <div class="caption-pos-quick-row">
+                            <button type="button" class="caption-btn-pill caption-pos-pill" data-pos="top">Top (25%)</button>
+                            <button type="button" class="caption-btn-pill caption-pos-pill" data-pos="center">Center (50%)</button>
+                            <button type="button" class="caption-btn-pill caption-pos-pill active" data-pos="lower">Lower Safe (75%)</button>
+                            <button type="button" class="caption-btn-pill caption-pos-pill" data-pos="bottom">Bottom (84%)</button>
+                          </div>
+                        </div>
+
+                        <div class="caption-control-group">
+                          <label>Caption Size <span id="captionSizeBadge" class="caption-size-badge">44px</span></label>
+                          <div class="caption-size-row">
+                            <button type="button" class="caption-btn-step" id="captionSizeDec" title="Decrease font size">-</button>
+                            <input type="range" class="caption-size-slider" id="captionSizeSlider" min="24" max="76" value="44">
+                            <button type="button" class="caption-btn-step" id="captionSizeInc" title="Increase font size">+</button>
+                          </div>
+                          <div class="caption-pos-quick-row" style="margin-top:4px;">
+                            <button type="button" class="caption-btn-pill caption-size-preset-pill" data-size="32">Small (32px)</button>
+                            <button type="button" class="caption-btn-pill caption-size-preset-pill active" data-size="44">Medium (44px)</button>
+                            <button type="button" class="caption-btn-pill caption-size-preset-pill" data-size="56">Large (56px)</button>
+                            <button type="button" class="caption-btn-pill caption-size-preset-pill" data-size="68">Extra Large (68px)</button>
+                          </div>
+                          <small style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-top:2px;">Tip: You can also hover over the caption and scroll your mouse wheel to resize!</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -2696,9 +1547,13 @@ function onAndroidVideoSelected(uri, filename, duration) {
                 style="display:none;position:absolute;left:50%;top:25%;transform:translate(-50%,-50%);">
                 <div id="betaTextDragContent" class="beta-text-drag-content">WAIT FOR IT! 😱</div>
                 <div class="beta-drag-badge">
-                  <span>✥ Drag to Move</span> · <span id="betaDragCoordBadge">50%, 25%</span> · <span
+                  <button type="button" class="ctrl-btn-size" id="betaTextSizeDec" title="Decrease font size (−)" style="margin-right:2px;">−</button>
+                  <span id="betaTextSizeBadge" class="ctrl-size-badge" style="margin-right:2px;">42px</span>
+                  <button type="button" class="ctrl-btn-size" id="betaTextSizeInc" title="Increase font size (+)" style="margin-right:6px;">+</button>
+                  <span class="ctrl-drag-icon">✥ Drag</span> · <span id="betaDragCoordBadge">50%, 25%</span> · <span
                     id="betaDragTimeBadge">0.0s – 5.0s</span>
                 </div>
+                <div class="overlay-resize-handle" id="betaTextResizeHandle" title="Drag corner to resize text">⤡</div>
               </div>
             </div>
 
@@ -2922,6 +1777,111 @@ function onAndroidVideoSelected(uri, filename, duration) {
         </div>
       </div>
     </section>
+
+    <!-- ==========================================================================
+         Trending Live Broadcasts & Gameplay Section (YouTube, Twitch, Kick)
+         ========================================================================== -->
+    <section class="page-section" id="trending" style="display:none;">
+      <div class="trending-container">
+        <!-- Top Hero Header -->
+        <header class="trending-header">
+          <div class="trending-hero-wrap">
+            <div>
+              <span class="eyebrow" style="color:#ffffff;display:flex;align-items:center;gap:6px;font-size:0.72rem;letter-spacing:0.08em;font-weight:700;">
+                <span class="trending-live-dot" style="margin-right:2px;"></span> LIVE DISCOVERY &amp; VIRAL CURATION
+              </span>
+              <h1>Trending Streams &amp; Gameplay</h1>
+              <p>Explore current live broadcasts and trending gaming clips across YouTube, Twitch &amp; Kick. Instant one-click clipping straight into Live Studio or Create Studio.</p>
+            </div>
+
+            <!-- Top 3 Platform Switcher (YouTube, Twitch, Kick) -->
+            <div class="trending-platform-bar" role="tablist">
+              <button type="button" class="trending-tab-btn active" data-platform="youtube" role="tab" aria-selected="true">
+                <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                <span>YouTube</span>
+              </button>
+              <button type="button" class="trending-tab-btn" data-platform="twitch" role="tab" aria-selected="false">
+                <svg viewBox="0 0 24 24"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></svg>
+                <span>Twitch</span>
+              </button>
+              <button type="button" class="trending-tab-btn" data-platform="kick" role="tab" aria-selected="false">
+                <svg viewBox="0 0 24 24"><path d="M3 3h4.8v6.4L13.8 3h6L12.9 10.8 20.4 21h-6.2l-6.4-8.8V21H3z"/></svg>
+                <span>Kick</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Search & Filter Bar -->
+          <div class="trending-toolbar">
+            <div class="trending-search-wrap">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" class="trending-search-input" id="trendingSearchInput" placeholder="Search live streams, game titles or creators (e.g. GTA 6, Valorant, Speed, Kai)..." autocomplete="off" spellcheck="false">
+            </div>
+
+            <div class="trending-quick-chips">
+              <button type="button" class="trending-chip-btn active" data-tag="all">All</button>
+              <button type="button" class="trending-chip-btn" data-tag="GTA">GTA VI / V</button>
+              <button type="button" class="trending-chip-btn" data-tag="Valorant">Valorant</button>
+              <button type="button" class="trending-chip-btn" data-tag="Minecraft">Minecraft</button>
+              <button type="button" class="trending-chip-btn" data-tag="Fortnite">Fortnite</button>
+              <button type="button" class="trending-chip-btn" data-tag="Call of Duty">Call of Duty</button>
+              <button type="button" class="trending-chip-btn" data-tag="Just Chatting">Just Chatting</button>
+            </div>
+
+            <button type="button" class="trending-refresh-btn" id="trendingRefreshBtn" title="Refresh live streams">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+              <span>Refresh</span>
+            </button>
+          </div>
+        </header>
+
+        <!-- YouTube Dual View (1. Live Streams + 2. Trending Gameplay) -->
+        <div id="trendingYtView" style="display:flex;flex-direction:column;gap:32px;">
+          <!-- Section 1: Current Live Streams -->
+          <div class="trending-section-block">
+            <div class="trending-section-title-wrap">
+              <h3 class="trending-section-title">
+                <span class="trending-live-dot"></span> Current Live Streams
+              </h3>
+              <span class="trending-stream-count">Side-to-Side Stream Cockpit</span>
+            </div>
+            <div class="trending-cards-grid" id="trendingYtLiveGrid">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Section 2: Trending Gameplay Videos -->
+          <div class="trending-section-block">
+            <div class="trending-section-title-wrap">
+              <h3 class="trending-section-title">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+                Trending Gameplay Videos
+              </h3>
+              <span class="trending-stream-count">High-CTR Clip Candidates</span>
+            </div>
+            <div class="trending-cards-grid" id="trendingYtVideosGrid">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Generic View (Twitch & Kick Streams) -->
+        <div id="trendingGenericView" style="display:none;flex-direction:column;gap:24px;">
+          <div class="trending-section-block">
+            <div class="trending-section-title-wrap">
+              <h3 class="trending-section-title" id="trendingGenericTitle">
+                <span class="trending-live-dot" style="background:#9146FF;box-shadow:0 0 10px #9146FF;"></span> Top Live Broadcasts
+              </h3>
+              <span class="trending-stream-count">Real-time Stream Directory</span>
+            </div>
+            <div class="trending-cards-grid" id="trendingGenericStreamsGrid">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <div id="publishModal" class="modal-overlay"
       style="display:none;position:fixed;inset:0;background:rgba(5,8,13,0.85);backdrop-filter:blur(10px);z-index:9999;align-items:center;justify-content:center;padding:20px;">
       <div class="modal-card panel"
@@ -3036,13 +1996,14 @@ function onAndroidVideoSelected(uri, filename, duration) {
       </div>
     </div>
 
-    <!-- App-Themed Update Modal Popup -->
-    <div id="updateModal" class="modal-overlay"
-      style="display:none;position:fixed;inset:0;background:rgba(5,8,13,0.85);backdrop-filter:blur(10px);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+    <!-- App-Themed Update Modal Popup with Live Moving Matrix Canvas Background -->
+    <div id="updateModal" class="modal-overlay update-modal-overlay"
+      style="display:none;position:fixed;inset:0;background:#050508;z-index:9999;align-items:center;justify-content:center;padding:20px;overflow:hidden;">
+      <canvas id="updateModalAsciiCanvas" class="restart-ascii-canvas update-modal-ascii-canvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;opacity:0.42;"></canvas>
       <div class="modal-card panel update-modal-card"
-        style="background:var(--panel-strong,#12171e);border:1px solid rgba(255,255,255,0.15);border-radius:20px;max-width:520px;width:100%;box-shadow:0 30px 90px rgba(0,0,0,0.6);padding:26px;position:relative;">
+        style="background:rgba(16,18,24,0.94);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,0.16);border-radius:22px;max-width:520px;width:100%;box-shadow:0 30px 90px rgba(0,0,0,0.85), 0 0 50px rgba(129,140,248,0.10);padding:26px;position:relative;z-index:10;animation:restartModalPop 0.35s cubic-bezier(0.16,1,0.3,1);">
         <button type="button" class="modal-close-btn" id="closeUpdateModal"
-          style="position:absolute;top:16px;right:18px;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1;"
+          style="position:absolute;top:16px;right:18px;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1;z-index:25;"
           aria-label="Close">&times;</button>
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
           <div
@@ -3059,7 +2020,7 @@ function onAndroidVideoSelected(uri, filename, duration) {
           </div>
         </div>
         <div id="updateModalContent"
-          style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;margin-bottom:20px;font-size:13px;color:#cbd5e1;line-height:1.5;">
+          style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px;margin-bottom:20px;font-size:13px;color:#cbd5e1;line-height:1.5;">
           Checking GitHub for the latest release…
         </div>
         <div style="display:flex;gap:10px;justify-content:flex-end;">
@@ -3185,7 +2146,7 @@ function onAndroidVideoSelected(uri, filename, duration) {
       <div class="restart-modal-window">
         <div class="restart-modal-header">
           <div class="restart-logo-wrapper">
-            <img src="static/icon.png" alt="Clipify AI Logo" class="restart-app-logo" />
+            <img src="{{ url_for('static', filename='icon.png') }}" alt="Clipify AI Logo" class="restart-app-logo" />
             <div class="restart-logo-glow"></div>
           </div>
           <div class="restart-title-group">
@@ -3233,7 +2194,7 @@ function onAndroidVideoSelected(uri, filename, duration) {
       <div class="restart-modal-window">
         <div class="restart-modal-header">
           <div class="restart-logo-wrapper">
-            <img src="static/icon.png" alt="Clipify AI Logo" class="restart-app-logo" />
+            <img src="{{ url_for('static', filename='icon.png') }}" alt="Clipify AI Logo" class="restart-app-logo" />
             <div class="restart-logo-glow"></div>
           </div>
           <div class="restart-title-group">
@@ -3277,16 +2238,19 @@ function onAndroidVideoSelected(uri, filename, duration) {
 
     <footer>Clipify AI · local AI editing workspace · WhisperX + ClipsAI + Ollama + FFmpeg</footer>
   </main>
-  <script src="static/pipeline_status.js"></script>
-  <script src="static/review_player.js"></script>
-  <script src="static/forest_game.js"></script>
-  <script src="static/updater.js"></script>
-  <script src="static/model_hub.js"></script>
-  <script src="static/app.js"></script>
-  <script src="static/beta_matrix.js"></script>
-  <script src="static/tour.js"></script>
-  <script src="static/cache_manager.js"></script>
-  <script src="static/clippy.js"></script>
+  <script src="{{ url_for('static', filename='pipeline_status.js', v='4.0.12') }}"></script>
+  <script src="{{ url_for('static', filename='review_player.js', v='4.0.12') }}"></script>
+  <script src="{{ url_for('static', filename='forest_game.js', v='4.0.12') }}"></script>
+  <script src="{{ url_for('static', filename='updater.js', v='4.0.12.5') }}"></script>
+  <script src="{{ url_for('static', filename='model_hub.js', v='4.0.12') }}"></script>
+  <script src="{{ url_for('static', filename='android_bridge.js', v='4.0.12.3') }}"></script>
+  <script src="{{ url_for('static', filename='app.js', v='4.0.12.3') }}"></script>
+  <script src="{{ url_for('static', filename='beta_matrix.js', v='4.0.12.3') }}"></script>
+  <script src="{{ url_for('static', filename='tour.js', v='4.0.12.3') }}"></script>
+  <script src="{{ url_for('static', filename='cache_manager.js', v='4.0.12') }}"></script>
+  <script src="{{ url_for('static', filename='clippy.js', v='4.0.12.3') }}"></script>
+  <script src="{{ url_for('static', filename='trending.js', v='5.0.2') }}"></script>
+  <script src="{{ url_for('static', filename='caption_playground.js', v='5.0.2') }}"></script>
   <script>
     if (window.location.search.includes('open_support=1') || window.location.hash.includes('support')) {
       window.addEventListener('load', () => setTimeout(() => window.showSupportModal && window.showSupportModal(), 300));

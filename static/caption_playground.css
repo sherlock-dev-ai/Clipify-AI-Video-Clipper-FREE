@@ -1,0 +1,409 @@
+/* ==========================================================================
+   Interactive Caption Design & Visual Mouse Playground - Obsidian Theme
+   ========================================================================== */
+
+.caption-studio-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 20px;
+  margin-top: 14px;
+}
+
+.caption-studio-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.caption-studio-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.caption-studio-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+/* Style Showcase Cards Grid */
+.caption-styles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.caption-style-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  user-select: none;
+}
+
+.caption-style-card:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.caption-style-card.active {
+  border-color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.12);
+}
+
+.caption-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.caption-card-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.caption-card-font {
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.caption-card-preview {
+  padding: 10px 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: center;
+  font-size: 0.88rem;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Individual Preset CSS Renders */
+.cap-style-gold {
+  font-family: 'Montserrat', 'Arial Black', sans-serif;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
+}
+.cap-style-gold .cap-word-pop {
+  color: #FFE500;
+  text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 0 0 10px rgba(255, 229, 0, 0.5);
+}
+
+.cap-style-lime {
+  font-family: 'Impact', 'Komika Axis', sans-serif;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 2px 2px 0 #000, -2px -2px 0 #000;
+}
+.cap-style-lime .cap-word-pop {
+  color: #39FF14;
+  text-shadow: 0 0 8px rgba(57, 255, 20, 0.8), 2px 2px 0 #000;
+}
+
+.cap-style-hormozi {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 2px 2px 0 #000, -2px -2px 0 #000;
+  text-transform: uppercase;
+}
+.cap-style-hormozi .cap-word-pop {
+  color: #FFD700;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.cap-style-cyan {
+  font-family: 'Inter', 'Helvetica Neue', sans-serif;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 2px 2px 0 #000, -2px -2px 0 #000;
+}
+.cap-style-cyan .cap-word-pop {
+  color: #00F2FE;
+  text-shadow: 0 0 10px rgba(0, 242, 254, 0.7), 2px 2px 0 #000;
+}
+
+.cap-style-fire {
+  font-family: 'Montserrat', 'Arial Black', sans-serif;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 2px 2px 0 #000, -2px -2px 0 #000;
+}
+.cap-style-fire .cap-word-pop {
+  color: #FF3344;
+  text-shadow: 0 0 10px rgba(255, 51, 68, 0.8), 2px 2px 0 #000;
+}
+
+.cap-style-retro {
+  font-family: 'Courier New', 'Courier', monospace;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.85);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.cap-style-retro .cap-word-pop {
+  color: #00FF66;
+  text-decoration: underline;
+}
+
+.cap-style-lavender {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 2px 2px 0 #000, -2px -2px 0 #000;
+}
+.cap-style-lavender .cap-word-pop {
+  color: #E879F9;
+  text-shadow: 0 0 10px rgba(232, 121, 249, 0.8), 2px 2px 0 #000;
+}
+
+/* ==========================================================================
+   Interactive Phone Stage & Mouse Adjuster
+   ========================================================================== */
+
+.caption-stage-container {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 20px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 18px;
+  margin-top: 10px;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .caption-stage-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 9:16 Phone Mockup Canvas */
+.caption-phone-stage {
+  position: relative;
+  width: 220px;
+  height: 391px; /* 9:16 aspect ratio */
+  background: linear-gradient(180deg, #18181b 0%, #09090b 100%);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.8);
+  margin: 0 auto;
+  user-select: none;
+  cursor: grab;
+}
+
+.caption-phone-stage:active {
+  cursor: grabbing;
+}
+
+/* Phone Screen Guidelines */
+.caption-stage-guide {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+}
+
+.caption-guide-top { top: 25%; }
+.caption-guide-center { top: 50%; border-top-color: rgba(255, 255, 255, 0.25); }
+.caption-guide-lower { top: 75%; }
+
+.caption-guide-label {
+  position: absolute;
+  right: 8px;
+  top: -16px;
+  font-size: 0.58rem;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Draggable Caption Box */
+.caption-drag-box {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 86%;
+  text-align: center;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.4);
+  background: rgba(0, 0, 0, 0.4);
+  cursor: move;
+  transition: border-color 0.15s, background 0.15s;
+  touch-action: none;
+}
+
+.caption-drag-box:hover,
+.caption-drag-box.dragging {
+  border-color: #ffffff;
+  background: rgba(0, 0, 0, 0.65);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+
+.caption-drag-text {
+  font-size: 14px;
+  line-height: 1.25;
+  pointer-events: none;
+  word-break: break-word;
+}
+
+/* Resize Handle on Corner */
+.caption-resize-corner {
+  position: absolute;
+  bottom: -5px;
+  right: -5px;
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  border: 2px solid #000000;
+  border-radius: 50%;
+  cursor: nwse-resize;
+  z-index: 10;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+}
+
+.caption-pos-tag {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ffffff;
+  color: #000000;
+  font-size: 0.64rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+}
+
+/* Controls Beside Phone Stage */
+.caption-stage-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.caption-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.caption-control-group label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.caption-pos-quick-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.caption-btn-pill {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.caption-btn-pill:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.caption-btn-pill.active {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+}
+
+/* Mouse Size Row */
+.caption-size-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.caption-btn-step {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: all 0.15s;
+}
+
+.caption-btn-step:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.caption-size-slider {
+  flex: 1;
+  accent-color: #ffffff;
+  cursor: pointer;
+}
+
+.caption-size-badge {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 4px 10px;
+  border-radius: 6px;
+  min-width: 48px;
+  text-align: center;
+}

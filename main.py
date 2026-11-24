@@ -685,7 +685,7 @@ def _resolve_default_model(base_url: str) -> str:
 
 OLLAMA_MODEL = _resolve_default_model(OLLAMA_BASE_URL)
 CAPTION_FONT = os.getenv("CLIPPEDAI_FONT", "Montserrat Extra Bold")
-CAPTION_FONT_SIZE = int(os.getenv("CLIPPEDAI_FONT_SIZE", "78"))
+CAPTION_FONT_SIZE = int(os.getenv("CLIPPEDAI_CAPTION_FONT_SIZE", os.getenv("CLIPPEDAI_FONT_SIZE", "78")))
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "600"))
 
 def _default_transcription_model() -> str:
@@ -1548,8 +1548,36 @@ def transcribe_with_progress(audio_file_path, transcriber):
 
         alignment_module.nltk_load = compatible_nltk_load
 
+        no_caps = os.getenv("DISABLE_CAPTIONS", "0").lower() in ("1", "true", "yes", "on")
         def safe_align(*args, **kwargs):
+            if no_caps:
+                print("  [Align] Subtitle captions disabled: skipping phoneme alignment pass and using speech timestamps directly.", flush=True)
+                segs = args[0] if args and isinstance(args[0], (list, tuple)) else []
+                return {"segments": segs, "word_segments": []}
+
+            total_segs = len(args[0]) if args and isinstance(args[0], (list, tuple)) else 0
+            dev_target = kwargs.get("device") or (args[4] if len(args) > 4 else "cpu")
+            try:
+                import torch
+                torch.set_num_threads(min(16, os.cpu_count() or 8))
+            except Exception:
+                pass
+            print(f"  [Align] Synchronizing phoneme timestamps on {str(dev_target).upper()} ({total_segs} speech segments across {duration:.1f}s audio)...", flush=True)
+
+            last_pct = [-1.0]
+            last_t = [0.0]
+            def _align_callback(pct: float):
+                now = time.time()
+                if pct >= 100.0 or (pct - last_pct[0]) >= 5.0 or (now - last_t[0]) >= 3.0:
+                    last_pct[0] = pct
+                    last_t[0] = now
+                    curr_s = min(total_segs, int((pct / 100.0) * total_segs))
+                    print(f"Alignment progress: {pct:.1f}% ({curr_s}/{total_segs} segments)", flush=True)
+
+            kwargs["progress_callback"] = _align_callback
             aligned = original_align(*args, **kwargs)
+            print("  [Align] Phoneme alignment completed (100%). Word-level timestamps ready.", flush=True)
+
             if not isinstance(aligned, dict):
                 return aligned
 
@@ -1639,19 +1667,28 @@ def transcribe_with_progress(audio_file_path, transcriber):
                     _patch_whisper_tokenizer()
                     user_lang = os.getenv("WHISPERX_LANGUAGE")
                     if not user_lang or not isinstance(user_lang, str) or user_lang.strip().lower() in ("", "none", "null", "auto", "detect"):
-                        user_lang = "en"
+                        detected_lang = None
                     else:
-                        user_lang = user_lang.strip().lower()
-                    t_kwargs["language"] = user_lang
+                        detected_lang = user_lang.strip().lower()
+                    if detected_lang:
+                        t_kwargs["language"] = detected_lang
+                    else:
+                        t_kwargs.pop("language", None)
                     res = orig_model_transcribe(audio_in, *t_args, **t_kwargs)
                     print("  [Align] Speech decoding completed (100%). Aligning word timestamps with audio...", flush=True)
                     return res
 
                 transcriber._model.transcribe = live_progress_transcribe
 
+            active_lang = os.getenv("WHISPERX_LANGUAGE")
+            if not active_lang or active_lang.strip().lower() in ("", "none", "null", "auto", "detect"):
+                active_lang = "en"
+            else:
+                active_lang = active_lang.strip().lower()
+
             transcription = transcriber.transcribe(
                 audio_file_path=audio_file_path,
-                iso6391_lang_code="en",
+                iso6391_lang_code=active_lang,
                 batch_size=t_batch_size,
             )
         except Exception as rt_err:
@@ -2392,7 +2429,7 @@ def create_animated_subtitles(video_path, transcription, clip, output_path):
 
     beats = _group_words_into_beats(clip_words_local)
     font_name = resolve_caption_font_name(CAPTION_FONT)
-    font_size = max(48, min(110, CAPTION_FONT_SIZE))
+    font_size = max(26, min(110, CAPTION_FONT_SIZE))
     outline = 6 if PREMIUM_CAPTIONS else 4
     shadow = 2
 
@@ -2400,7 +2437,12 @@ def create_animated_subtitles(video_path, transcription, clip, output_path):
     accent_code = ACCENT_COLOR_MAP.get(CAPTION_ACCENT, "&H0000FFFF&")
     gaming_split_active = os.getenv("CLIPPEDAI_GAMING_SPLIT", "1").strip().lower() in {"1", "true", "yes", "on"}
     preset = CAPTION_PRESET.strip().lower()
-    if preset in ("center_seam", "split"):
+    y_pct_val = float(os.getenv("CLIPPEDAI_CAPTION_Y_PCT", "0"))
+
+    if y_pct_val > 0:
+        alignment = 2
+        margin_v = int(1920 * (100 - y_pct_val) / 100)
+    elif preset in ("center_seam", "split"):
         alignment = 2
         margin_v = 920
     elif preset in ("lower_safe", "lower"):
@@ -7241,12 +7283,18 @@ def process_single_video(
                 raise RuntimeError(f"Vertical resize failed: {resized_path}")
 
             # Captions
-            print(f"     [3/5] Render dynamic Shorts captions...")
-            captioned_path = create_animated_subtitles(
-                resized_path, transcription, clip, final_path
-            )
+            no_caps = os.getenv("DISABLE_CAPTIONS", "0").lower() in ("1", "true", "yes", "on")
+            if no_caps:
+                print(f"     [3/5] Skipping captions (Captions Disabled / Clean Video)...")
+                captioned_path = final_path
+                shutil.copy2(resized_path, final_path)
+            else:
+                print(f"     [3/5] Render dynamic Shorts captions...")
+                captioned_path = create_animated_subtitles(
+                    resized_path, transcription, clip, final_path
+                )
             if not captioned_path or not os.path.exists(captioned_path):
-                raise RuntimeError("Caption renderer did not produce a final captioned video.")
+                raise RuntimeError("Caption renderer did not produce a final video.")
             if os.path.abspath(captioned_path) != os.path.abspath(final_path):
                 shutil.copy2(captioned_path, final_path)
                 temp_files.append(captioned_path)
@@ -7519,15 +7567,60 @@ def main():
     print(f" Max clips    : {args.clips} per video")
     print(f" FFmpeg       : {FFMPEG_BIN}")
     print(f" ffprobe      : {FFPROBE_BIN}")
+    gpu_name = ""
+    gpu_mem = ""
     try:
-        import torch
-
-        if torch.cuda.is_available():
-            print(f" GPU          : {torch.cuda.get_device_name(0)}")
-        else:
-            print(" GPU          : not visible to this Python process (Ollama may still use GPU)")
+        import pynvml
+        pynvml.nvmlInit()
+        h = pynvml.nvmlDeviceGetHandleByIndex(0)
+        gpu_name = pynvml.nvmlDeviceGetName(h)
+        m = pynvml.nvmlDeviceGetMemoryInfo(h)
+        gpu_mem = f"({m.total / 1e9:.1f} GB VRAM, {m.free / 1e9:.1f} GB free)"
     except Exception:
-        print(" GPU          : detection skipped")
+        pass
+    if not gpu_name:
+        try:
+            import nvidia_ml_py as pynvml
+            pynvml.nvmlInit()
+            h = pynvml.nvmlDeviceGetHandleByIndex(0)
+            gpu_name = pynvml.nvmlDeviceGetName(h)
+            m = pynvml.nvmlDeviceGetMemoryInfo(h)
+            gpu_mem = f"({m.total / 1e9:.1f} GB VRAM, {m.free / 1e9:.1f} GB free)"
+        except Exception:
+            pass
+    if not gpu_name:
+        try:
+            smi = subprocess.check_output(
+                ["nvidia-smi", "--query-gpu=gpu_name,memory.total,memory.free", "--format=csv,noheader,nounits"],
+                text=True, creationflags=_hidden_creationflags() if sys.platform == "win32" else 0
+            ).strip().splitlines()
+            if smi:
+                parts = smi[0].split(",")
+                gpu_name = parts[0].strip()
+                gpu_mem = f"({float(parts[1])/1024:.1f} GB VRAM, {float(parts[2])/1024:.1f} GB free)"
+        except Exception:
+            pass
+    if not gpu_name:
+        try:
+            import torch
+            if torch.cuda.is_available():
+                gpu_name = torch.cuda.get_device_name(0)
+        except Exception:
+            pass
+
+    has_ct2 = False
+    try:
+        import ctranslate2
+        has_ct2 = ctranslate2.get_cuda_device_count() > 0
+    except Exception:
+        pass
+
+    if gpu_name:
+        print(f" [Hardware] GPU          : {gpu_name} {gpu_mem}")
+        print(f" [Hardware] Acceleration : {'NVIDIA CUDA Active (CTranslate2 float16)' if has_ct2 else 'CPU Mode'}")
+        print(f" [Hardware] Alignment    : Multi-threaded CPU Phoneme Matcher (VRAM reserved for LLM)")
+    else:
+        print(" [Hardware] GPU          : CPU / Integrated Graphics")
     print("=" * 68)
     print()
 

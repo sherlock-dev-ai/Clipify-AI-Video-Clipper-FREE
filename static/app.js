@@ -1,4 +1,4 @@
-const state = { jobId: null, mode: 'viral', source: null, logoFile: null, logoPath: null, logoServerPath: null, es: null, model: null, modelsAvailable: false, font: 'Montserrat Extra Bold', outputs: [], currentOutputIndex: 0, drag: null, reviewFile: null, editorLogoFile: null, editorLogoPath: null, youtubePoll: null, sourcePreviewUrl: null };
+const state = window.state = { jobId: null, mode: 'viral', source: null, logoFile: null, logoPath: null, logoServerPath: null, es: null, model: null, modelsAvailable: false, font: 'Montserrat Extra Bold', outputs: [], currentOutputIndex: 0, drag: null, reviewFile: null, editorLogoFile: null, editorLogoPath: null, youtubePoll: null, sourcePreviewUrl: null };
 const $ = s => document.querySelector(s); const $$ = s => [...document.querySelectorAll(s)];
 
 async function safeJson(response, fallbackMsg = 'Server response error') {
@@ -25,29 +25,55 @@ function startTypewriter() {
   const focus = $('#typewriterFocus');
   if (!lead || !focus) return;
   const leadText = 'From long-form video to a ';
-  const focusText = 'Short worth watching.';
+  const phrases = [
+    'Short worth watching.',
+    'viral TikTok hook.',
+    'high-retention 9:16 cut.',
+    'trending YouTube Short.'
+  ];
+  let phraseIdx = 0;
+  let focusText = phrases[phraseIdx];
   let index = 0;
   let phase = 'typingLead';
+
+  // Clear initially so typing starts from scratch cleanly without ghost text
+  lead.textContent = '';
+  focus.textContent = '';
+
   const tick = () => {
     if (phase === 'typingLead') {
       lead.textContent = leadText.slice(0, ++index);
-      if (index >= leadText.length) { index = 0; phase = 'typingFocus'; }
-      return setTimeout(tick, 62);
+      if (index >= leadText.length) {
+        index = 0;
+        phase = 'typingFocus';
+        return setTimeout(tick, 180);
+      }
+      return setTimeout(tick, 48);
     }
     if (phase === 'typingFocus') {
       focus.textContent = focusText.slice(0, ++index);
-      if (index >= focusText.length) { phase = 'pause'; return setTimeout(tick, 2100); }
-      return setTimeout(tick, 72);
+      if (index >= focusText.length) {
+        phase = 'pause';
+        return setTimeout(tick, 2400);
+      }
+      return setTimeout(tick, 58);
     }
-    if (phase === 'pause') { phase = 'erasingFocus'; index = focusText.length; return tick(); }
+    if (phase === 'pause') {
+      phase = 'erasingFocus';
+      index = focusText.length;
+      return tick();
+    }
     if (phase === 'erasingFocus') {
       focus.textContent = focusText.slice(0, --index);
-      if (index <= 0) { phase = 'erasingLead'; index = leadText.length; }
-      return setTimeout(tick, 42);
+      if (index <= 0) {
+        phraseIdx = (phraseIdx + 1) % phrases.length;
+        focusText = phrases[phraseIdx];
+        index = 0;
+        phase = 'typingFocus';
+        return setTimeout(tick, 350);
+      }
+      return setTimeout(tick, 32);
     }
-    lead.textContent = leadText.slice(0, --index);
-    if (index <= 0) { phase = 'typingLead'; index = 0; return setTimeout(tick, 500); }
-    return setTimeout(tick, 42);
   };
   setTimeout(tick, 350);
 }
@@ -1638,7 +1664,16 @@ async function start() {
     if (!state.jobId) {
       if (state.source && state.source.origin === 'youtube' && state.source.jobId) {
         state.jobId = state.source.jobId;
+      } else if (state.source && (state.source.origin === 'android_native' || state.source.uri || window.AndroidBridge)) {
+        state.jobId = state.source.jobId || ('mobile_job_' + Date.now());
+        state.source.jobId = state.jobId;
+        addLog('[Mobile] Processing local video: ' + (state.source?.name || 'native'));
       } else if (state.source instanceof File) {
+        if (window.AndroidBridge && !window.CLIPPY_DESKTOP_CONNECTED) {
+          state.jobId = 'mobile_job_' + Date.now();
+          state.source.jobId = state.jobId;
+          addLog('[Mobile] Video ready: ' + (state.source?.name || ''));
+        } else {
         // Immediate visual feedback for long video uploads
         progressPanel.hidden = false;
         results.hidden = true;
@@ -1689,6 +1724,7 @@ async function start() {
 
         state.jobId = uploadData.job_id;
         addLog(`[Upload] Video ready as project ${state.jobId}`);
+        }
       } else {
         throw Error('Could not find video project. Please re-select or re-import the video.');
       }
@@ -1798,6 +1834,27 @@ async function start() {
     'branding',
     JSON.stringify(selectedBranding())
   );
+
+  if (window.captionPlaygroundState) {
+    if (window.captionPlaygroundState.yPercent) {
+      form.append('caption_y_pct', String(window.captionPlaygroundState.yPercent));
+      form.append('caption_preset', 'custom');
+      const marginV = Math.round(1920 * (100 - window.captionPlaygroundState.yPercent) / 100);
+      form.append('caption_margin_v', String(marginV));
+    }
+    if (window.captionPlaygroundState.fontSize) {
+      form.append('caption_font_size', String(window.captionPlaygroundState.fontSize));
+    }
+    if (window.captionPlaygroundState.styleId) {
+      form.append('caption_accent', window.captionPlaygroundState.styleId);
+    }
+  }
+
+  const selectedFont = $('#fontSelect')?.value || 'Montserrat Extra Bold';
+  if (selectedFont === 'none') {
+    form.append('disable_captions', '1');
+    form.append('captions_enabled', '0');
+  }
 
   create.disabled = true;
   progressPanel.hidden = false;
@@ -2020,13 +2077,12 @@ async function watchJob(jobId) {
     };
 
     stream.onerror = () => {
-      if (!terminal && stream.readyState === EventSource.CLOSED) {
-        terminal = true;
-        clearInterval(pollInterval);
-        stream.close();
+      // SSE connection closed/errored: Close SSE handle, but DO NOT abort the job!
+      // The pollInterval loop continues to poll /api/status/:id seamlessly.
+      if (stream) {
+        try { stream.close(); } catch (_) {}
         if (state.es === stream) state.es = null;
-        setPipelineFailure('Connection to the local processing service was lost before the job finished.');
-        create.disabled = false;
+        stream = null;
       }
     };
   }
@@ -3067,7 +3123,7 @@ function navigateTo(id) {
     }
     return;
   }
-  if (['support', 'promoters', 'models', 'update', 'guide'].includes(target)) {
+  if (['support', 'promoters', 'campaigns', 'models', 'update', 'guide'].includes(target)) {
     // Ensure base section is visible so the main workspace is never pitch black behind modals
     const currentVisible = document.querySelector('.page-section.visible') || document.getElementById('create');
     if (currentVisible) {
@@ -3079,6 +3135,7 @@ function navigateTo(id) {
     if (target === 'guide' && window.startClipifyTour) window.startClipifyTour();
     if (target === 'support' && window.showSupportModal) window.showSupportModal();
     if (target === 'promoters' && window.showPromotersModal) window.showPromotersModal();
+    if (target === 'campaigns' && window.showCampaignsModal) window.showCampaignsModal();
     return;
   }
   if (location.hash.slice(1) !== target) {
@@ -3096,8 +3153,28 @@ function navigateTo(id) {
   );
   if (target === 'projects') loadProjects();
   if (target === 'assets') loadProjects().then(loadAssets);
+  if (target === 'trending') {
+    if (typeof window.loadTrending === 'function') window.loadTrending();
+  }
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
+
+window.clipTrendingVideo = function(videoUrl) {
+  if (!videoUrl) return;
+  navigateTo('create');
+  const ytInput = $('#youtubeUrl');
+  if (ytInput) {
+    ytInput.value = videoUrl;
+    setTimeout(() => {
+      if (typeof importYouTube === 'function') importYouTube();
+    }, 200);
+  }
+};
+
+window.clipTrendingLive = function(streamUrl) {
+  if (!streamUrl) return;
+  window.location.href = `/live?stream_url=${encodeURIComponent(streamUrl)}`;
+};
 
 $('#navGuideLink')?.addEventListener('click', (e) => {
   e.preventDefault();
@@ -3117,6 +3194,38 @@ $('#previewReview')?.addEventListener('click', (e) => {
     navigateTo('editor');
   }
 });
+
+async function handleOpenInput(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  const btn = e?.currentTarget || $('#openInput');
+  const originalText = btn ? btn.textContent : 'Open input';
+  if (btn) btn.textContent = 'Opening…';
+
+  try {
+    const res = await fetch('/api/open-input-folder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: state.jobId || null })
+    });
+    const data = await res.json();
+    if (data && data.opened) {
+      if (btn) {
+        btn.textContent = 'Opened ✓';
+        setTimeout(() => { if (btn) btn.textContent = originalText; }, 2000);
+      }
+      return;
+    }
+  } catch (err) {
+    console.warn('Native input folder open failed:', err);
+  }
+
+  if (btn) {
+    btn.textContent = originalText;
+  }
+}
 
 async function handleOpenOutput(e) {
   if (e) {
@@ -3157,6 +3266,7 @@ async function handleOpenOutput(e) {
   }
 }
 
+$('#openInput')?.addEventListener('click', handleOpenInput);
 $('#openOutput')?.addEventListener('click', handleOpenOutput);
 $('#openOutput2')?.addEventListener('click', handleOpenOutput);
 
@@ -3631,7 +3741,7 @@ function initBetaTestingSection() {
   const downloadBtn = $('#betaDownloadBtn');
   const openInEditorBtn = $('#betaOpenInEditor');
 
-  let betaState = {
+  let betaState = window.betaState = {
     sourceFile: null,
     jobId: null,
     downloading: false,
@@ -3681,6 +3791,25 @@ function initBetaTestingSection() {
   if (betaLayout) {
     betaLayout.addEventListener('change', syncBetaLayoutVisibility);
     syncBetaLayoutVisibility();
+  }
+
+  const betaCapToggle = $('#betaCaptionsToggle');
+  const betaCapBadge = $('#betaCaptionsBadge');
+  const betaCapSettings = $('#betaCaptionsSettingsContainer');
+  if (betaCapToggle) {
+    betaCapToggle.addEventListener('change', () => {
+      const isEn = betaCapToggle.checked;
+      if (betaCapBadge) {
+        betaCapBadge.textContent = isEn ? 'ENABLED' : 'DISABLED';
+        betaCapBadge.style.color = isEn ? '#ffffff' : '#71717a';
+        betaCapBadge.style.background = isEn ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.03)';
+        betaCapBadge.style.borderColor = isEn ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)';
+      }
+      if (betaCapSettings) {
+        betaCapSettings.style.opacity = isEn ? '1' : '0.35';
+        betaCapSettings.style.pointerEvents = isEn ? 'auto' : 'none';
+      }
+    });
   }
 
   if (betaSplitSlider) {
@@ -3984,6 +4113,9 @@ function initBetaTestingSection() {
         const splitScreen = layout !== 'normal' ? '1' : '0';
         const gamingSplit = layout === 'gaming_split' ? '1' : '0';
 
+        const captionsEnabled = $('#betaCaptionsToggle')?.checked ?? true;
+        const selectedLanguage = $('#betaLanguageSelect')?.value || 'auto';
+
         const brandingPayload = {
           watermark_text_enabled: $('#betaWatermarkEnabled')?.checked || false,
           watermark_text: $('#betaWatermarkText')?.value || '',
@@ -3992,8 +4124,11 @@ function initBetaTestingSection() {
           watermark_text_angle: +($('#betaWmAngle')?.value || -20),
           watermark_text_size: 6,
           watermark_text_color: '#FFFFFF',
-          premium_captions: $('#betaPremiumCaptions')?.checked ?? true,
-          situational_cues: $('#betaSituationalCues')?.checked ?? true,
+          captions_enabled: captionsEnabled,
+          disable_captions: !captionsEnabled,
+          language: selectedLanguage,
+          premium_captions: captionsEnabled && ($('#betaPremiumCaptions')?.checked ?? true),
+          situational_cues: captionsEnabled && ($('#betaSituationalCues')?.checked ?? true),
           caption_preset: $('#betaCaptionPreset')?.value || 'center_seam',
           caption_accent: $('#betaCaptionAccent')?.value || 'gold_yellow',
         };
@@ -4013,11 +4148,35 @@ function initBetaTestingSection() {
           split_ratio: splitRatioVal,
           fast_whisper: '1',
           branding: brandingPayload,
-          premium_captions: $('#betaPremiumCaptions')?.checked ?? true,
-          situational_cues: $('#betaSituationalCues')?.checked ?? true,
+          captions_enabled: captionsEnabled,
+          disable_captions: !captionsEnabled,
+          language: selectedLanguage,
+          caption_language: selectedLanguage,
+          font: !captionsEnabled ? 'none' : 'Montserrat Extra Bold',
+          premium_captions: captionsEnabled && ($('#betaPremiumCaptions')?.checked ?? true),
+          situational_cues: captionsEnabled && ($('#betaSituationalCues')?.checked ?? true),
           caption_preset: $('#betaCaptionPreset')?.value || 'center_seam',
           caption_accent: $('#betaCaptionAccent')?.value || 'gold_yellow',
         };
+
+        if (window.captionPlaygroundState) {
+          if (window.captionPlaygroundState.yPercent) {
+            const yPct = window.captionPlaygroundState.yPercent;
+            startPayload.caption_y_pct = yPct;
+            startPayload.caption_preset = 'custom';
+            startPayload.caption_margin_v = Math.round(1920 * (100 - yPct) / 100);
+            brandingPayload.caption_preset = 'custom';
+            brandingPayload.caption_margin_v = Math.round(1920 * (100 - yPct) / 100);
+          }
+          if (window.captionPlaygroundState.fontSize) {
+            startPayload.caption_font_size = window.captionPlaygroundState.fontSize;
+            brandingPayload.caption_font_size = window.captionPlaygroundState.fontSize;
+          }
+          if (window.captionPlaygroundState.styleId) {
+            startPayload.caption_accent = window.captionPlaygroundState.styleId;
+            brandingPayload.caption_accent = window.captionPlaygroundState.styleId;
+          }
+        }
 
         const startRes = await fetch('/api/start', {
           method: 'POST',
@@ -4744,7 +4903,7 @@ function initInstantClippingSection() {
   const consoleLog = $('#instantConsoleLog');
   const copyLogBtn = $('#btnCopyInstantLog');
 
-  let instantState = {
+  let instantState = window.instantState = {
     jobId: null,
     sourceFile: null,
     sourceFileName: '',

@@ -188,6 +188,34 @@
     loadOllamaModels();
     fetchRankedClips();
     startPolling();
+    checkIncomingStreamUrl();
+  }
+
+  function checkIncomingStreamUrl() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const streamUrl = params.get('stream_url') || params.get('url');
+      if (streamUrl && liveSourceUrl) {
+        liveSourceUrl.value = streamUrl;
+        if (streamUrl.includes('twitch.tv')) {
+          const tab = document.querySelector('.source-tab[data-source="twitch"]');
+          if (tab) tab.click();
+        } else if (streamUrl.includes('kick.com')) {
+          const tab = document.querySelector('.source-tab[data-source="kick"]');
+          if (tab) tab.click();
+        } else {
+          const tab = document.querySelector('.source-tab[data-source="youtube"]');
+          if (tab) tab.click();
+        }
+        setTimeout(() => {
+          if (btnConnectStream && !btnConnectStream.disabled) {
+            btnConnectStream.click();
+          }
+        }, 450);
+      }
+    } catch (e) {
+      console.warn('Error checking incoming stream URL:', e);
+    }
   }
 
   async function loadOllamaModels() {

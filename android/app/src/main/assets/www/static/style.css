@@ -2791,11 +2791,161 @@ label {
   pointer-events: none;
 }
 
-.editor-text {
-  padding: 6px 10px;
+.editor-text,
+.preview-text {
+  position: absolute;
+  padding: 6px 12px;
   border-radius: 8px;
   color: white;
   background: rgba(0, 0, 0, 0.5);
+  cursor: grab;
+  touch-action: none;
+  z-index: 10;
+  display: inline-block;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 90%;
+  text-align: center;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  border: 1.5px dashed transparent;
+  box-sizing: border-box;
+}
+
+.editor-text:hover,
+.editor-text.dragging,
+.preview-text:hover,
+.preview-text.dragging {
+  border-color: rgba(250, 204, 21, 0.8);
+  box-shadow: 0 0 14px rgba(250, 204, 21, 0.4), 0 4px 14px rgba(0, 0, 0, 0.7);
+}
+
+.editor-text.dragging,
+.preview-text.dragging {
+  cursor: grabbing !important;
+}
+
+.editor-text-content {
+  display: inline-block;
+  line-height: 1.25;
+  pointer-events: none;
+}
+
+.overlay-quick-controls {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(12, 14, 20, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  padding: 2px 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+  z-index: 45;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  font-size: 11px;
+}
+
+.editor-text:hover .overlay-quick-controls,
+.editor-text.dragging .overlay-quick-controls,
+.editor-text:focus-within .overlay-quick-controls,
+.preview-text:hover .overlay-quick-controls,
+.preview-text.dragging .overlay-quick-controls,
+.preview-text:focus-within .overlay-quick-controls,
+.beta-text-drag-overlay:hover .overlay-quick-controls,
+.beta-text-drag-overlay.dragging .overlay-quick-controls {
+  opacity: 1;
+}
+
+.ctrl-btn-size {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.12s ease;
+}
+
+.ctrl-btn-size:hover {
+  background: var(--brand, #9b5cff);
+  border-color: #ffffff;
+  color: #ffffff;
+  transform: scale(1.15);
+}
+
+.ctrl-btn-size:active {
+  transform: scale(0.92);
+}
+
+.ctrl-size-badge {
+  font-size: 11px;
+  font-weight: 800;
+  color: #facc15;
+  padding: 0 4px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.ctrl-drag-icon {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+  cursor: grab;
+  padding: 0 2px;
+}
+
+.overlay-resize-handle {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: #facc15;
+  color: #000000;
+  font-size: 11px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: nwse-resize;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+  z-index: 46;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.12s ease, background 0.15s ease;
+  user-select: none;
+  pointer-events: auto;
+  line-height: 1;
+}
+
+.editor-text:hover .overlay-resize-handle,
+.editor-text.dragging .overlay-resize-handle,
+.preview-text:hover .overlay-resize-handle,
+.preview-text.dragging .overlay-resize-handle,
+.beta-text-drag-overlay:hover .overlay-resize-handle,
+.beta-text-drag-overlay.dragging .overlay-resize-handle {
+  opacity: 1;
+}
+
+.overlay-resize-handle:hover {
+  transform: scale(1.25);
+  background: #ffffff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.9);
 }
 
 .editor-info h2 {
@@ -5739,4 +5889,35 @@ div[id*="monica-action"] {
   gap: 4px;
   background: #09090c;
   scroll-behavior: smooth;
+}
+
+/* Update Modal & In-Place Updater Dynamic Moving Background */
+.update-modal-overlay {
+  background: rgba(6, 6, 10, 0.78) !important;
+  backdrop-filter: blur(24px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
+  overflow: hidden !important;
+}
+
+.update-modal-ascii-canvas {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+  opacity: 0.45 !important;
+}
+
+.update-modal-card {
+  position: relative !important;
+  z-index: 10 !important;
+  background: rgba(16, 18, 24, 0.94) !important;
+  backdrop-filter: blur(22px) !important;
+  -webkit-backdrop-filter: blur(22px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-radius: 22px !important;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.85), 0 0 50px rgba(129, 140, 248, 0.10) !important;
+  animation: restartModalPop 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }

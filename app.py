@@ -5211,7 +5211,7 @@ def cache_clear():
         "message": f"Successfully cleared {formatted} of disk space ({yt_deleted} YouTube video(s) and {cache_deleted} cache file(s) removed)."
     })
 
-APP_VERSION = "v5.0.1"
+APP_VERSION = "v5.0.2"
 try:
     _v_file = ROOT / "version.json"
     if _v_file.exists():
@@ -5970,6 +5970,42 @@ def _clippy_builtin_fallback(user_query: str) -> str:
     """Provides natural, human-like responses when Ollama is offline or uninstalled."""
     q = user_query.lower().strip()
 
+    # Trending Streams & Gameplay
+    if any(k in q for k in ("trend", "twitch", "kick", "stream", "live stream", "broadcast", "gameplay", "clip this")):
+        return (
+            "[NAVIGATE:trending]\n"
+            "I've opened the **Trending Streams & Gameplay Cockpit** for you! 🔴\n\n"
+            "Here you can discover and clip content across 3 major platforms:\n"
+            "- 📺 **YouTube**: Live broadcasts with viewer counts + trending gameplay videos with high viral CTR.\n"
+            "- 🟣 **Twitch**: Live streams with streamer name, viewer counts, and game categories.\n"
+            "- 🟢 **Kick**: Featured and trending creator livestreams.\n\n"
+            "**One-Click Clipping:**\n"
+            "- Click **⚡ Clip This** on any regular video to import it into Create Studio.\n"
+            "- Click **🔴 Clip This Stream** on any live broadcast to open Live Studio with the stream pre-connected and ready to clip!"
+        )
+
+    # Disable Captions Toggle & Language Selection
+    if any(k in q for k in ("disable caption", "toggle caption", "turn off caption", "no caption", "caption toggle", "language", "hindi", "spanish", "audio language", "transcribe language", "auto-detect")):
+        return (
+            "[NAVIGATE:beta]\n"
+            "I've opened **Beta Features** where you can configure Captions & Languages! 🌐\n\n"
+            "- 🔘 **Disable Captions (Toggle)**: Turn OFF the **Subtitle Captions** switch to export clean vertical shorts without burned-in text.\n"
+            "- 🗣️ **Language Selection**: Choose from 18 audio languages (English, Hindi हिन्दी, Spanish, French, German, Japanese, Korean, Chinese, Arabic, and Auto-Detect) for precise transcription.\n\n"
+            "Both controls are active right now inside the **Beta Features** tab on the left menu!"
+        )
+
+    # Caption Designs & Interactive Mouse Playground
+    if any(k in q for k in ("caption design", "caption style", "caption playground", "yellow caption", "lime green", "tiktok cyan", "caption preset", "resize caption", "drag caption", "caption size", "caption position", "hormozi")):
+        return (
+            "[NAVIGATE:beta]\n"
+            "I've opened the **Caption Designs & Mouse Playground** in Beta Features! 🎨\n\n"
+            "**Features you can try:**\n"
+            "- 🌈 **7 High-Impact Caption Presets**: Viral Yellow Punch, Cyber Lime Green, Hormozi Bold White, TikTok Cyan Pop, Crimson Fire, Typewriter Retro, and Neon Lavender.\n"
+            "- 🖱️ **Interactive Mouse Dragging**: Click and drag the subtitle box anywhere on the 9:16 phone stage with automatic alignment snapping (Top Safe 25%, Center Seam 50%, Lower Safe 75%).\n"
+            "- 🎛️ **Mouse Resizing**: Resize text easily using the corner drag handle (`⤡`), mouse wheel scrolling, or the size slider (`24px` to `76px`).\n"
+            "- 📐 **1:1 Video Sync**: The position and font size you set here are passed directly to the video export pipeline!"
+        )
+
     # Instant Clipping & Variations
     if any(k in q for k in (
         "instant", "quick clip", "fast clip", "fast mode", "instant clipping", 
@@ -5992,7 +6028,7 @@ def _clippy_builtin_fallback(user_query: str) -> str:
     # GPU Acceleration, CUDA, Hardware delays
     if any(k in q for k in ("gpu", "cuda", "nvidia", "hardware", "cpu", "delay", "slow", "speed up", "transcribe", "nvenc")):
         return (
-            "🚀 **GPU Acceleration & Performance in Clipify AI v5.0.0**:\n\n"
+            "🚀 **GPU Acceleration & Performance in Clipify AI v5.0.2**:\n\n"
             "- **Automatic NVIDIA CUDA Detection**: Clipify AI automatically detects your NVIDIA GPU (RTX / GTX with CUDA 12). "
             "When detected, Whisper speech-to-text transcribes at lightning speed using CTranslate2 `float16`.\n"
             "- **Zero CPU Bottlenecks**: The CPU is only used as a fallback if no compatible GPU is installed, preventing transcription freezes and system lag.\n"
@@ -6010,7 +6046,7 @@ def _clippy_builtin_fallback(user_query: str) -> str:
         )
 
     # Clipper Campaigns & Bounties
-    if any(k in q for k in ("campaign", "bount", "monetiz", "earn", "platform", "vyro", "content reward", "clipster", "payout", "paid")):
+    if any(k in q for k in ("campaign", "bount", "monetiz", "earn", "platform", "vyro", "content reward", "clipster", "payout", "paid", "make money", "best campaign")):
         return (
             "[NAVIGATE:campaigns]\n"
             "I've opened the **Clipper Campaigns & Bounties Directory** for you! 💰\n\n"
@@ -6028,9 +6064,10 @@ def _clippy_builtin_fallback(user_query: str) -> str:
             "No worries! I'm here to help. You can tell me what you'd like to do:\n"
             "- ⚡ **Create fast 9:16 vertical clips** from YouTube links or local videos (`#instant`)\n"
             "- 💰 **Find clipper bounties & campaigns** to earn from your clips (`#campaigns`)\n"
+            "- 🔴 **Explore Trending live streams** on YouTube, Twitch & Kick (`#trending`)\n"
+            "- 🎨 **Try Caption Designs & Position Playground** (`#beta`)\n"
             "- 🎙️ **Generate voiceover stories** with gameplay backgrounds (`#narrate`)\n"
-            "- 🔴 **Clip live streams** from OBS in real-time (`#live`)\n"
-            "- ✍️ **Add custom draggable text overlays** (`#beta`)\n\n"
+            "- 🔴 **Clip live streams** from OBS in real-time (`#live`)\n\n"
             "What kind of clip are you looking to create?"
         )
 
@@ -6143,12 +6180,14 @@ def _clippy_builtin_fallback(user_query: str) -> str:
         return "You're very welcome! Let me know if you need any other help creating your clips."
 
     return (
-        "I'm here to help you get the most out of Clipify AI v5.0.1! "
-        "You can ask me how to use **Instant Clipping** (with Split Screen & 'Generate Another Clip'), "
-        "adjust text overlays in the **Editor** with the new in-preview resize handles, "
-        "enable **GPU acceleration**, clip live OBS streams in **Live Studio**, create voiceovers in **Narration Studio**, "
-        "or join our **Instagram Creator Community**. "
-        "You can also click **App Guide** on the left menu anytime for an interactive tour!"
+        "I'm here to help you get the most out of Clipify AI v5.0.2! 🚀\n\n"
+        "Here are a few quick things I can help you with:\n"
+        "- 🔴 **Trending Streams**: Discover live streams on YouTube, Twitch & Kick and clip in 1 click (`#trending`)\n"
+        "- 🎨 **Caption Studio**: Try 7 animated styles and resize/drag captions with your mouse (`#beta`)\n"
+        "- 💰 **Campaigns & Bounties**: Explore platforms paying clippers per view (`#campaigns`)\n"
+        "- ⚡ **Instant Clipping**: Create fast 9:16 vertical shorts from any YouTube link (`#instant`)\n"
+        "- 🌐 **Captions & Languages**: Disable captions or select from 18 audio languages (`#beta`)\n\n"
+        "Just ask me what you'd like to do!"
     )
 
 

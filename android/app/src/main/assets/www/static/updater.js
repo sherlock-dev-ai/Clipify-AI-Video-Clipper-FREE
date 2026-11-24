@@ -22,8 +22,8 @@
     let updateState = {
       checked: false,
       updateAvailable: false,
-      latestVersion: 'v5.0.0',
-      currentVersion: 'v5.0.0',
+      latestVersion: 'v5.0.1',
+      currentVersion: 'v5.0.1',
       releaseUrl: 'https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases',
       releaseName: '',
       notes: '',
@@ -51,8 +51,8 @@
         updateState = {
           checked: true,
           updateAvailable: !!data.update_available,
-          latestVersion: data.latest_version || 'v5.0.0',
-          currentVersion: data.current_version || 'v5.0.0',
+          latestVersion: data.latest_version || 'v5.0.1',
+          currentVersion: data.current_version || 'v5.0.1',
           releaseUrl: data.release_url || updateState.releaseUrl,
           releaseName: data.release_name || '',
           notes: data.body || '',
@@ -60,10 +60,10 @@
           gitBehind: !!data.git_behind
         };
 
-        if (badge) badge.textContent = data.current_version || 'v5.0.0';
-        if (navVersionTag) navVersionTag.textContent = data.current_version || 'v5.0.0';
+        if (badge) badge.textContent = data.current_version || 'v5.0.1';
+        if (navVersionTag) navVersionTag.textContent = data.current_version || 'v5.0.1';
         const topBadgeNum = document.querySelector('#topBrandVersionBadge .version-num');
-        if (topBadgeNum) topBadgeNum.textContent = data.current_version || 'v5.0.0';
+        if (topBadgeNum) topBadgeNum.textContent = data.current_version || 'v5.0.1';
 
         if (updateState.updateAvailable) {
           if (card) card.classList.add('has-update');
@@ -83,11 +83,11 @@
         } else {
           if (card) card.classList.remove('has-update');
           if (navVersionTag) {
-            navVersionTag.textContent = data.current_version || 'v5.0.0';
+            navVersionTag.textContent = data.current_version || 'v5.0.1';
             navVersionTag.style.background = '';
             navVersionTag.style.color = '';
           }
-          if (badge) badge.textContent = data.current_version || 'v5.0.0';
+          if (badge) badge.textContent = data.current_version || 'v5.0.1';
           if (statusMsg) statusMsg.textContent = 'Up to date ✓';
           if (btn) {
             btn.innerHTML = '<span class="btn-update-icon">↻</span> Update';
@@ -111,6 +111,7 @@
 
     function openModalWithRelease(info) {
       if (!modal) return;
+      ensureModalAsciiBackground();
       modal.style.display = 'flex';
       if (modalTitle) modalTitle.textContent = `New Release Available: ${info.latestVersion}`;
       if (btnView) btnView.href = info.releaseUrl;
@@ -135,6 +136,7 @@
 
     function openModalUpToDate(info) {
       if (!modal) return;
+      ensureModalAsciiBackground();
       modal.style.display = 'flex';
       if (modalTitle) modalTitle.textContent = 'Clipify AI is Up to Date';
       if (btnView) btnView.href = info.releaseUrl;
@@ -165,6 +167,7 @@
       btnExecute.innerHTML = '<span class="btn-update-icon spinning">↻</span> Updating…';
 
       // Immediately hide modal and trigger updating takeover sub-window
+      stopModalAsciiBackground();
       if (modal) modal.style.display = 'none';
       triggerRestartTakeover('Applying core updates & rebooting local engine…');
 
@@ -184,7 +187,7 @@
           actionRow.style.display = 'flex';
           actionRow.style.gap = '10px';
           actionRow.innerHTML = `
-            <a href="https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/tag/v5.0.0" target="_blank" class="btn-restart-retry" style="text-align:center;text-decoration:none;background:#22c55e;color:#000;font-weight:700;">Download v5.0.0 Installer →</a>
+            <a href="https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/tag/v5.0.1" target="_blank" class="btn-restart-retry" style="text-align:center;text-decoration:none;background:#22c55e;color:#000;font-weight:700;">Download v5.0.1 Installer →</a>
             <button type="button" class="btn-restart-retry" id="btnRestartForceReload">Retry / Reload</button>
           `;
           document.getElementById('btnRestartForceReload')?.addEventListener('click', () => window.location.reload());
@@ -376,11 +379,41 @@
       }, 400);
     }
 
+    let modalAsciiCtrl = null;
+    function ensureModalAsciiBackground() {
+      if (!modal) return;
+      let canvas = modal.querySelector('.update-modal-ascii-canvas');
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.id = 'updateModalAsciiCanvas';
+        canvas.className = 'restart-ascii-canvas update-modal-ascii-canvas';
+        modal.insertBefore(canvas, modal.firstChild);
+      }
+      if (!modalAsciiCtrl) {
+        modalAsciiCtrl = initAsciiMatrixBackground(canvas);
+      }
+      if (modalAsciiCtrl) {
+        modalAsciiCtrl.start();
+      }
+    }
+
+    function stopModalAsciiBackground() {
+      if (modalAsciiCtrl) {
+        modalAsciiCtrl.stop();
+      }
+    }
+
     function initRestartCanvas() {
       const canvas = document.getElementById('restartAsciiCanvas');
       if (!canvas) return;
+      const ctrl = initAsciiMatrixBackground(canvas);
+      if (ctrl) ctrl.start();
+    }
+
+    function initAsciiMatrixBackground(canvas) {
+      if (!canvas) return null;
       const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      if (!ctx) return null;
 
       const SYMBOLS = ['!', '@', '#', '$', '%', '^', '&', '*', '0', '1', '7', '8', 'X', 'Q', 'G', '~', '/', '\\', '+', '?'];
       const LOGO_SYMBOLS = ['✦', '★', '●', '■', '1', '0', '#', '*', '%', 'V'];
@@ -419,13 +452,14 @@
       }
       buildGrid();
 
-      window.addEventListener('resize', () => {
+      function onResize() {
         width = canvas.width = window.innerWidth;
         height = canvas.height = window.innerHeight;
         cols = Math.floor(width / SPACING);
         rows = Math.floor(height / SPACING);
         buildGrid();
-      });
+      }
+      window.addEventListener('resize', onResize);
 
       let mouse = { x: -9999, y: -9999, active: false };
       window.addEventListener('mousemove', (e) => {
@@ -462,6 +496,140 @@
         // Chin Bottom
         [-5, 3], [-4, 4], [-3, 4], [-2, 4], [-1, 4], [0, 4], [1, 4], [2, 4], [3, 4], [4, 4], [5, 3]
       ];
+
+      // 5x7 ASCII bitmap definitions for the word "CLIPIFY"
+      const GLYPHS = {
+        'C': [
+          " 1111",
+          "1    ",
+          "1    ",
+          "1    ",
+          "1    ",
+          "1    ",
+          " 1111"
+        ],
+        'L': [
+          "1    ",
+          "1    ",
+          "1    ",
+          "1    ",
+          "1    ",
+          "1    ",
+          "11111"
+        ],
+        'I': [
+          "11111",
+          "  1  ",
+          "  1  ",
+          "  1  ",
+          "  1  ",
+          "  1  ",
+          "11111"
+        ],
+        'P': [
+          "1111 ",
+          "1   1",
+          "1   1",
+          "1111 ",
+          "1    ",
+          "1    ",
+          "1    "
+        ],
+        'F': [
+          "11111",
+          "1    ",
+          "1    ",
+          "1111 ",
+          "1    ",
+          "1    ",
+          "1    "
+        ],
+        'Y': [
+          "1   1",
+          "1   1",
+          " 1 1 ",
+          "  1  ",
+          "  1  ",
+          "  1  ",
+          "  1  "
+        ]
+      };
+
+      const WORD = ['C', 'L', 'I', 'P', 'I', 'F', 'Y'];
+      const WORD_MAP = [];
+      let currentOffsetCol = 0;
+      WORD.forEach((letter) => {
+        const rws = GLYPHS[letter] || GLYPHS['C'];
+        for (let r = 0; r < 7; r++) {
+          const line = rws[r] || "     ";
+          for (let c = 0; c < 5; c++) {
+            if (line[c] === '1') {
+              WORD_MAP.push({ relCol: currentOffsetCol + c, relRow: r });
+            }
+          }
+        }
+        currentOffsetCol += 6; // 5 cols + 1 col gap
+      });
+      const WORD_TOTAL_COLS = currentOffsetCol; // ~42 cols
+      const WORD_TOTAL_ROWS = 7;
+
+      // Active Clipify Word Spawns
+      let textSpawns = [];
+      let lastTextSpawn = Date.now() - 1500;
+
+      function spawnClipifyWord() {
+        if (cols < 20 || rows < 10) return;
+        const maxCol = Math.max(1, cols - WORD_TOTAL_COLS - 2);
+        const maxRow = Math.max(1, rows - WORD_TOTAL_ROWS - 2);
+
+        const startCol = Math.floor(1 + Math.random() * maxCol);
+        const startRow = Math.floor(1 + Math.random() * maxRow);
+
+        const charOverrides = {};
+        WORD_MAP.forEach((pt, idx) => {
+          charOverrides[idx] = LOGO_SYMBOLS[Math.floor(Math.random() * LOGO_SYMBOLS.length)];
+        });
+
+        textSpawns.push({
+          startCol,
+          startRow,
+          alpha: 0,
+          targetAlpha: 0.95,
+          phase: 'fadeIn',
+          timer: 0,
+          holdDuration: 3.2 + Math.random() * 1.8,
+          fadeSpeed: 1.1,
+          charOverrides
+        });
+      }
+
+      // Inline text highlights: e.g. "CLIPIFY", "CLIPIFY AI"
+      let inlineWords = [];
+      const INLINE_STRINGS = ['CLIPIFY', 'CLIPIFY AI', 'CLIP.AI', '★ CLIPIFY ★'];
+      function spawnInlineWord() {
+        if (inlineWords.length >= 4 || cols < 15) return;
+        const word = INLINE_STRINGS[Math.floor(Math.random() * INLINE_STRINGS.length)];
+        const maxC = Math.max(0, cols - word.length - 2);
+        const maxR = Math.max(0, rows - 2);
+        const startC = Math.floor(1 + Math.random() * maxC);
+        const startR = Math.floor(1 + Math.random() * maxR);
+
+        inlineWords.push({
+          word,
+          startC,
+          startR,
+          alpha: 0,
+          targetAlpha: 0.90 + Math.random() * 0.10,
+          phase: 'fadeIn',
+          timer: 0,
+          life: 3.0 + Math.random() * 2.0
+        });
+      }
+
+      // Pre-seed an initial CLIPIFY word and inline words
+      spawnClipifyWord();
+      spawnInlineWord();
+      spawnInlineWord();
 
       // Active Clipify Logo Shape Spawns
       let logoSpawns = [];
@@ -547,7 +715,9 @@
         }
       }
 
-      let running = true;
+      let running = false;
+      let rafId = null;
+
       function animate() {
         if (!running) return;
         ctx.fillStyle = '#000000';
@@ -560,6 +730,25 @@
         if (logoSpawns.length < 2 && (now - lastLogoSpawn) > 2800) {
           spawnLogoInstance();
           lastLogoSpawn = now;
+        }
+
+        // Spawn Clipify 5x7 ASCII word periodically
+        if (textSpawns.length < 2 && (now - lastTextSpawn) > 3500) {
+          spawnClipifyWord();
+          lastTextSpawn = now;
+        }
+
+        // Spawn inline text words
+        if (inlineWords.length < 4 && Math.random() < 0.15) {
+          spawnInlineWord();
+        }
+
+        // Occasional cyber symbol glitch / shift in "CLIPIFY"
+        if (Math.random() < 0.3) {
+          for (const ts of textSpawns) {
+            const randIdx = Math.floor(Math.random() * WORD_MAP.length);
+            ts.charOverrides[randIdx] = LOGO_SYMBOLS[Math.floor(Math.random() * LOGO_SYMBOLS.length)];
+          }
         }
 
         ctx.font = '11px "Courier New", monospace, monospace';
@@ -689,9 +878,107 @@
           ctx.shadowBlur = 0;
         }
 
-        requestAnimationFrame(animate);
+        // Render 5x7 ASCII Block "CLIPIFY" Word Formations
+        for (let t = textSpawns.length - 1; t >= 0; t--) {
+          const ts = textSpawns[t];
+          ts.timer += 0.016;
+
+          if (ts.phase === 'fadeIn') {
+            ts.alpha += 0.016 * ts.fadeSpeed;
+            if (ts.alpha >= ts.targetAlpha) {
+              ts.alpha = ts.targetAlpha;
+              ts.phase = 'hold';
+              ts.timer = 0;
+            }
+          } else if (ts.phase === 'hold') {
+            if (ts.timer >= ts.holdDuration) {
+              ts.phase = 'fadeOut';
+            }
+          } else if (ts.phase === 'fadeOut') {
+            ts.alpha -= 0.016 * ts.fadeSpeed;
+            if (ts.alpha <= 0) {
+              textSpawns.splice(t, 1);
+              spawnClipifyWord();
+              continue;
+            }
+          }
+
+          if (ts.alpha > 0.02) {
+            ctx.font = 'bold 12px "Courier New", monospace';
+            ctx.shadowColor = 'rgba(160, 220, 255, 0.9)';
+            ctx.shadowBlur = 9;
+            WORD_MAP.forEach((pt, idx) => {
+              const c = ts.startCol + pt.relCol;
+              const r = ts.startRow + pt.relRow;
+              const targetPt = gridMap[`${c},${r}`];
+              if (targetPt) {
+                const ch = ts.charOverrides[idx] || '#';
+                ctx.fillStyle = `rgba(240, 248, 255, ${Math.max(0, ts.alpha).toFixed(2)})`;
+                ctx.fillText(ch, targetPt.x, targetPt.y);
+              }
+            });
+            ctx.shadowBlur = 0;
+          }
+        }
+
+        // Render Inline "CLIPIFY" Text Words
+        ctx.font = 'bold 13px "Courier New", monospace';
+        for (let w = inlineWords.length - 1; w >= 0; w--) {
+          const iw = inlineWords[w];
+          iw.timer += 0.016;
+
+          if (iw.phase === 'fadeIn') {
+            iw.alpha += 0.04;
+            if (iw.alpha >= iw.targetAlpha) {
+              iw.alpha = iw.targetAlpha;
+              iw.phase = 'hold';
+              iw.timer = 0;
+            }
+          } else if (iw.phase === 'hold') {
+            if (iw.timer >= iw.life) {
+              iw.phase = 'fadeOut';
+            }
+          } else if (iw.phase === 'fadeOut') {
+            iw.alpha -= 0.035;
+            if (iw.alpha <= 0) {
+              inlineWords.splice(w, 1);
+              continue;
+            }
+          }
+
+          if (iw.alpha > 0.02) {
+            ctx.shadowColor = 'rgba(192, 132, 252, 0.9)';
+            ctx.shadowBlur = 8;
+            for (let ci = 0; ci < iw.word.length; ci++) {
+              const pt = gridMap[`${iw.startC + ci},${iw.startR}`];
+              if (pt) {
+                ctx.fillStyle = `rgba(245, 235, 255, ${Math.max(0, iw.alpha).toFixed(2)})`;
+                ctx.fillText(iw.word[ci], pt.x, pt.y);
+              }
+            }
+            ctx.shadowBlur = 0;
+          }
+        }
+
+        rafId = requestAnimationFrame(animate);
       }
-      animate();
+
+      return {
+        start: () => {
+          if (running) return;
+          running = true;
+          onResize();
+          animate();
+        },
+        stop: () => {
+          running = false;
+          if (rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+          }
+        },
+        resize: onResize
+      };
     }
 
     if (btn) {
@@ -744,10 +1031,21 @@
 
     closeModal?.addEventListener('click', () => {
       modal.style.display = 'none';
+      stopModalAsciiBackground();
     });
 
     modal?.addEventListener('click', (e) => {
-      if (e.target === modal) modal.style.display = 'none';
+      if (e.target === modal) {
+        modal.style.display = 'none';
+        stopModalAsciiBackground();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal && modal.style.display === 'flex') {
+        modal.style.display = 'none';
+        stopModalAsciiBackground();
+      }
     });
 
     // Check silently on startup after 3 seconds

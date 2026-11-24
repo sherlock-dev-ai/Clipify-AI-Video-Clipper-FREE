@@ -3,16 +3,16 @@
 
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Clipify AI</title>
-  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icon.png', v='4.0.12') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='4.0.12.3') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='studio.css', v='4.0.12') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='model_hub.css', v='4.0.12') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='tour.css', v='4.0.12.3') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='cache_manager.css', v='4.0.12') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='trending.css', v='5.0.2') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='caption_playground.css', v='5.0.2') }}">
+  <link rel="icon" type="image/png" href="static/icon.png">
+  <link rel="stylesheet" href="static/style.css">
+  <link rel="stylesheet" href="static/studio.css">
+  <link rel="stylesheet" href="static/model_hub.css">
+  <link rel="stylesheet" href="static/tour.css">
+  <link rel="stylesheet" href="static/cache_manager.css">
+  <link rel="stylesheet" href="static/trending.css">
+  <link rel="stylesheet" href="static/caption_playground.css">
 </head>
 
 <body>
@@ -22,7 +22,7 @@
   <div class="noise"></div>
   <aside class="sidebar">
     <div class="brand">
-      <img class="brand-mark" src="{{ url_for('static', filename='icon.png', v='20261018-3') }}" alt=""
+      <img class="brand-mark" src="static/icon.png" alt=""
         aria-hidden="true">
       <div class="brand-copy">
         <div class="brand-title-wrap">
@@ -2146,7 +2146,7 @@
       <div class="restart-modal-window">
         <div class="restart-modal-header">
           <div class="restart-logo-wrapper">
-            <img src="{{ url_for('static', filename='icon.png') }}" alt="Clipify AI Logo" class="restart-app-logo" />
+            <img src="static/icon.png" alt="Clipify AI Logo" class="restart-app-logo" />
             <div class="restart-logo-glow"></div>
           </div>
           <div class="restart-title-group">
@@ -2194,7 +2194,7 @@
       <div class="restart-modal-window">
         <div class="restart-modal-header">
           <div class="restart-logo-wrapper">
-            <img src="{{ url_for('static', filename='icon.png') }}" alt="Clipify AI Logo" class="restart-app-logo" />
+            <img src="static/icon.png" alt="Clipify AI Logo" class="restart-app-logo" />
             <div class="restart-logo-glow"></div>
           </div>
           <div class="restart-title-group">
@@ -2238,19 +2238,19 @@
 
     <footer>Clipify AI · local AI editing workspace · WhisperX + ClipsAI + Ollama + FFmpeg</footer>
   </main>
-  <script src="{{ url_for('static', filename='pipeline_status.js', v='4.0.12') }}"></script>
-  <script src="{{ url_for('static', filename='review_player.js', v='4.0.12') }}"></script>
-  <script src="{{ url_for('static', filename='forest_game.js', v='4.0.12') }}"></script>
-  <script src="{{ url_for('static', filename='updater.js', v='4.0.12.5') }}"></script>
-  <script src="{{ url_for('static', filename='model_hub.js', v='4.0.12') }}"></script>
-  <script src="{{ url_for('static', filename='android_bridge.js', v='4.0.12.3') }}"></script>
-  <script src="{{ url_for('static', filename='app.js', v='4.0.12.3') }}"></script>
-  <script src="{{ url_for('static', filename='beta_matrix.js', v='4.0.12.3') }}"></script>
-  <script src="{{ url_for('static', filename='tour.js', v='4.0.12.3') }}"></script>
-  <script src="{{ url_for('static', filename='cache_manager.js', v='4.0.12') }}"></script>
-  <script src="{{ url_for('static', filename='clippy.js', v='4.0.12.3') }}"></script>
-  <script src="{{ url_for('static', filename='trending.js', v='5.0.2') }}"></script>
-  <script src="{{ url_for('static', filename='caption_playground.js', v='5.0.2') }}"></script>
+  <script src="static/pipeline_status.js"></script>
+  <script src="static/review_player.js"></script>
+  <script src="static/forest_game.js"></script>
+  <script src="static/updater.js"></script>
+  <script src="static/model_hub.js"></script>
+  <script src="static/android_bridge.js"></script>
+  <script src="static/app.js"></script>
+  <script src="static/beta_matrix.js"></script>
+  <script src="static/tour.js"></script>
+  <script src="static/cache_manager.js"></script>
+  <script src="static/clippy.js"></script>
+  <script src="static/trending.js"></script>
+  <script src="static/caption_playground.js"></script>
   <script>
     if (window.location.search.includes('open_support=1') || window.location.hash.includes('support')) {
       window.addEventListener('load', () => setTimeout(() => window.showSupportModal && window.showSupportModal(), 300));

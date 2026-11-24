@@ -225,12 +225,15 @@
     const rect = betaSection.getBoundingClientRect();
     const parent = betaSection.parentElement || document.body;
 
-    // Expand width across the entire container and viewport
-    width = canvas.width = Math.round(Math.max(window.innerWidth, betaSection.offsetWidth || 0, rect.width || 0, parent.clientWidth || 0, 1200));
-    height = canvas.height = Math.round(Math.max(window.innerHeight, betaSection.offsetHeight || 0, rect.height || 0, betaSection.scrollHeight || 0, 900));
+    // Expand width across the entire container, window and scrollable bounds
+    width = canvas.width = Math.round(Math.max(window.innerWidth, betaSection.offsetWidth || 0, rect.width || 0, parent.clientWidth || 0, betaSection.scrollWidth || 0, 1400));
+    height = canvas.height = Math.round(Math.max(window.innerHeight, betaSection.offsetHeight || 0, rect.height || 0, betaSection.scrollHeight || 0, parent.clientHeight || 0, 1000));
 
-    cols = Math.floor(width / SPACING);
-    rows = Math.floor(height / SPACING);
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+
+    cols = Math.ceil(width / SPACING) + 3;
+    rows = Math.ceil(height / SPACING) + 3;
 
     grid = [];
     gridMap = {};
@@ -486,17 +489,24 @@
 
     ctx = canvas.getContext('2d');
 
-    // 1:1 Pixel-Accurate Mouse Event Tracking
-    betaSection.addEventListener('mousemove', (e) => {
+    // 1:1 Pixel-Accurate Mouse Event Tracking with window-level delegate for cards and nested inputs
+    window.addEventListener('mousemove', (e) => {
+      if (!running || !canvas || !betaSection) return;
       const rect = canvas.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
-        mouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
-        mouse.y = (e.clientY - rect.top) * (canvas.height / rect.height);
-        mouse.active = true;
+        const cx = e.clientX;
+        const cy = e.clientY;
+        if (cx >= rect.left && cx <= rect.right && cy >= rect.top && cy <= rect.bottom) {
+          mouse.x = (cx - rect.left) * (canvas.width / rect.width);
+          mouse.y = (cy - rect.top) * (canvas.height / rect.height);
+          mouse.active = true;
+        } else {
+          mouse.active = false;
+        }
       }
-    });
+    }, { passive: true });
 
-    betaSection.addEventListener('mouseleave', () => {
+    document.addEventListener('mouseleave', () => {
       mouse.active = false;
     });
 

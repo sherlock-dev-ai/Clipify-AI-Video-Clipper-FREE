@@ -2677,16 +2677,26 @@ def import_youtube():
 
     def worker() -> None:
         proc: subprocess.Popen[str] | None = None
+        last_error: str = ""
         try:
             ffmpeg_path = _ffmpeg_path()
             output_template = str(input_dir / "youtube.%(ext)s")
             command = [*yt_dlp_cmd, "--no-playlist", "--no-warnings", "--newline", "--progress",
-                       "--extractor-args", "youtube:player_client=android,ios,web",
+                       "--extractor-args", "youtube:player_client=android,ios,mweb",
                        "--progress-template", "download:[clip-prog] %(progress._percent_str)s|%(progress.downloaded_bytes)s|%(progress.total_bytes|progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s",
                        "--restrict-filenames", "--merge-output-format", "mp4", "--max-filesize", "4G",
                        "--socket-timeout", "20", "--retries", "3", "--fragment-retries", "3",
                        "-f", "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/18/bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo[height<=480]+bestaudio/best[height<=480]/best",
                        "--ffmpeg-location", str(Path(ffmpeg_path).parent)]
+            cookie_candidates = [
+                ROOT / "cookies.txt",
+                USER_DATA_DIR / "cookies.txt",
+                ROOT / "youtube_cookies.txt",
+                USER_DATA_DIR / "youtube_cookies.txt",
+            ]
+            cookie_file = next((str(p) for p in cookie_candidates if p.is_file()), None)
+            if cookie_file:
+                command.extend(["--cookies", cookie_file])
             node_binary = shutil.which("node") or shutil.which("node.exe")
             if node_binary:
                 command.extend(["--js-runtimes", f"node:{node_binary}", "--remote-components", "ejs:github"])
@@ -2814,7 +2824,10 @@ def import_youtube():
                     for event in reversed(jobs[job_id].get("events", [])):
                         message = str(event.get("message", ""))
                         if message.startswith("ERROR:"):
-                            last_error = message
+                            if "not a bot" in message.lower() or "sign in" in message.lower():
+                                last_error = "YouTube requested bot verification. Try saving the video with your browser and uploading the file directly, or provide cookies.txt."
+                            else:
+                                last_error = message
                             break
                 detail = last_error or ("yt-dlp failed." if return_code != 0 else "yt-dlp finished but no video containing both video and audio was created.")
                 with jobs_lock:
@@ -3336,12 +3349,22 @@ def _instant_worker(
             log(f"Connecting to YouTube stream: {youtube_url}...")
             update_status("running", 10, "Fetching YouTube stream")
             yt_out = input_dir / f"yt_source_{job_id[:8]}.mp4"
+            cookie_candidates = [
+                ROOT / "cookies.txt",
+                USER_DATA_DIR / "cookies.txt",
+                ROOT / "youtube_cookies.txt",
+                USER_DATA_DIR / "youtube_cookies.txt",
+            ]
+            cookie_file = next((str(p) for p in cookie_candidates if p.is_file()), None)
+            yt_cookie_args = ["--cookies", cookie_file] if cookie_file else []
+
             yt_cmd = [
                 sys.executable, "-m", "yt_dlp",
                 "--no-playlist",
-                "-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best",
-                "--extractor-args", "youtube:player_client=android,ios,web",
+                "-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best/18",
+                "--extractor-args", "youtube:player_client=android,ios,mweb",
                 "--no-check-certificates",
+                *yt_cookie_args,
                 "-o", str(yt_out),
                 youtube_url
             ]
@@ -3351,14 +3374,20 @@ def _instant_worker(
                     sys.executable, "-m", "yt_dlp",
                     "--no-playlist",
                     "-f", "18/best[ext=mp4]/best",
+                    "--extractor-args", "youtube:player_client=android,ios,mweb",
                     "--no-check-certificates",
+                    *yt_cookie_args,
                     "-o", str(yt_out),
                     youtube_url
                 ]
                 _run_hidden(yt_cmd_fb, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
 
             if not yt_out.exists() or yt_out.stat().st_size == 0:
-                err_msg = yt_proc.stderr[-300:] if yt_proc.stderr else "Failed to download YouTube video."
+                raw_err = yt_proc.stderr or ""
+                if "not a bot" in raw_err.lower() or "sign in" in raw_err.lower():
+                    err_msg = "YouTube requested bot verification. Try downloading with your browser and uploading the MP4 directly, or provide cookies.txt."
+                else:
+                    err_msg = raw_err[-300:] if raw_err else "Failed to download YouTube video."
                 log(f"ERROR: YouTube download failed: {err_msg}")
                 update_status("error", 0, "YouTube import failed")
                 return
@@ -4903,6 +4932,7 @@ def updater_apply():
 
         # Check if a dedicated fast update asset exists in latest release
         update_url = None
+        rel_data: dict[str, Any] = {}
         try:
             rel_req = urllib.request.Request(
                 f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",

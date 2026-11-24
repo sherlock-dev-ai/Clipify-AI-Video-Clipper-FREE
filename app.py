@@ -3435,7 +3435,8 @@ def _instant_worker(
     custom_start: float,
     youtube_url: str = "",
     num_clips: int = 1,
-    captions: str = "yes"
+    captions: str = "yes",
+    iteration: int = 0
 ) -> None:
     job_dir = JOBS / job_id
     input_dir = job_dir / "input"
@@ -3521,6 +3522,15 @@ def _instant_worker(
             total_dur = 60.0
         log(f"Source video verified: {input_path.name} (Duration: {total_dur:.1f}s)")
 
+        # Load previously used segments for this video to ensure diverse, non-overlapping clips
+        used_segments_file = job_dir / "used_segments.json"
+        used_segments: list[list[float]] = []
+        if used_segments_file.exists():
+            try:
+                used_segments = json.loads(used_segments_file.read_text(encoding="utf-8"))
+            except Exception:
+                used_segments = []
+
         # Calculate segment windows for num_clips
         clip_len = min(target_dur, total_dur)
         usable_span = max(0.0, total_dur - clip_len)
@@ -3531,23 +3541,71 @@ def _instant_worker(
                 s = 0.0
             elif start_mode == "custom":
                 s = max(0.0, min(custom_start, usable_span))
-            else:  # auto / golden hook window
-                s = 0.0 if total_dur <= clip_len else max(0.0, min(total_dur * 0.18, usable_span))
+            else:  # auto / golden hook or generate another option
+                if usable_span <= 0.0:
+                    s = 0.0
+                else:
+                    golden_ratios = [0.18, 0.48, 0.72, 0.04, 0.32, 0.60, 0.85, 0.12, 0.39, 0.67, 0.88, 0.24, 0.54, 0.79]
+
+                    def overlap_amount(candidate_s: float) -> float:
+                        candidate_e = candidate_s + clip_len
+                        tot_overlap = 0.0
+                        for prev_s, prev_e in used_segments:
+                            overlap = max(0.0, min(candidate_e, prev_e) - max(candidate_s, prev_s))
+                            tot_overlap += overlap
+                        return tot_overlap
+
+                    sample_points = []
+                    for r in golden_ratios:
+                        cand = max(0.0, min(usable_span, total_dur * r))
+                        sample_points.append(cand)
+
+                    num_grid = max(6, int(usable_span / max(5.0, clip_len * 0.75)))
+                    for g in range(num_grid):
+                        sample_points.append(g * (usable_span / max(1, num_grid - 1)))
+
+                    rot = iteration % len(sample_points)
+                    candidate_order = sample_points[rot:] + sample_points[:rot]
+
+                    best_s = None
+                    min_overlap = float("inf")
+                    for cand_s in candidate_order:
+                        ov = overlap_amount(cand_s)
+                        if ov == 0.0:
+                            best_s = cand_s
+                            break
+                        if ov < min_overlap:
+                            min_overlap = ov
+                            best_s = cand_s
+
+                    s = best_s if best_s is not None else max(0.0, min(usable_span, total_dur * golden_ratios[iteration % len(golden_ratios)]))
+
             segments.append((s, s + clip_len))
+            used_segments.append([round(s, 2), round(s + clip_len, 2)])
+            if iteration > 0:
+                log(f"⚡ Iteration #{iteration + 1}: Selected unique hook window at {s:.1f}s -> {s + clip_len:.1f}s (avoiding previous clips)")
         else:
             if usable_span <= 0.0:
                 for _ in range(num_clips):
                     segments.append((0.0, clip_len))
             else:
                 step = usable_span / (num_clips + 1)
+                offset_shift = (iteration * (step * 0.35)) % max(1.0, step)
                 for i in range(num_clips):
                     if start_mode == "start" and i == 0:
                         s = 0.0
                     elif start_mode == "custom" and i == 0:
                         s = max(0.0, min(custom_start, usable_span))
                     else:
-                        s = max(0.0, min(usable_span, step * (i + 1)))
+                        base = step * (i + 1) + offset_shift
+                        s = max(0.0, min(usable_span, base))
                     segments.append((s, s + clip_len))
+                    used_segments.append([round(s, 2), round(s + clip_len, 2)])
+
+        try:
+            used_segments_file.write_text(json.dumps(used_segments), encoding="utf-8")
+        except Exception:
+            pass
 
         outputs = []
         ffmpeg = _ffmpeg_path()
@@ -3636,7 +3694,10 @@ def _instant_worker(
                 else:
                     filter_str = crop_chain
 
-            out_name = f"instant_{job_id[:8]}_short_{c_idx + 1}.mp4" if num_clips > 1 else f"instant_{job_id[:8]}_short.mp4"
+            if iteration > 0:
+                out_name = f"instant_{job_id[:8]}_short_v{iteration + 1}_{c_idx + 1}.mp4" if num_clips > 1 else f"instant_{job_id[:8]}_short_v{iteration + 1}.mp4"
+            else:
+                out_name = f"instant_{job_id[:8]}_short_{c_idx + 1}.mp4" if num_clips > 1 else f"instant_{job_id[:8]}_short.mp4"
             out_path = out_dir / out_name
 
             cmd = [
@@ -3745,7 +3806,7 @@ def instant_upload():
 def instant_start():
     """Launch the isolated lightning-fast instant clipping job."""
     data = request.get_json(silent=True) or {}
-    job_id = str(data.get("job_id", "")).strip() or str(uuid.uuid4())
+    job_id = str(data.get("job_id", "")).strip()
     youtube_url = str(data.get("youtube_url", "")).strip()
     target_dur = max(5.0, min(120.0, float(data.get("duration", 30.0))))
     layout = str(data.get("layout", "center_crop")).strip()
@@ -3753,12 +3814,33 @@ def instant_start():
     num_clips = max(1, min(10, int(data.get("num_clips", data.get("clips", 1)))))
     start_mode = str(data.get("start_mode", "auto")).strip()
     custom_start = max(0.0, float(data.get("custom_start", 0.0)))
+    iteration = max(0, int(data.get("iteration", 0)))
+
+    # If YouTube URL provided: verify whether existing job_id matches this exact video
+    if youtube_url:
+        if job_id:
+            job_dir_check = JOBS / job_id
+            yt_file = job_dir_check / "yt_url.txt"
+            if not yt_file.exists() or yt_file.read_text(encoding="utf-8").strip() != youtube_url:
+                # Video link is different from previous job -> spawn fresh isolated job
+                job_id = str(uuid.uuid4())
+                iteration = 0
+        else:
+            job_id = str(uuid.uuid4())
+    elif not job_id:
+        job_id = str(uuid.uuid4())
 
     job_dir = JOBS / job_id
     input_dir = job_dir / "input"
     out_dir = job_dir / "output"
     input_dir.mkdir(parents=True, exist_ok=True)
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    if youtube_url:
+        try:
+            (job_dir / "yt_url.txt").write_text(youtube_url, encoding="utf-8")
+        except Exception:
+            pass
 
     input_path = None
     input_files = list(input_dir.glob("*.mp4")) + list(input_dir.glob("*.mov")) + list(input_dir.glob("*.mkv"))
@@ -3784,22 +3866,23 @@ def instant_start():
             "status": "queued",
             "progress": 0,
             "stage": "Queued",
-            "logs": [f"[{datetime.now().strftime('%H:%M:%S')}] Job queued."],
+            "logs": [f"[{datetime.now().strftime('%H:%M:%S')}] Job queued (Iteration #{iteration + 1})."],
             "outputs": [],
             "output_url": None,
             "filename": input_path.name if input_path else "",
             "duration": target_dur,
             "num_clips": num_clips,
-            "captions": captions
+            "captions": captions,
+            "iteration": iteration
         }
 
     threading.Thread(
         target=_instant_worker,
-        args=(job_id, input_path, target_dur, layout, start_mode, custom_start, youtube_url, num_clips, captions),
+        args=(job_id, input_path, target_dur, layout, start_mode, custom_start, youtube_url, num_clips, captions, iteration),
         daemon=True
     ).start()
 
-    return jsonify({"ok": True, "job_id": job_id, "status": "queued"})
+    return jsonify({"ok": True, "job_id": job_id, "status": "queued", "iteration": iteration})
 
 
 @app.get("/api/instant/status/<job_id>")

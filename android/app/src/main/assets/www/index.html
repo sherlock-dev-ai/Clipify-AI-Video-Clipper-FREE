@@ -2395,11 +2395,18 @@ function onAndroidVideoSelected(uri, filename, duration) {
 
             <!-- Action Buttons -->
             <div id="instantExportActions" class="instant-export-actions" style="display:none;">
-              <a id="btnInstantDownload" class="btn btn-primary" download href="#"
-                style="flex:1;text-align:center;text-decoration:none;">Download Short ↓</a>
-              <button type="button" id="btnInstantDownloadAll" class="btn btn-secondary" style="flex:1;display:none;">Download All Clips ↓</button>
-              <button type="button" id="btnInstantOpenEditor" class="btn btn-secondary" style="flex:1;">Open in Editor
-                ✂️</button>
+              <div class="instant-export-row">
+                <button type="button" id="btnInstantGenerateAnother" class="btn btn-primary instant-another-btn"
+                  style="flex:1.4;display:flex;align-items:center;justify-content:center;gap:7px;">
+                  <span>⚡ Generate Another Clip</span>
+                </button>
+                <a id="btnInstantDownload" class="btn btn-secondary" download href="#"
+                  style="flex:1;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;">Download Short ↓</a>
+              </div>
+              <div class="instant-export-row">
+                <button type="button" id="btnInstantDownloadAll" class="btn btn-secondary" style="flex:1;display:none;">Download All Clips ↓</button>
+                <button type="button" id="btnInstantOpenEditor" class="btn btn-secondary" style="flex:1;">Open in Editor ✂️</button>
+              </div>
             </div>
           </div>
 

@@ -5633,8 +5633,36 @@ div[id*="monica-action"] {
 
 .instant-export-actions {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   margin-top: 14px;
+}
+
+.instant-export-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.instant-another-btn {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border: 1px solid #ffffff !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 16px rgba(255, 255, 255, 0.2);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+
+.instant-another-btn:hover {
+  background: #e4e4e7 !important;
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.35);
+}
+
+.instant-another-btn:active {
+  transform: translateY(0);
 }
 
 /* Console Wrapper */

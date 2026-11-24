@@ -4566,6 +4566,7 @@ function initInstantClippingSection() {
   const emptyPreview = $('#instantEmptyPreview');
   const multiClipBar = $('#instantMultiClipBar');
   const exportActions = $('#instantExportActions');
+  const generateAnotherBtn = $('#btnInstantGenerateAnother');
   const downloadBtn = $('#btnInstantDownload');
   const downloadAllBtn = $('#btnInstantDownloadAll');
   const openEditorBtn = $('#btnInstantOpenEditor');
@@ -4578,6 +4579,8 @@ function initInstantClippingSection() {
     sourceFileName: '',
     sourceDuration: 0,
     youtubeUrl: '',
+    loadedYtUrl: '',
+    clipIteration: 0,
     duration: 30,
     layout: 'center_crop',
     captions: 'yes',
@@ -4696,11 +4699,13 @@ function initInstantClippingSection() {
       if (!res.ok || !data.ok) throw new Error(data.error || 'Upload failed');
 
       instantState.jobId = data.job_id;
+      instantState.clipIteration = 0;
+      instantState.loadedYtUrl = '';
+      instantState.youtubeUrl = '';
       instantState.sourceDuration = data.duration || 0;
       if (selectedDur) selectedDur.textContent = `${(data.duration || 0).toFixed(1)}s`;
       addLog(`[Instant] Video ready: ${data.filename} (${(data.duration || 0).toFixed(1)}s)`, 'success');
       if (ytInput) ytInput.value = '';
-      instantState.youtubeUrl = '';
     } catch (err) {
       addLog(`[Instant] Upload error: ${err.message}`, 'warn');
       alert(`Upload failed: ${err.message}`);
@@ -4714,13 +4719,32 @@ function initInstantClippingSection() {
       instantState.jobId = null;
       instantState.sourceFileName = '';
       instantState.sourceDuration = 0;
+      instantState.clipIteration = 0;
       if (fileInput) fileInput.value = '';
       if (selectedBadge) selectedBadge.style.display = 'none';
       addLog('[Instant] Source video cleared.');
     });
   }
 
-  // --- YouTube Fetch ---
+  // --- YouTube Input & Fetch Listeners ---
+  if (ytInput) {
+    const handleYtInputChange = () => {
+      const currentUrl = ytInput.value.trim();
+      if (currentUrl && currentUrl !== instantState.loadedYtUrl) {
+        // Different video link entered: reset old job so new video is fetched fresh
+        instantState.jobId = null;
+        instantState.sourceFile = null;
+        instantState.clipIteration = 0;
+        instantState.loadedYtUrl = currentUrl;
+        instantState.youtubeUrl = currentUrl;
+        if (selectedBadge) selectedBadge.style.display = 'none';
+      }
+    };
+    ytInput.addEventListener('input', handleYtInputChange);
+    ytInput.addEventListener('change', handleYtInputChange);
+    ytInput.addEventListener('paste', () => setTimeout(handleYtInputChange, 50));
+  }
+
   if (ytFetchBtn && ytInput) {
     ytFetchBtn.addEventListener('click', () => {
       const url = ytInput.value.trim();
@@ -4732,7 +4756,13 @@ function initInstantClippingSection() {
         alert('Please enter a valid YouTube video link.');
         return;
       }
+      // If URL changed from before, reset job and iteration
+      if (url !== instantState.loadedYtUrl) {
+        instantState.jobId = null;
+        instantState.clipIteration = 0;
+      }
       instantState.youtubeUrl = url;
+      instantState.loadedYtUrl = url;
       instantState.sourceFile = null;
       if (selectedBadge) selectedBadge.style.display = 'none';
       addLog(`[Instant] YouTube stream link loaded: ${url}`, 'step');
@@ -4754,185 +4784,244 @@ function initInstantClippingSection() {
     });
   }
 
-  // --- Start Instant Clip Execution ---
-  if (startClipBtn) {
-    startClipBtn.addEventListener('click', async () => {
-      if (instantState.running) return;
+  // --- Core Instant Clip Runner ---
+  async function runInstantClip(isAnother = false) {
+    if (instantState.running) return;
 
-      const ytUrl = ytInput ? ytInput.value.trim() : '';
-      if (!instantState.jobId && !ytUrl && !instantState.sourceFile) {
-        // Fallback: check if active project video exists
-        if (state.jobId) {
-          instantState.jobId = state.jobId;
-          addLog(`[Instant] Reusing active project video: ${state.jobId}`);
-        } else {
-          alert('Please drop a source video or enter a YouTube link before generating.');
-          return;
-        }
-      }
+    const currentYt = ytInput ? ytInput.value.trim() : '';
 
-      instantState.running = true;
-      startClipBtn.disabled = true;
-      startClipBtn.innerHTML = '<span>⚡ Rendering Instant Short (0%)...</span>';
-      if (statusPill) {
-        statusPill.className = 'instant-status-pill status-running';
-        statusPill.textContent = 'Processing...';
+    if (!isAnother) {
+      // If user typed/pasted a new YouTube link, reset old job
+      if (currentYt && currentYt !== instantState.loadedYtUrl) {
+        instantState.jobId = null;
+        instantState.sourceFile = null;
+        instantState.clipIteration = 0;
+        instantState.loadedYtUrl = currentYt;
+        instantState.youtubeUrl = currentYt;
       }
+    }
+
+    if (!instantState.jobId && !currentYt && !instantState.sourceFile) {
+      if (state.jobId) {
+        instantState.jobId = state.jobId;
+        addLog(`[Instant] Reusing active project video: ${state.jobId}`);
+      } else {
+        alert('Please drop a source video or enter a YouTube link before generating.');
+        return;
+      }
+    }
+
+    instantState.running = true;
+    startClipBtn.disabled = true;
+    if (generateAnotherBtn) {
+      generateAnotherBtn.disabled = true;
+      generateAnotherBtn.innerHTML = '<span>⚡ Rendering Next Hook...</span>';
+    }
+
+    const iterDisplay = instantState.clipIteration > 0 ? ` (Clip #${instantState.clipIteration + 1})` : '';
+    startClipBtn.innerHTML = `<span>⚡ Rendering Instant Short${iterDisplay}...</span>`;
+    if (statusPill) {
+      statusPill.className = 'instant-status-pill status-running';
+      statusPill.textContent = isAnother ? `Rendering Clip #${instantState.clipIteration + 1}...` : 'Processing...';
+    }
+
+    if (isAnother) {
+      addLog(`[Instant] ⚡ Finding and cutting a completely different hook (Iteration #${instantState.clipIteration + 1})...`, 'step');
+    } else {
       addLog('[Instant] Launching isolated high-speed render...', 'step');
+    }
 
-      try {
-        const payload = {
-          job_id: instantState.jobId,
-          youtube_url: ytUrl || instantState.youtubeUrl,
-          duration: instantState.duration,
-          layout: instantState.layout,
-          captions: instantState.captions,
-          num_clips: instantState.numClips,
-          start_mode: instantState.startMode,
-          custom_start: customStartSec ? parseFloat(customStartSec.value) || 0 : 0
-        };
+    try {
+      const payload = {
+        job_id: instantState.jobId,
+        youtube_url: currentYt || instantState.youtubeUrl,
+        duration: instantState.duration,
+        layout: instantState.layout,
+        captions: instantState.captions,
+        num_clips: instantState.numClips,
+        start_mode: isAnother ? 'auto' : instantState.startMode,
+        custom_start: customStartSec ? parseFloat(customStartSec.value) || 0 : 0,
+        iteration: instantState.clipIteration
+      };
 
-        const res = await fetch('/api/instant/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to start instant pipeline');
+      const res = await fetch('/api/instant/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to start instant pipeline');
 
-        const activeJobId = data.job_id;
-        instantState.jobId = activeJobId;
-        addLog(`[Instant] Worker thread active for Job: ${activeJobId}`);
+      const activeJobId = data.job_id;
+      instantState.jobId = activeJobId;
+      addLog(`[Instant] Engine worker running for Job: ${activeJobId}`);
 
-        // Poll instant status
-        let seenLogs = 0;
-        const pollInterval = setInterval(async () => {
-          try {
-            const pollRes = await fetch(`/api/instant/status/${activeJobId}`, { cache: 'no-store' });
-            if (!pollRes.ok) return;
-            const statusData = await pollRes.json();
-            if (!statusData.ok) return;
+      // Poll instant status
+      let seenLogs = 0;
+      const pollInterval = setInterval(async () => {
+        try {
+          const pollRes = await fetch(`/api/instant/status/${activeJobId}`, { cache: 'no-store' });
+          if (!pollRes.ok) return;
+          const statusData = await pollRes.json();
+          if (!statusData.ok) return;
 
-            // Stream new logs
-            if (Array.isArray(statusData.logs) && statusData.logs.length > seenLogs) {
-              const newLines = statusData.logs.slice(seenLogs);
-              newLines.forEach(l => {
-                let type = 'info';
-                if (l.includes('ERROR:')) type = 'warn';
-                else if (l.includes('✔') || l.includes('🎉')) type = 'success';
-                else if (l.includes('⚡') || l.includes('Applying')) type = 'step';
-                addLog(l, type);
-              });
-              seenLogs = statusData.logs.length;
+          // Stream new logs
+          if (Array.isArray(statusData.logs) && statusData.logs.length > seenLogs) {
+            const newLines = statusData.logs.slice(seenLogs);
+            newLines.forEach(l => {
+              let type = 'info';
+              if (l.includes('ERROR:')) type = 'warn';
+              else if (l.includes('✔') || l.includes('🎉')) type = 'success';
+              else if (l.includes('⚡') || l.includes('Applying')) type = 'step';
+              addLog(l, type);
+            });
+            seenLogs = statusData.logs.length;
+          }
+
+          // Update button label
+          if (statusData.progress) {
+            startClipBtn.innerHTML = `<span>⚡ Rendering Instant Shorts (${statusData.progress}%)...</span>`;
+          }
+
+          if (statusData.status === 'done') {
+            clearInterval(pollInterval);
+            instantState.running = false;
+            startClipBtn.disabled = false;
+            startClipBtn.innerHTML = '<span>⚡ Generate Instant Shorts (Fast Mode)</span>';
+            if (generateAnotherBtn) {
+              generateAnotherBtn.disabled = false;
+              generateAnotherBtn.innerHTML = '<span>⚡ Generate Another Clip</span>';
+            }
+            if (statusPill) {
+              statusPill.className = 'instant-status-pill status-done';
+              statusPill.textContent = 'Finished ✔';
             }
 
-            // Update button label
-            if (statusData.progress) {
-              startClipBtn.innerHTML = `<span>⚡ Rendering Instant Shorts (${statusData.progress}%)...</span>`;
-            }
+            // Multi-clip and display setup
+            const outputs = Array.isArray(statusData.outputs) && statusData.outputs.length > 0
+              ? statusData.outputs
+              : [statusData.filename || 'instant_short.mp4'];
+            instantState.outputs = outputs;
+            instantState.activeClipIndex = 0;
 
-            if (statusData.status === 'done') {
-              clearInterval(pollInterval);
-              instantState.running = false;
-              startClipBtn.disabled = false;
-              startClipBtn.innerHTML = '<span>⚡ Generate More Instant Shorts</span>';
-              if (statusPill) {
-                statusPill.className = 'instant-status-pill status-done';
-                statusPill.textContent = 'Finished ✔';
+            function selectClip(idx) {
+              instantState.activeClipIndex = idx;
+              const filename = outputs[idx];
+              const clipUrl = `/media/${activeJobId}/${filename}`;
+              instantState.outputUrl = clipUrl;
+              instantState.outputFile = filename;
+
+              if (videoPlayer) {
+                videoPlayer.src = clipUrl;
+                videoPlayer.style.display = 'block';
+                videoPlayer.load();
+                videoPlayer.play().catch(() => {});
               }
+              if (emptyPreview) emptyPreview.style.display = 'none';
 
-              // Multi-clip and display setup
-              const outputs = Array.isArray(statusData.outputs) && statusData.outputs.length > 0 
-                ? statusData.outputs 
-                : [statusData.filename || 'instant_short.mp4'];
-              instantState.outputs = outputs;
-              instantState.activeClipIndex = 0;
-
-              function selectClip(idx) {
-                instantState.activeClipIndex = idx;
-                const filename = outputs[idx];
-                const clipUrl = `/media/${activeJobId}/${filename}`;
-                instantState.outputUrl = clipUrl;
-                instantState.outputFile = filename;
-
-                if (videoPlayer) {
-                  videoPlayer.src = clipUrl;
-                  videoPlayer.style.display = 'block';
-                  videoPlayer.load();
-                  videoPlayer.play().catch(() => {});
-                }
-                if (emptyPreview) emptyPreview.style.display = 'none';
-
-                if (downloadBtn) {
-                  downloadBtn.href = `${clipUrl}?download=1`;
-                  downloadBtn.download = filename;
-                  downloadBtn.textContent = outputs.length > 1 ? `Download Clip ${idx + 1} ↓` : `Download Short ↓`;
-                }
-
-                if (multiClipBar) {
-                  multiClipBar.querySelectorAll('.instant-clip-tab').forEach((tab, tIdx) => {
-                    tab.classList.toggle('active', tIdx === idx);
-                  });
-                }
+              if (downloadBtn) {
+                downloadBtn.href = `${clipUrl}?download=1`;
+                downloadBtn.download = filename;
+                downloadBtn.textContent = outputs.length > 1 ? `Download Clip ${idx + 1} ↓` : `Download Short ↓`;
               }
 
               if (multiClipBar) {
-                if (outputs.length > 1) {
-                  multiClipBar.style.display = 'flex';
-                  multiClipBar.innerHTML = '';
-                  outputs.forEach((out, i) => {
-                    const tab = document.createElement('button');
-                    tab.type = 'button';
-                    tab.className = `instant-clip-tab ${i === 0 ? 'active' : ''}`;
-                    tab.textContent = `Clip ${i + 1}`;
-                    tab.addEventListener('click', () => selectClip(i));
-                    multiClipBar.appendChild(tab);
-                  });
-
-                  if (downloadAllBtn) {
-                    downloadAllBtn.style.display = 'block';
-                    downloadAllBtn.onclick = () => {
-                      outputs.forEach((out, i) => {
-                        setTimeout(() => {
-                          const a = document.createElement('a');
-                          a.href = `/media/${activeJobId}/${out}?download=1`;
-                          a.download = out;
-                          document.body.appendChild(a);
-                          a.click();
-                          a.remove();
-                        }, i * 350);
-                      });
-                    };
-                  }
-                } else {
-                  multiClipBar.style.display = 'none';
-                  if (downloadAllBtn) downloadAllBtn.style.display = 'none';
-                }
+                multiClipBar.querySelectorAll('.instant-clip-tab').forEach((tab, tIdx) => {
+                  tab.classList.toggle('active', tIdx === idx);
+                });
               }
-
-              if (exportActions) exportActions.style.display = 'flex';
-              selectClip(0);
-
-              addLog(`[Instant] ✔ Output ready (${outputs.length} clip${outputs.length > 1 ? 's' : ''})!`, 'success');
-            } else if (statusData.status === 'error') {
-              clearInterval(pollInterval);
-              instantState.running = false;
-              startClipBtn.disabled = false;
-              startClipBtn.innerHTML = '<span>⚡ Retry Instant Short</span>';
-              if (statusPill) {
-                statusPill.className = 'instant-status-pill status-ready';
-                statusPill.textContent = 'Failed';
-              }
-              alert(`Instant render failed: ${statusData.detail || statusData.error || 'Unknown error'}`);
             }
-          } catch (err) {
-            console.error('[Instant] Status poll error:', err);
-          }
-        }, 1000);
 
-      } catch (err) {
-        instantState.running = false;
-        startClipBtn.disabled = false;
+            if (multiClipBar) {
+              if (outputs.length > 1) {
+                multiClipBar.style.display = 'flex';
+                multiClipBar.innerHTML = '';
+                outputs.forEach((out, i) => {
+                  const tab = document.createElement('button');
+                  tab.type = 'button';
+                  tab.className = `instant-clip-tab ${i === 0 ? 'active' : ''}`;
+                  tab.textContent = `Clip ${i + 1}`;
+                  tab.addEventListener('click', () => selectClip(i));
+                  multiClipBar.appendChild(tab);
+                });
+
+                if (downloadAllBtn) {
+                  downloadAllBtn.style.display = 'block';
+                  downloadAllBtn.onclick = () => {
+                    outputs.forEach((out, i) => {
+                      setTimeout(() => {
+                        const a = document.createElement('a');
+                        a.href = `/media/${activeJobId}/${out}?download=1`;
+                        a.download = out;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                      }, i * 350);
+                    });
+                  };
+                }
+              } else {
+                multiClipBar.style.display = 'none';
+                if (downloadAllBtn) downloadAllBtn.style.display = 'none';
+              }
+            }
+
+            if (exportActions) exportActions.style.display = 'flex';
+            selectClip(0);
+
+            const clipLabel = isAnother ? `Different Clip #${instantState.clipIteration + 1}` : 'Instant Short';
+            addLog(`[Instant] ✔ ${clipLabel} ready! (${outputs.length} clip${outputs.length > 1 ? 's' : ''})`, 'success');
+          } else if (statusData.status === 'error') {
+            clearInterval(pollInterval);
+            instantState.running = false;
+            startClipBtn.disabled = false;
+            startClipBtn.innerHTML = '<span>⚡ Retry Instant Short</span>';
+            if (generateAnotherBtn) {
+              generateAnotherBtn.disabled = false;
+              generateAnotherBtn.innerHTML = '<span>⚡ Generate Another Clip</span>';
+            }
+            if (statusPill) {
+              statusPill.className = 'instant-status-pill status-ready';
+              statusPill.textContent = 'Failed';
+            }
+            alert(`Instant render failed: ${statusData.detail || statusData.error || 'Unknown error'}`);
+          }
+        } catch (err) {
+          console.error('[Instant] Status poll error:', err);
+        }
+      }, 1000);
+
+    } catch (err) {
+      instantState.running = false;
+      startClipBtn.disabled = false;
+      startClipBtn.innerHTML = '<span>⚡ Generate Instant Shorts (Fast Mode)</span>';
+      if (generateAnotherBtn) {
+        generateAnotherBtn.disabled = false;
+        generateAnotherBtn.innerHTML = '<span>⚡ Generate Another Clip</span>';
+      }
+      if (statusPill) {
+        statusPill.className = 'instant-status-pill status-ready';
+        statusPill.textContent = 'Ready';
+      }
+      addLog(`[Instant] Launch error: ${err.message}`, 'warn');
+      alert(`Could not start instant clipping: ${err.message}`);
+    }
+  }
+
+  // --- Wire Buttons ---
+  if (startClipBtn) {
+    startClipBtn.addEventListener('click', () => {
+      runInstantClip(false);
+    });
+  }
+
+  if (generateAnotherBtn) {
+    generateAnotherBtn.addEventListener('click', () => {
+      if (instantState.running) return;
+      instantState.clipIteration += 1;
+      runInstantClip(true);
+    });
+  }
         startClipBtn.innerHTML = '<span>⚡ Make Instant Short Now</span>';
         if (statusPill) {
           statusPill.className = 'instant-status-pill status-ready';

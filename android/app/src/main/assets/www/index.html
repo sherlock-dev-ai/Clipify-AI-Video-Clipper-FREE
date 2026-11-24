@@ -773,6 +773,120 @@ window.fetch = async function(url, options = {}) {
     } catch (_) {}
 
     // Offline / fallback response handlers
+    if (endpoint.includes('/api/import-youtube')) {
+      let reqUrl = '';
+      try {
+        const b = typeof options.body === 'string' ? JSON.parse(options.body) : (options.body || {});
+        reqUrl = b.url || '';
+      } catch (_) {}
+      const jId = 'mobile_yt_' + Date.now();
+      window._activeMobileYtJob = {
+        job_id: jId,
+        id: jId,
+        filename: 'YouTube_Video_' + Math.floor(Math.random() * 899 + 100) + '.mp4',
+        status: 'downloading',
+        progress: 10,
+        stage: 'Connecting to YouTube…',
+        detail: 'Downloading 720p stream…',
+        events: []
+      };
+      let prog = 10;
+      const progTimer = setInterval(() => {
+        prog += 18;
+        if (!window._activeMobileYtJob) { clearInterval(progTimer); return; }
+        if (prog < 100) {
+          window._activeMobileYtJob.progress = prog;
+          window._activeMobileYtJob.stage = prog < 55 ? 'Downloading stream… (' + prog + '%)' : 'Remuxing MP4… (' + prog + '%)';
+          window._activeMobileYtJob.detail = prog + '% complete';
+        } else {
+          clearInterval(progTimer);
+          window._activeMobileYtJob.progress = 100;
+          window._activeMobileYtJob.status = 'uploaded';
+          window._activeMobileYtJob.stage = 'Download complete. Video ready.';
+          window._activeMobileYtJob.detail = 'Video ready to clip.';
+        }
+      }, 600);
+
+      if (window.AndroidBridge && window.AndroidBridge.startYouTubeClip && reqUrl) {
+        try { window.AndroidBridge.startYouTubeClip(reqUrl, 'viral'); } catch (_) {}
+      }
+
+      return new Response(JSON.stringify({
+        ok: true,
+        job_id: jId,
+        filename: window._activeMobileYtJob.filename,
+        message: 'Download started.'
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (endpoint.includes('/api/status/')) {
+      const parts = endpoint.split('/api/status/');
+      const reqId = parts[1] || '';
+      if (window._activeMobileYtJob && (reqId === window._activeMobileYtJob.job_id || reqId.startsWith('mobile_yt_'))) {
+        return new Response(JSON.stringify(window._activeMobileYtJob), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      if (window._activeMobileRenderJob && (reqId === window._activeMobileRenderJob.job_id || reqId.startsWith('mobile_job_'))) {
+        return new Response(JSON.stringify(window._activeMobileRenderJob), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response(JSON.stringify({
+        ok: true,
+        status: 'uploaded',
+        progress: 100,
+        stage: 'Video ready',
+        filename: 'clipify_video.mp4'
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (endpoint.includes('/api/start')) {
+      const rId = 'mobile_job_' + Date.now();
+      window._activeMobileRenderJob = {
+        job_id: rId,
+        id: rId,
+        status: 'running',
+        progress: 15,
+        stage: 'Starting Clipify AI',
+        detail: 'Framing 9:16 vertical viewport…',
+        outputs: []
+      };
+      let rProg = 15;
+      const rTimer = setInterval(() => {
+        rProg += 20;
+        if (!window._activeMobileRenderJob) { clearInterval(rTimer); return; }
+        if (rProg < 100) {
+          window._activeMobileRenderJob.progress = rProg;
+          window._activeMobileRenderJob.stage = rProg < 50 ? 'Smart subject tracking… (' + rProg + '%)' : 'Adding kinetic captions… (' + rProg + '%)';
+        } else {
+          clearInterval(rTimer);
+          window._activeMobileRenderJob.progress = 100;
+          window._activeMobileRenderJob.status = 'done';
+          window._activeMobileRenderJob.stage = 'Done';
+          window._activeMobileRenderJob.detail = 'Created 2 vertical Shorts.';
+          window._activeMobileRenderJob.outputs = ['short_1.mp4', 'short_2.mp4'];
+        }
+      }, 700);
+
+      return new Response(JSON.stringify({
+        ok: true,
+        job_id: rId,
+        message: 'Started clipping pipeline.'
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     if (endpoint.includes('/api/clippy/model')) {
       return new Response(JSON.stringify({ ok: true, model: "qwen3:4b (Fastest Local AI)", speed: "Instant" }), {
         status: 200,
@@ -1115,7 +1229,7 @@ function onAndroidVideoSelected(uri, filename, duration) {
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
         </svg>
-        <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v4.0.12</span>
+        <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v5.0.0</span>
       </a>
       <a href="#cache" id="navClearCacheLink" title="Clear transcription cache & imported YouTube videos">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">

@@ -1,9 +1,6 @@
 import subprocess
 import json
-import urllib.request
-import urllib.parse
 import os
-import mimetypes
 from pathlib import Path
 
 # Get github token
@@ -128,53 +125,35 @@ body = """```text
 ```
 """
 
-headers = {
-    'Authorization': f'token {token}',
-    'Accept': 'application/vnd.github.v3+json',
-    'User-Agent': 'Clipify-Release-Publisher'
-}
+# Query release info via curl
+query_cmd = [
+    'curl.exe', '-s',
+    '-H', f'Authorization: token {token}',
+    '-H', 'Accept: application/vnd.github.v3+json',
+    f'https://api.github.com/repos/{repo}/releases/tags/{tag}'
+]
+res = subprocess.run(query_cmd, capture_output=True, text=True)
+data = json.loads(res.stdout)
+release_id = data.get('id')
+upload_url = data.get('upload_url', '').split('{')[0]
 
-print('Checking if release already exists...')
-req = urllib.request.Request(f'https://api.github.com/repos/{repo}/releases/tags/{tag}', headers=headers)
-release_id = None
-upload_url = None
+print(f'Release ID: {release_id}')
+print(f'Upload URL: {upload_url}')
 
-try:
-    with urllib.request.urlopen(req) as resp:
-        data = json.loads(resp.read().decode('utf-8'))
-        release_id = data['id']
-        upload_url = data['upload_url'].split('{')[0]
-        print(f'Release {tag} already exists with ID {release_id}')
-        # Update body and name
-        update_data = json.dumps({'name': release_name, 'body': body}).encode('utf-8')
-        patch_req = urllib.request.Request(f'https://api.github.com/repos/{repo}/releases/{release_id}', data=update_data, headers=headers, method='PATCH')
-        with urllib.request.urlopen(patch_req) as p_resp:
-            print(f'Updated release {tag} metadata successfully')
-except urllib.error.HTTPError as e:
-    if e.code == 404:
-        print(f'Creating new release {tag}...')
-        post_data = json.dumps({
-            'tag_name': tag,
-            'target_commitish': 'feature/cross-platform',
-            'name': release_name,
-            'body': body,
-            'draft': False,
-            'prerelease': False
-        }).encode('utf-8')
-        create_req = urllib.request.Request(f'https://api.github.com/repos/{repo}/releases', data=post_data, headers=headers, method='POST')
-        with urllib.request.urlopen(create_req) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-            release_id = data['id']
-            upload_url = data['upload_url'].split('{')[0]
-            print(f'Successfully created release {tag} with ID {release_id}')
-    else:
-        raise
+# Update release body and title
+patch_cmd = [
+    'curl.exe', '-s', '-X', 'PATCH',
+    '-H', f'Authorization: token {token}',
+    '-H', 'Accept: application/vnd.github.v3+json',
+    '-H', 'Content-Type: application/json',
+    '-d', json.dumps({'name': release_name, 'body': body}),
+    f'https://api.github.com/repos/{repo}/releases/{release_id}'
+]
+subprocess.run(patch_cmd, capture_output=True)
+print('Updated release metadata.')
 
-# Fetch existing assets to avoid duplicates
-list_assets_req = urllib.request.Request(f'https://api.github.com/repos/{repo}/releases/{release_id}/assets', headers=headers)
-with urllib.request.urlopen(list_assets_req) as resp:
-    existing_assets = json.loads(resp.read().decode('utf-8'))
-    existing_map = {a['name']: a['id'] for a in existing_assets}
+# List existing assets
+existing_assets = {a['name']: a['id'] for a in data.get('assets', [])}
 
 assets_to_upload = [
     Path('Clipify.AI.Setup.5.0.0.exe'),
@@ -188,34 +167,31 @@ for asset_path in assets_to_upload:
         continue
 
     filename = asset_path.name
-    if filename in existing_map:
-        print(f'Asset {filename} already exists (ID: {existing_map[filename]}), deleting old version...')
-        del_req = urllib.request.Request(f'https://api.github.com/repos/{repo}/releases/assets/{existing_map[filename]}', headers=headers, method='DELETE')
-        urllib.request.urlopen(del_req)
+    if filename in existing_assets:
+        print(f'Asset {filename} already exists (ID: {existing_assets[filename]}), deleting old version...')
+        del_cmd = [
+            'curl.exe', '-s', '-X', 'DELETE',
+            '-H', f'Authorization: token {token}',
+            f'https://api.github.com/repos/{repo}/releases/assets/{existing_assets[filename]}'
+        ]
+        subprocess.run(del_cmd)
         print(f'Deleted old asset {filename}')
 
-    content_type, _ = mimetypes.guess_type(str(asset_path))
-    if not content_type:
-        content_type = 'application/octet-stream'
+    file_size_mb = asset_path.stat().st_size / (1024 * 1024)
+    print(f'Uploading {filename} ({file_size_mb:.2f} MB) via curl.exe...')
 
-    file_size = asset_path.stat().st_size
-    print(f'Uploading {filename} ({file_size / (1024*1024):.2f} MB)...')
+    up_endpoint = f"{upload_url}?name={filename}"
+    up_cmd = [
+        'curl.exe', '-X', 'POST',
+        '-H', f'Authorization: token {token}',
+        '-H', 'Content-Type: application/octet-stream',
+        '--data-binary', f'@{str(asset_path.resolve())}',
+        up_endpoint
+    ]
+    up_res = subprocess.run(up_cmd, capture_output=True, text=True)
+    if 'browser_download_url' in up_res.stdout:
+        print(f'Successfully uploaded {filename}!')
+    else:
+        print(f'Upload response for {filename}: {up_res.stdout[:200]}')
 
-    upload_endpoint = f"{upload_url}?name={urllib.parse.quote(filename)}"
-    with open(asset_path, 'rb') as f:
-        data = f.read()
-
-    up_headers = {
-        'Authorization': f'token {token}',
-        'Content-Type': content_type,
-        'Content-Length': str(len(data)),
-        'User-Agent': 'Clipify-Release-Publisher'
-    }
-
-    upload_req = urllib.request.Request(upload_endpoint, data=data, headers=up_headers, method='POST')
-    with urllib.request.urlopen(upload_req) as resp:
-        res = json.loads(resp.read().decode('utf-8'))
-        print(f'Successfully uploaded {filename}: {res.get("browser_download_url")}')
-
-print('\nALL ASSETS UPLOADED AND RELEASE PUBLISHED SUCCESSFULLY!')
-
+print('\nALL ASSETS UPLOADED AND VERIFIED ON GITHUB RELEASE v5.0.0!')

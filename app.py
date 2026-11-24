@@ -386,24 +386,20 @@ def _pipeline_failure_detail(return_code: int, outputs: list[str], recent_lines:
     """Prefer the worker's concrete failure over the old generic no-output text."""
     if return_code == 0 and outputs:
         return f"Created {len(outputs)} Short(s)."
-    
-    error_keywords = ("[fatal]", "[error]", "exception:", "traceback", "failed:", "error:", "[skip]", "too short", "no clips")
-    failure_line = ""
-    for line in reversed(recent_lines):
-        line_lower = line.lower()
-        if any(k in line_lower for k in error_keywords):
-            failure_line = line
-            break
-
+    failure_line = next(
+        (line for line in reversed(recent_lines)
+         if any(k in line.lower() for k in ("[fatal]", "[error]", "exception:", "traceback", "failed:", "error:"))),
+        "",
+    )
     if failure_line:
         clean = failure_line.strip()
-        for prefix in ("[FATAL]", "[ERROR]", "[fatal]", "[error]", "[SKIP]", "[skip]"):
+        for prefix in ("[FATAL]", "[ERROR]", "[fatal]", "[error]"):
             if clean.startswith(prefix):
                 clean = clean[len(prefix):].strip()
         return clean[:1000]
     if return_code != 0:
-        return f"Pipeline worker exited with code {return_code} without reporting a specific failure. Check the processing log for details."
-    return "Pipeline worker exited with code 0 but created no final captioned Shorts (the source video may be shorter than the requested minimum duration or contains no speech). Click 'Processing Log' below for details."
+        return f"Pipeline worker exited with code {return_code} without reporting a specific failure."
+    return "Pipeline worker exited with code 0 but created no final captioned Shorts."
 
 
 # Third-party libraries print banners and advisories on stdout. Those lines
@@ -1055,8 +1051,8 @@ def _ensure_video_has_audio(target: Path) -> Path:
         ffmpeg_bin = _ffmpeg_path()
         ffprobe_bin = str(Path(ffmpeg_bin).with_name("ffprobe.exe" if sys.platform.startswith("win") else "ffprobe"))
         probe = _run_hidden(
-            [ffprobe_bin, "-v", "error", "-read_intervals", "%+5", "-select_streams", "a:0", "-show_entries", "stream=codec_type", "-of", "csv=p=0", str(target)],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15, check=False
+            [ffprobe_bin, "-v", "error", "-select_streams", "a", "-show_entries", "stream=codec_type", "-of", "csv=p=0", str(target)],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30, check=False
         )
         if probe.returncode == 0 and "audio" in probe.stdout.lower():
             return target
@@ -1086,30 +1082,16 @@ def _media_duration_seconds(path_value: str) -> float:
     if not p.name or not p.exists():
         return 0.0
     try:
-        ffmpeg_bin = _ffmpeg_path()
-        ffprobe_bin = str(Path(ffmpeg_bin).with_name("ffprobe.exe" if sys.platform.startswith("win") else "ffprobe"))
-        probe = _run_hidden(
-            [ffprobe_bin, "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(p)],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15, check=False
-        )
-        if probe.returncode == 0 and probe.stdout.strip():
-            val = float(probe.stdout.strip())
-            if val > 0:
-                return val
-    except Exception:
-        pass
-
-    try:
         proc = _run_hidden(
             [_ffmpeg_path(), "-i", str(p)],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
         )
-        m = re.search(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)", proc.stderr or "")
-        if m:
-            return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
     except (OSError, subprocess.SubprocessError, RuntimeError):
-        pass
-    return 0.0
+        return 0.0
+    m = re.search(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)", proc.stderr or "")
+    if not m:
+        return 0.0
+    return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
 
 
 def _hex6(value: str, default: str = "#FFFFFF") -> str:
@@ -1717,14 +1699,6 @@ job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, ma
         heartbeat_stop.set()
 
 
-@app.after_request
-def add_cache_control_headers(response):
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
-    return response
-
-
 @app.get("/")
 def index():
     return render_template("index.html", modes=MODES)
@@ -2272,7 +2246,7 @@ def narrate_thumbnail(clip_id: str):
 
 def _clean_ai_script(raw: str) -> str:
     """Clean LLM output so it produces clean spoken narration without markdown, labels, or stage directions."""
-    text = str(raw or "")
+    text = raw or ""
     # Remove reasoning / think blocks
     text = re.sub(r"<think\b.*?</think>", "", text, flags=re.IGNORECASE | re.DOTALL)
     text = re.sub(r"<think\b.*", "", text, flags=re.IGNORECASE | re.DOTALL)
@@ -2394,7 +2368,7 @@ def _prompt_fallback(prompt: str, style: str, duration: int = 30) -> str:
 
 
 def _fit_script_to_duration(script: str, duration: int) -> str:
-    target_words = max(35, int(round(duration * 3.2)))
+    target_words = max(35, round(duration * 3.2))
     words = script.split()
     if len(words) >= target_words:
         return script.strip()
@@ -2420,7 +2394,7 @@ def _fit_script_to_duration(script: str, duration: int) -> str:
 
 
 def _format_script_sentences(script: str) -> str:
-    clean = re.sub(r"\s+", " ", str(script or "")).strip()
+    clean = re.sub(r"\s+", " ", script or "").strip()
     if not clean:
         return ""
     sentences = re.findall(r".*?(?:[.!?]+(?=\s|$)|$)", clean)
@@ -2466,7 +2440,7 @@ def narrate_generate_script():
     if not prompt:
         return jsonify({"error": "Give the AI a prompt like a funny joke, dramatic hook, or story setup."}), 400
     prompt_lower = prompt.lower()
-    target_words = int(round(duration * 2.65))
+    target_words = round(duration * 2.65)
     pacing = f"Aim for roughly {target_words} words ({duration} seconds narration). Speak directly to the viewer with punchy sentences. Return ONLY the spoken narration."
     if any(word in prompt_lower for word in ("funny", "joke", "laugh", "roast", "chaos", "meme", "comedy")):
         system_prompt = (
@@ -2508,7 +2482,7 @@ def narrate_random_script():
         duration = max(30, min(60, int(data.get("target_duration", 30))))
     except (TypeError, ValueError):
         duration = 30
-    target_words = int(round(duration * 3.2))
+    target_words = round(duration * 3.2)
     fallback = _fit_script_to_duration(_random_script(), duration)
     script = _call_ollama_script_prompt(
         f"Create a fresh, original narration for a random short-form video idea that lasts about {duration} seconds. Write approximately {target_words}-{target_words + 12} words at a natural pace of about 3.2 words per second. Write only spoken prose. Do not include a title, hook label, narrator or voiceover label, stage direction, music cue, bracketed text, or Markdown. Finish with sentence punctuation.",
@@ -2707,11 +2681,10 @@ def import_youtube():
             ffmpeg_path = _ffmpeg_path()
             output_template = str(input_dir / "youtube.%(ext)s")
             command = [*yt_dlp_cmd, "--no-playlist", "--no-warnings", "--newline", "--progress",
-                       "--progress-template", "download:[clip-prog] %(progress._percent_str)s|%(progress.downloaded_bytes)s|%(progress.total_bytes|progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s",
-                       "--restrict-filenames", "--merge-output-format", "mp4",
                        "--extractor-args", "youtube:player_client=android,ios,web",
-                       "--socket-timeout", "60", "--retries", "10", "--fragment-retries", "10",
-                       "--concurrent-fragments", "4", "--buffer-size", "16M", "--http-chunk-size", "10M",
+                       "--progress-template", "download:[clip-prog] %(progress._percent_str)s|%(progress.downloaded_bytes)s|%(progress.total_bytes|progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s",
+                       "--restrict-filenames", "--merge-output-format", "mp4", "--max-filesize", "4G",
+                       "--socket-timeout", "20", "--retries", "3", "--fragment-retries", "3",
                        "-f", "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/18/bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo[height<=480]+bestaudio/best[height<=480]/best",
                        "--ffmpeg-location", str(Path(ffmpeg_path).parent)]
             node_binary = shutil.which("node") or shutil.which("node.exe")
@@ -2823,127 +2796,31 @@ def import_youtube():
                     job["events"].append({"kind": "log", "message": line})
             return_code = proc.wait()
             videos = []
-            video_only_files = []
-            audio_only_files = []
             ffprobe = Path(ffmpeg_path).with_name("ffprobe.exe")
-            
             for candidate in input_dir.iterdir():
-                if not candidate.is_file() or candidate.stat().st_size < 1024:
+                if not candidate.is_file() or not is_allowed(candidate.name):
                     continue
-                if candidate.suffix.lower() in {".part", ".ytdl"}:
-                    continue
-                cname = candidate.name.lower()
                 probe = _run_hidden(
                     [str(ffprobe), "-v", "error", "-show_entries", "stream=codec_type",
                      "-of", "csv=p=0", str(candidate)],
                     capture_output=True, text=True, encoding="utf-8", errors="replace",
                     timeout=30, check=False,
                 )
-                stdout_low = probe.stdout.lower() if probe.returncode == 0 else ""
-                has_video = "video" in stdout_low or candidate.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"}
-                has_audio = "audio" in stdout_low or candidate.suffix.lower() in {".m4a", ".aac", ".opus", ".mp3", ".wav"}
-                
-                if "video" in stdout_low and "audio" in stdout_low:
+                if probe.returncode == 0 and "video" in probe.stdout.lower() and "audio" in probe.stdout.lower():
                     videos.append(candidate)
-                elif "video" in stdout_low:
-                    video_only_files.append(candidate)
-                elif "audio" in stdout_low or has_audio:
-                    audio_only_files.append(candidate)
-
-            # If yt-dlp downloaded separate video and audio streams, merge them with FFmpeg now
-            if not videos and video_only_files and audio_only_files:
-                v_src = max(video_only_files, key=lambda p: p.stat().st_size)
-                a_src = max(audio_only_files, key=lambda p: p.stat().st_size)
-                merged_dest = input_dir / f"youtube_merged_{job_id}.mp4"
-                mux_cmd = [
-                    ffmpeg_path, "-y", "-i", str(v_src), "-i", str(a_src),
-                    "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
-                    "-movflags", "+faststart", str(merged_dest)
-                ]
-                mux_proc = _run_hidden(mux_cmd, timeout=180, check=False)
-                if mux_proc.returncode == 0 and merged_dest.is_file() and merged_dest.stat().st_size >= 1024:
-                    videos.append(merged_dest)
-
-            # Fallback: if only video file exists (e.g. silent stream), synthesize silent audio so pipeline succeeds
-            if not videos and video_only_files:
-                v_src = max(video_only_files, key=lambda p: p.stat().st_size)
-                v_audio = _ensure_video_has_audio(v_src)
-                if v_audio and v_audio.is_file() and v_audio.stat().st_size >= 1024:
-                    videos.append(v_audio)
-
-            # Fallback: if only audio stream was downloaded (e.g. long video or audio-only), synthesize video canvas with audio
-            if not videos and not video_only_files and audio_only_files:
-                a_src = max(audio_only_files, key=lambda p: p.stat().st_size)
-                synth_dest = input_dir / f"youtube_audio_synth_{job_id}.mp4"
-                synth_cmd = [
-                    ffmpeg_path, "-y",
-                    "-f", "lavfi", "-i", "color=c=black:s=1280x720:r=30",
-                    "-i", str(a_src),
-                    "-c:v", "libx264", "-tune", "stillimage", "-pix_fmt", "yuv420p",
-                    "-c:a", "aac", "-b:a", "192k",
-                    "-shortest", "-movflags", "+faststart", str(synth_dest)
-                ]
-                synth_proc = _run_hidden(synth_cmd, timeout=300, check=False)
-                if synth_proc.returncode == 0 and synth_dest.is_file() and synth_dest.stat().st_size >= 1024:
-                    videos.append(synth_dest)
-
-            # Check any remaining video files in input_dir
-            if not videos:
-                for cand in input_dir.iterdir():
-                    if cand.is_file() and cand.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".avi"} and cand.stat().st_size >= 1024:
-                        fixed = _ensure_video_has_audio(cand)
-                        if fixed and fixed.is_file():
-                            videos.append(fixed)
-                            break
-
-            if return_code != 0 and not videos:
-                last_error = ""
+            last_error = ""
+            if return_code != 0 or not videos:
                 with jobs_lock:
                     for event in reversed(jobs[job_id].get("events", [])):
                         message = str(event.get("message", ""))
                         if message.startswith("ERROR:"):
                             last_error = message
                             break
-
-                # If YouTube gave a bot verification challenge, automatically retry with iOS/Android mobile stream client
-                if "bot" in last_error.lower() or "sign in" in last_error.lower():
-                    emit(job_id, "log", "[YouTube] Detected bot challenge on standard client. Retrying with mobile stream client…")
-                    retry_cmd = [*yt_dlp_cmd, "--no-playlist", "--no-warnings", "--newline",
-                                 "--restrict-filenames", "--merge-output-format", "mp4",
-                                 "--extractor-args", "youtube:player_client=ios,android",
-                                 "--socket-timeout", "60", "--retries", "10",
-                                 "-f", "18/best[height<=720]/best",
-                                 "--ffmpeg-location", str(Path(ffmpeg_path).parent),
-                                 "-o", output_template, source_url]
-                    r_proc = subprocess.Popen(retry_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                              text=True, encoding="utf-8", errors="replace", bufsize=1,
-                                              creationflags=_hidden_creationflags())
-                    if r_proc.stdout:
-                        for r_raw in r_proc.stdout:
-                            r_line = r_raw.strip()
-                            if r_line:
-                                emit(job_id, "log", f"[YouTube] {r_line}")
-                    r_proc.wait()
-                    videos = [p for p in input_dir.iterdir() if p.is_file() and p.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm"} and p.stat().st_size >= 1024]
-                    if videos:
-                        return_code = 0
-
-            if return_code != 0 and not videos:
-                detail = last_error or ("yt-dlp failed to download the video." if return_code != 0 else "yt-dlp finished but no valid video was created.")
-                if "bot" in detail.lower() or "sign in" in detail.lower():
-                    detail = "YouTube requires bot verification for this specific video. Please try again or download via browser."
+                detail = last_error or ("yt-dlp failed." if return_code != 0 else "yt-dlp finished but no video containing both video and audio was created.")
                 with jobs_lock:
                     jobs[job_id].update(status="error", stage="YouTube download failed", detail=detail)
                     jobs[job_id]["events"].append({"kind":"error","message":detail})
                 return
-
-            if not videos:
-                detail = "Could not locate a downloaded video stream. Please verify the URL or try importing a local video."
-                with jobs_lock:
-                    jobs[job_id].update(status="error", stage="YouTube download failed", detail=detail)
-                    jobs[job_id]["events"].append({"kind":"error","message":detail})
-                return
-
             target = max(videos, key=lambda p: p.stat().st_mtime)
             if target.stat().st_size == 0:
                 detail = "Downloaded video file is empty (0 bytes). Your disk may be full or the download timed out."
@@ -3095,25 +2972,6 @@ def start():
     if max_duration <= min_duration:
         max_duration = min_duration + 1
 
-    def _safe_f(v: Any, default: float) -> float:
-        try:
-            if v is None or v == "" or str(v).lower() in ("nan", "null", "undefined"):
-                return default
-            return float(v)
-        except (TypeError, ValueError):
-            return default
-
-    def _safe_i(v: Any, default: int) -> int:
-        try:
-            if v is None or v == "" or str(v).lower() in ("nan", "null", "undefined"):
-                return default
-            return int(float(v))
-        except (TypeError, ValueError):
-            return default
-
-    trim_start = _safe_f(data.get("trim_start", data.get("trimStart")), 0.0)
-    trim_end = _safe_f(data.get("trim_end", data.get("trimEnd")), 0.0)
-
     # A source shorter than the requested minimum can never yield a clip, and
     # the pipeline then fails with "No final captioned Shorts were produced."
     # Shorten the requested window to fit the footage instead, and say so.
@@ -3122,48 +2980,13 @@ def start():
         return jsonify({"error": "Job not found."}), 404
     input_dir = job_dir / "input"
     if input_dir.is_dir():
-        sources = sorted(p for p in input_dir.iterdir() if p.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"} and not p.name.startswith("original_"))
+        sources = sorted(p for p in input_dir.iterdir() if p.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"})
         if sources:
             if all(s.stat().st_size < 1024 for s in sources):
                 return jsonify({
                     "error": "The input video file is incomplete or empty (< 1 KB). The download may still be running, was interrupted, or disk space was exhausted. Please wait for the download to finish or re-import the video."
                 }), 400
             source_seconds = _media_duration_seconds(str(sources[0]))
-
-            # If user selected a trimmed window in Beta or manual controls, extract it cleanly
-            if trim_end > trim_start and (trim_start > 0.0 or (source_seconds > 0 and trim_end < source_seconds - 1.0)):
-                ffmpeg_bin = _ffmpeg_path()
-                trimmed_dest = input_dir / f"trimmed_{job_id}.mp4"
-                trim_cmd = [
-                    ffmpeg_bin, "-y", "-ss", str(trim_start), "-to", str(trim_end),
-                    "-i", str(sources[0]), "-c:v", "libx264", "-preset", "veryfast",
-                    "-crf", "18", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
-                    str(trimmed_dest)
-                ]
-                trim_proc = _run_hidden(trim_cmd, timeout=300, check=False)
-                if trim_proc.returncode == 0 and trimmed_dest.is_file() and trimmed_dest.stat().st_size >= 1024:
-                    orig_target = input_dir / f"original_{sources[0].name}"
-                    sources[0].rename(orig_target)
-                    trimmed_dest.rename(sources[0])
-                    source_seconds = _media_duration_seconds(str(sources[0]))
-                    emit(job_id, "log", f"[Setup] Trimmed video footage to range {trim_start:.1f}s – {trim_end:.1f}s ({source_seconds:.1f}s)")
-            elif source_seconds and source_seconds > 2400.0:
-                # Extra-long stream safety: if stream is > 40 minutes and untrimmed, automatically focus on the first 30 minutes
-                ffmpeg_bin = _ffmpeg_path()
-                capped_dest = input_dir / f"capped_{job_id}.mp4"
-                cap_cmd = [
-                    ffmpeg_bin, "-y", "-t", "1800",
-                    "-i", str(sources[0]), "-c:v", "copy", "-c:a", "copy", "-movflags", "+faststart",
-                    str(capped_dest)
-                ]
-                cap_proc = _run_hidden(cap_cmd, timeout=120, check=False)
-                if cap_proc.returncode == 0 and capped_dest.is_file() and capped_dest.stat().st_size >= 1024:
-                    orig_target = input_dir / f"original_{sources[0].name}"
-                    sources[0].rename(orig_target)
-                    capped_dest.rename(sources[0])
-                    source_seconds = _media_duration_seconds(str(sources[0]))
-                    emit(job_id, "log", f"[Setup] Long video stream ({sources[0].stat().st_size / (1024*1024):.1f} MB) auto-focused to first 30 minutes ({source_seconds:.0f}s) for rapid high-impact candidate clipping.")
-
             if source_seconds and source_seconds < min_duration:
                 fitted_max = max(6, int(source_seconds))
                 fitted_min = max(5, min(fitted_max - 1, int(source_seconds * 0.6)))
@@ -3197,7 +3020,7 @@ def start():
                 _input_check = _job_dir_check / "input"
                 _disk_sources = sorted(
                     p for p in (_input_check.iterdir() if _input_check.is_dir() else [])
-                    if p.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".avi"} and not p.name.startswith("original_")
+                    if p.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".avi"}
                 )
                 if _disk_sources:
                     job = {
@@ -3235,35 +3058,35 @@ def start():
         "logo_enabled": bool(branding_raw.get("logo_enabled", branding_raw.get("watermark_enabled", False))),
         "logo_path": str(branding_raw.get("logo_path", branding_raw.get("watermark_path", str(ROOT / "static" / "clipify-ai-mark.png")))).strip(),
         "logo_position": str(branding_raw.get("logo_position", branding_raw.get("watermark_position", "top-right"))),
-        "logo_size": max(1, min(50, _safe_i(branding_raw.get("logo_size", branding_raw.get("watermark_size")), 8))),
-        "logo_opacity": max(0, min(100, _safe_i(branding_raw.get("logo_opacity", branding_raw.get("watermark_opacity")), 80))),
-        "logo_margin": max(0, min(500, _safe_i(branding_raw.get("logo_margin", branding_raw.get("watermark_margin")), 40))),
-        "logo_x": max(0.0, min(100.0, _safe_f(branding_raw.get("logo_x", branding_raw.get("watermark_x")), 92.0))),
-        "logo_y": max(0.0, min(100.0, _safe_f(branding_raw.get("logo_y", branding_raw.get("watermark_y")), 8.0))),
+        "logo_size": max(1, min(50, int(branding_raw.get("logo_size", branding_raw.get("watermark_size", 8))))),
+        "logo_opacity": max(0, min(100, int(branding_raw.get("logo_opacity", branding_raw.get("watermark_opacity", 80))))),
+        "logo_margin": max(0, min(500, int(branding_raw.get("logo_margin", branding_raw.get("watermark_margin", 40))))),
+        "logo_x": max(0, min(100, float(branding_raw.get("logo_x", branding_raw.get("watermark_x", 92))))),
+        "logo_y": max(0, min(100, float(branding_raw.get("logo_y", branding_raw.get("watermark_y", 8))))),
         "logo_bg_remove": bool(branding_raw.get("logo_bg_remove", branding_raw.get("watermark_bg_remove", False))),
         "logo_bg_color": "#" + _hex6(str(branding_raw.get("logo_bg_color", branding_raw.get("watermark_bg_color", "#9B5CFF")))),
-        "logo_bg_similarity": max(0.01, min(1.0, _safe_f(branding_raw.get("logo_bg_similarity", branding_raw.get("watermark_bg_similarity")), 0.22))),
-        "logo_bg_blend": max(0.0, min(1.0, _safe_f(branding_raw.get("logo_bg_blend"), 0.05))),
+        "logo_bg_similarity": max(0.01, min(1.0, float(branding_raw.get("logo_bg_similarity", branding_raw.get("watermark_bg_similarity", 0.22))))),
+        "logo_bg_blend": max(0.0, min(1.0, float(branding_raw.get("logo_bg_blend", 0.05)))),
         "text_enabled": bool(branding_raw.get("text_enabled", False)),
         "text": str(branding_raw.get("text", "")).strip()[:100],
         "text_position": str(branding_raw.get("text_position", "bottom-center")),
-        "text_size": max(3, min(12, _safe_i(branding_raw.get("text_size"), 6))),
+        "text_size": max(3, min(12, int(branding_raw.get("text_size", 6)))),
         "text_color": str(branding_raw.get("text_color", "#FFFFFF")),
         "text_bg_enabled": bool(branding_raw.get("text_bg_enabled", True)),
         "text_bg_color": str(branding_raw.get("text_bg_color", "#000000")),
-        "text_bg_opacity": max(0, min(100, _safe_i(branding_raw.get("text_bg_opacity"), 65))),
-        "text_margin": max(20, min(500, _safe_i(branding_raw.get("text_margin"), 110))),
-        "text_x": max(0.0, min(100.0, _safe_f(branding_raw.get("text_x"), 50.0))),
-        "text_y": max(0.0, min(100.0, _safe_f(branding_raw.get("text_y"), 75.0))),
+        "text_bg_opacity": max(0, min(100, int(branding_raw.get("text_bg_opacity", 65)))),
+        "text_margin": max(20, min(500, int(branding_raw.get("text_margin", 110)))),
+        "text_x": max(0, min(100, float(branding_raw.get("text_x", 50)))),
+        "text_y": max(0, min(100, float(branding_raw.get("text_y", 75)))),
         "watermark_text_enabled": bool(branding_raw.get("watermark_text_enabled", False)),
         "watermark_text": str(branding_raw.get("watermark_text", "")).strip()[:100],
         "watermark_text_position": str(branding_raw.get("watermark_text_position", "center")),
-        "watermark_text_size": max(3, min(20, _safe_i(branding_raw.get("watermark_text_size"), 6))),
-        "watermark_text_opacity": max(0, min(100, _safe_i(branding_raw.get("watermark_text_opacity"), 35))),
-        "watermark_text_angle": max(-45, min(45, _safe_i(branding_raw.get("watermark_text_angle"), -20))),
+        "watermark_text_size": max(3, min(20, int(branding_raw.get("watermark_text_size", 6)))),
+        "watermark_text_opacity": max(0, min(100, int(branding_raw.get("watermark_text_opacity", 35)))),
+        "watermark_text_angle": max(-45, min(45, int(branding_raw.get("watermark_text_angle", -20)))),
         "watermark_text_color": "#" + _hex6(str(branding_raw.get("watermark_text_color", "#FFFFFF"))),
-        "watermark_text_x": max(0.0, min(100.0, _safe_f(branding_raw.get("watermark_text_x"), 50.0))),
-        "watermark_text_y": max(0.0, min(100.0, _safe_f(branding_raw.get("watermark_text_y"), 50.0))),
+        "watermark_text_x": max(0, min(100, float(branding_raw.get("watermark_text_x", 50)))),
+        "watermark_text_y": max(0, min(100, float(branding_raw.get("watermark_text_y", 50)))),
         "premium_captions": bool(branding_raw.get("premium_captions", data.get("premium_captions", True))),
         "situational_cues": bool(branding_raw.get("situational_cues", data.get("situational_cues", True))),
         "caption_preset": str(branding_raw.get("caption_preset", data.get("caption_preset", "center_seam" if (gaming_split or split_screen) else "lower_safe"))),
@@ -3800,7 +3623,7 @@ def events(job_id: str):
                 if job:
                     new_events = list(job.get("events", [])[sent:])
                     sent = len(job.get("events", []))
-                    done = bool(job.get("status") in {"done", "error"})
+                    done = job.get("status") in {"done", "error"}
                     snapshot = {
                         "kind": "status",
                         "status": job.get("status"),
@@ -4324,8 +4147,8 @@ def open_output_folder():
     target_dir: Path | None = None
 
     # 1. If explicit job_id is provided, check its output folder first
-    if job_id and isinstance(job_id, str):
-        safe_job = _safe_job_directory(job_id.strip())
+    if job_id:
+        safe_job = _safe_job_directory(str(job_id).strip())
         if safe_job:
             cand = safe_job / "output"
             if cand.exists() and cand.is_dir():
@@ -4577,19 +4400,7 @@ def cache_clear():
         "message": f"Successfully cleared {formatted} of disk space ({yt_deleted} YouTube video(s) and {cache_deleted} cache file(s) removed)."
     })
 
-def _read_app_version() -> str:
-    v_file = ROOT / "version.json"
-    if v_file.is_file():
-        try:
-            with open(v_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if data.get("version"):
-                    return str(data["version"])
-        except Exception:
-            pass
-    return "v5.0.0"
-
-APP_VERSION = _read_app_version()
+APP_VERSION = "v4.0.11"
 GITHUB_REPO = "sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE"
 
 
@@ -4657,45 +4468,18 @@ def updater_apply():
     """Performs a fast, in-place update from GitHub without requiring a full re-install."""
     def _delayed_restart():
         import time
-        time.sleep(1.0)
+        time.sleep(2.0)
         try:
-            creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
             app_exe = ROOT / "Clipify AI.exe"
-            if not app_exe.is_file() and (ROOT.parent.parent / "Clipify AI.exe").is_file():
-                app_exe = ROOT.parent.parent / "Clipify AI.exe"
-
-            restart_bat = ROOT / "scratch" / "restart_clipify.bat"
-            restart_bat.parent.mkdir(parents=True, exist_ok=True)
-
             if app_exe.is_file():
-                with open(restart_bat, "w", encoding="utf-8") as f:
-                    f.write(f'@echo off\r\nping 127.0.0.1 -n 2 >nul\r\nstart "" "{app_exe}"\r\nexit\r\n')
-                subprocess.Popen(
-                    ["cmd.exe", "/c", str(restart_bat)],
-                    cwd=str(app_exe.parent),
-                    creationflags=creationflags,
-                    close_fds=True,
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
+                subprocess.Popen([str(app_exe)], cwd=str(ROOT), creationflags=creationflags)
             else:
-                py = sys.executable or shutil.which("python.exe") or "python"
-                app_file = str(ROOT / "app.py")
-                with open(restart_bat, "w", encoding="utf-8") as f:
-                    f.write(f'@echo off\r\nping 127.0.0.1 -n 2 >nul\r\nstart "" "{py}" "{app_file}"\r\nexit\r\n')
-                subprocess.Popen(
-                    ["cmd.exe", "/c", str(restart_bat)],
-                    cwd=str(ROOT),
-                    creationflags=creationflags,
-                    close_fds=True,
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
+                py = sys.executable
+                subprocess.Popen([py, "app.py"], cwd=str(ROOT), creationflags=creationflags)
             os._exit(0)
-        except Exception as e:
-            logger.error("Failed restarting Clipify process: %s", e)
+        except Exception:
+            pass
 
     is_git = (ROOT / ".git").is_dir()
     git_bin = shutil.which("git") or shutil.which("git.exe") or "git"
@@ -4709,10 +4493,12 @@ def updater_apply():
             # 1. Fetch latest changes
             _run_hidden([git_bin, "fetch", "origin", branch], cwd=str(ROOT), timeout=60, check=False)
 
-            # 2. Rebase pull to safely preserve any local modifications
-            _run_hidden([git_bin, "add", "static/", "templates/", "app.py"], cwd=str(ROOT), timeout=15, check=False)
-            _run_hidden([git_bin, "commit", "-m", "chore: local update workspace preserve"], cwd=str(ROOT), timeout=15, check=False)
-            pull = _run_hidden([git_bin, "pull", "--rebase", "origin", branch], cwd=str(ROOT), timeout=90, check=False)
+            # 2. Fast-forward pull
+            pull = _run_hidden([git_bin, "pull", "--ff-only", "origin", branch], cwd=str(ROOT), timeout=90, check=False)
+            if pull.returncode != 0:
+                # Fallback: stash unstaged scratch edits and pull
+                _run_hidden([git_bin, "stash"], cwd=str(ROOT), timeout=15, check=False)
+                pull = _run_hidden([git_bin, "pull", "origin", branch], cwd=str(ROOT), timeout=90, check=False)
 
             if pull.returncode == 0:
                 threading.Thread(target=_delayed_restart, daemon=True).start()
@@ -4736,7 +4522,6 @@ def updater_apply():
         import zipfile
 
         # Check if a dedicated fast update asset exists in latest release
-        rel_data: dict[str, Any] = {}
         update_url = None
         try:
             rel_req = urllib.request.Request(
@@ -4789,15 +4574,6 @@ def updater_apply():
                 updated_count += 1
 
         tf_path.unlink(missing_ok=True)
-
-        # Record latest version in version.json
-        try:
-            latest_v = (rel_data.get("tag_name") or "v5.0.0").strip() if rel_data else "v5.0.0"
-            with open(ROOT / "version.json", "w", encoding="utf-8") as vf:
-                json.dump({"version": latest_v, "updated_at": __import__("time").time()}, vf, indent=2)
-        except Exception:
-            pass
-
         threading.Thread(target=_delayed_restart, daemon=True).start()
 
         return jsonify({
@@ -4839,7 +4615,7 @@ def diagnostic():
     import platform as _platform
 
     report: dict = {
-        "generated_at": datetime.datetime.utcnow().isoformat() + "Z",
+        "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "platform": _platform.platform(),
         "python_version": sys.version,
         "app_dir": str(ROOT),
@@ -5168,10 +4944,8 @@ def _get_fastest_ollama_model() -> tuple[str, str | None]:
     return sorted_models[0], None
 
 
-_CLIPPY_SYSTEM_PROMPT = """/no_think
-You are the official in-app AI assistant for Clipify AI.
+_CLIPPY_SYSTEM_PROMPT = """You are the official in-app AI assistant for Clipify AI.
 You talk naturally, concisely, warmly, and helpfully like a knowledgeable human assistant.
-Do not output internal thinking or chain-of-thought tags. Answer the user directly and immediately.
 Never dump overwhelming bulleted feature lists for simple greetings (like "hi", "hello") or casual comments (like "im bored"). Reply normally and ask what they'd like to create!
 
 Key User Requests & Links:
@@ -5179,7 +4953,7 @@ Key User Requests & Links:
    👉 [**Join Official Instagram Creator Community**](https://ig.me/j/AQj1lYCWh_iV_S7J/)
    and creator contact `@sherlock.fy`.
 2. If the user asks about updates, what's new, or the latest version:
-   Explain that they are running **Clipify AI v5.0.0**! Highlight the Dual-Handle Visual Timeline Scrubber in Beta Lab, Multi-Color Action Cues (*SHOCKED* in red, *LAUGHS* in gold, *LOOKS* in cyan) + Studio SFX, Promoters Spotlight, Orbiting Stargazers Physics, and Live Studio RTMP clipping. Tell them they can click the "Update" button on the left sidebar to check and install 1-click in-place updates.
+   Explain that they are running **Clipify AI v4.0.11**! Highlight Live Studio (OBS RTMP stream clipping), Smart Podcast Split (auto 2-speaker with solo fallback), Anti-Burst Lanczos Upscaler, and Beta Lab text overlays. Tell them they can click the "Update" button on the left sidebar to check and install 1-click in-place updates.
 3. When the user asks how to use any feature (e.g. clipping live streams, adding text overlays in Beta Lab, creating AI voiceovers, or generating vertical shorts):
    - Give a simple, clear explanation in plain English.
    - Remind the user to click the "App Guide" button on the left sidebar if they want a guided, step-by-step interactive walkthrough.
@@ -5191,11 +4965,11 @@ Key User Requests & Links:
      - For video editing / branding / projects: [NAVIGATE:editor]
 
 App facts:
-- Version: v5.0.0
+- Version: v4.0.11
 - Clipify AI is 100% free, private, local-first. No API keys or paid tiers.
 - Live Studio (/live): Ingests OBS RTMP stream at rtmp://localhost:1935/live for instant highlight clipping.
 - Narration Studio (/narrate): Pairs Kokoro neural voices with gameplay backgrounds.
-- Beta Lab (#beta): Draggable timeline scrubber & timed custom text overlays burned non-destructively.
+- Beta Lab (#beta): Draggable & timed custom text overlays burned non-destructively.
 - Create Shorts (#create): AI highlight detection (WhisperX + ClipsAI + face tracking).
 """
 
@@ -5216,62 +4990,19 @@ def _clippy_builtin_fallback(user_query: str) -> str:
     # Updates and Version Info
     if any(k in q for k in ("update", "version", "what's new", "whats new", "latest", "upgrade", "changelog", "patch")):
         return (
-            f"You are currently running **Clipify AI {APP_VERSION}**! 🚀\n\n"
-            f"**What's new in {APP_VERSION}:**\n"
-            "- ⚡ **Dual-Handle Scrubber Timeline**: Visual real-time start/end trimming track directly under video preview.\n"
-            "- 🎨 **Situational Action Cues**: Multi-color emotion cues (*SHOCKED* in red, *LAUGHS* in gold, *LOOKS* in cyan) + audio SFX.\n"
-            "- 📥 **Long Video Robustness**: Auto-muxing fallback for long YouTube videos with zero separate stream errors.\n"
+            "You are currently running **Clipify AI v4.0.11**! 🚀\n\n"
+            "**What's new in v4.0.11:**\n"
             "- 🔴 **Live Studio**: Real-time OBS RTMP stream clipping (`rtmp://localhost:1935/live`).\n"
-            "- 🎙️ **Smart Podcast Split**: 2-speaker tracking with clean solo fallback.\n"
+            "- 🎙️ **Smart Podcast Split**: 2-speaker tracking with clean solo fallback (never slices solo hosts in half).\n"
             "- ✨ **Anti-Burst Lanczos Upscaler**: Lossless subclip trim + Lanczos unsharp contrast profiles.\n"
-            "- 🤖 **Redesigned Obsidian Clippy AI**: Pinned flush edge toggle, persistent chat history, and deep-link navigation.\n\n"
+            "- ✍️ **Beta Lab Text Overlays**: Draggable and timed text on the 9:16 frame.\n"
+            "- 🤖 **Redesigned Clippy AI**: Pinned flush edge toggle, persistent chat history, and deep-link navigation.\n\n"
             "To check for new updates or apply an in-place patch, click the **Update** button on the left sidebar!"
         )
 
     # Casual greetings
     if q in ("hi", "hello", "hey", "yo", "sup", "howdy", "good morning", "good evening") or q.startswith(("hi ", "hello ", "hey ")):
         return "Hey there! 👋 How can I help you today with your clips, live streams, or editing?"
-
-    # Games & Casual Banter
-    if any(k in q for k in ("rock paper scissors", "rock, paper, scissors", "rps", "play a game", "play game", "play rps", "rock", "paper", "scissors")):
-        import random
-        choices = ["Rock 🪨", "Paper 📄", "Scissors ✂️"]
-        ai_pick = random.choice(choices)
-        user_pick = "Rock" if "rock" in q else ("Paper" if "paper" in q else ("Scissors" if "scissors" in q else None))
-        if user_pick:
-            result_comment = "It's a tie! 🤝" if user_pick.lower() in ai_pick.lower() else ("You win! 🎉" if (user_pick == "Rock" and "Scissors" in ai_pick) or (user_pick == "Paper" and "Rock" in ai_pick) or (user_pick == "Scissors" and "Paper" in ai_pick) else "I win! 😎")
-            return (
-                f"You played **{user_pick}**, and I choose **{ai_pick}**!\n\n"
-                f"{result_comment} Want another round, or shall we make some viral clips? 🎬"
-            )
-        return (
-            f"Rock, Paper, Scissors... shoot! 🎲\n\n"
-            f"I choose **{ai_pick}**! Did you beat me, or should we get back to making some viral clips? 😄"
-        )
-
-    if q in ("no", "nah", "nope", "not now", "nevermind", "nvm", "stop", "cancel"):
-        return "Got it! No worries at all. Let me know whenever you'd like to clip, edit, or generate something cool."
-
-    if q in ("yes", "yeah", "yep", "sure", "ok", "okay", "alright", "fine", "let's do it", "lets do it"):
-        return "Awesome! What would you like to work on? You can import a video to create vertical Shorts, test out voiceovers in Narration Studio, or clip from a live stream!"
-
-    if any(k in q for k in ("who are you", "what are you")):
-        return (
-            "I'm **Clippy AI**, your built-in creative co-pilot for Clipify AI! 🤖✨\n\n"
-            "I can help you navigate between studios, optimize your clip settings, explain features, and give prompt ideas for voiceovers or titles."
-        )
-
-    if any(k in q for k in ("how are you", "how are u", "how's it going", "hows it going")):
-        return "I'm running fast and ready to clip! ⚡ How's your editing going today?"
-
-    if any(k in q for k in ("joke", "tell me a joke", "make me laugh")):
-        jokes = [
-            "Why did the video editor go to therapy? Because they couldn't deal with all their unresolved cuts! 🎬😂",
-            "Why don't YouTube Shorts ever sleep? Because the algorithm never rests! ⚡",
-            "What did the audio track say to the video frame? 'I think we're really out of sync today!' 🎵"
-        ]
-        import random
-        return random.choice(jokes)
 
     if "bored" in q:
         return "Let's make something cool! You can import a video to create quick viral Shorts, test out voiceovers in Narration Studio, or clip highlights from Live Studio. What are you in the mood to create?"
@@ -5337,13 +5068,11 @@ def _clippy_builtin_fallback(user_query: str) -> str:
     if any(k in q for k in ("thank", "thanks", "awesome", "great", "cool")):
         return "You're very welcome! Let me know if you need any other help creating your clips."
 
-    fallbacks = [
-        "I'm tuned to help you with video clipping, live stream highlights, neural voiceovers, and captions! What are you looking to create today?",
-        "I'm right here to help you get the most out of Clipify AI! Feel free to ask about setting up OBS, adding text in Beta Lab, or generating voiceover scripts.",
-        "Got something creative in mind? Let me know if you need tips on clipping long videos, adjusting 9:16 vertical framing, or choosing the best Ollama model."
-    ]
-    import random
-    return random.choice(fallbacks)
+    return (
+        "I'm here to help you get the most out of Clipify AI! "
+        "You can ask me how to clip live streams, add text in Beta Lab, generate voiceovers, or create viral shorts. "
+        "You can also click **App Guide** on the left menu anytime for an interactive walkthrough!"
+    )
 
 
 @app.get("/api/clippy/model")
@@ -5397,29 +5126,19 @@ def clippy_chat():
                     "model": fastest_model,
                     "messages": messages,
                     "stream": False,
-                    "options": {"temperature": 0.5, "num_predict": 750}
+                    "options": {"temperature": 0.4, "num_predict": 350}
                 }).encode("utf-8"),
                 headers={"Content-Type": "application/json"}
             )
-            with urllib.request.urlopen(chat_req, timeout=30.0) as resp:
+            with urllib.request.urlopen(chat_req, timeout=9.0) as resp:
                 if resp.status == 200:
                     chat_res = json.loads(resp.read().decode("utf-8", errors="replace"))
                     msg = chat_res.get("message", {}).get("content", "").strip()
-                    if "<think>" in msg or "</think>" in msg:
-                        msg = re.sub(r"(?s)<think>.*?</think>", "", msg).strip()
-                        if "</think>" in msg:
-                            msg = msg.split("</think>")[-1].strip()
-                    if not msg and chat_res.get("message", {}).get("thinking"):
-                        raw_think = chat_res["message"]["thinking"].strip()
-                        # Extract the actual conclusion/action if buried in thinking
-                        clean_lines = [ln.strip() for ln in raw_think.splitlines() if ln.strip() and not ln.strip().lower().startswith(("let me", "okay,", "first,", "i need", "wait,", "so final"))]
-                        if clean_lines:
-                            msg = clean_lines[-1].strip('"\'')
                     if msg:
                         low_m = message.lower()
                         if any(k in low_m for k in ("live", "obs", "rtmp", "stream")) and "[NAVIGATE:" not in msg:
                             msg = f"[NAVIGATE:live]\n{msg}\n\n*Tip: Click **App Guide** on the left menu for a step-by-step walkthrough!*"
-                        elif any(k in low_m for k in ("beta", "text overlay", "draggable text", "overlay", "scrubber", "timeline")) and "[NAVIGATE:" not in msg:
+                        elif any(k in low_m for k in ("beta", "text overlay", "draggable text", "overlay")) and "[NAVIGATE:" not in msg:
                             msg = f"[NAVIGATE:beta]\n{msg}\n\n*Tip: Click **App Guide** on the left menu for a step-by-step walkthrough!*"
                         elif any(k in low_m for k in ("narrat", "voiceover", "kokoro")) and "[NAVIGATE:" not in msg:
                             msg = f"[NAVIGATE:narrate]\n{msg}\n\n*Tip: Click **App Guide** on the left menu for a step-by-step walkthrough!*"

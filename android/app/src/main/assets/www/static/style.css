@@ -113,7 +113,7 @@ select {
   border-right: 1px solid var(--line);
   background: rgba(8, 12, 16, 0.9);
   backdrop-filter: blur(18px);
-  z-index: 10;
+  z-index: 2147483648 !important;
   display: flex;
   flex-direction: column;
 }
@@ -2405,6 +2405,7 @@ label {
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .project-main small,
@@ -2421,6 +2422,7 @@ label {
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .project-outputs {
@@ -2624,7 +2626,6 @@ label {
   height: 100%;
   object-fit: contain;
   pointer-events: none;
-}
 }
 
 .editor-text {
@@ -2959,7 +2960,6 @@ footer {
   align-items: center;
   justify-content: center;
   pointer-events: auto;
-  cursor: row-resize;
   cursor: ns-resize;
   z-index: 15;
   touch-action: none;
@@ -4009,11 +4009,19 @@ div[id*="monica-action"] {
 
 #beta {
   position: relative;
+  max-width: 100% !important;
+  width: 100% !important;
 }
 
 #beta > *:not(.beta-matrix-canvas) {
   position: relative;
   z-index: 1;
+}
+
+#beta .beta-card {
+  background: rgba(12, 12, 15, 0.82) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
 }
 
 .galaxy-hud-actions {
@@ -4336,7 +4344,6 @@ div[id*="monica-action"] {
   .beta-workspace-layout {
     display: flex !important;
     flex-direction: column !important;
-    grid-template-columns: 1fr !important;
     gap: 16px !important;
   }
 
@@ -4397,13 +4404,16 @@ div[id*="monica-action"] {
    ========================================================================== */
 .clipify-restart-overlay {
   position: fixed;
-  inset: 0;
-  width: 100vw;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 220px;
+  width: calc(100vw - 220px);
   height: 100vh;
   background: rgba(6, 6, 10, 0.72);
   backdrop-filter: blur(22px) saturate(160%);
   -webkit-backdrop-filter: blur(22px) saturate(160%);
-  z-index: 2147483647;
+  z-index: 2147483640;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4411,6 +4421,20 @@ div[id*="monica-action"] {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
   color: #ffffff;
   user-select: none;
+}
+
+@media (max-width: 980px) {
+  .clipify-restart-overlay {
+    left: 90px;
+    width: calc(100vw - 90px);
+  }
+}
+
+@media (max-width: 640px) {
+  .clipify-restart-overlay {
+    left: 0;
+    width: 100vw;
+  }
 }
 
 .restart-ascii-canvas {
@@ -4672,13 +4696,16 @@ div[id*="monica-action"] {
    ========================================================================== */
 .clipify-restart-overlay {
   position: fixed;
-  inset: 0;
-  width: 100vw;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 220px;
+  width: calc(100vw - 220px);
   height: 100vh;
   background: rgba(6, 6, 10, 0.72);
   backdrop-filter: blur(22px) saturate(160%);
   -webkit-backdrop-filter: blur(22px) saturate(160%);
-  z-index: 2147483647;
+  z-index: 2147483640;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4686,6 +4713,20 @@ div[id*="monica-action"] {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
   color: #ffffff;
   user-select: none;
+}
+
+@media (max-width: 980px) {
+  .clipify-restart-overlay {
+    left: 90px;
+    width: calc(100vw - 90px);
+  }
+}
+
+@media (max-width: 640px) {
+  .clipify-restart-overlay {
+    left: 0;
+    width: 100vw;
+  }
 }
 
 .restart-ascii-canvas {

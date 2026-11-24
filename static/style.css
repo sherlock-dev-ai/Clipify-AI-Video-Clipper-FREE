@@ -2405,6 +2405,7 @@ label {
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .project-main small,
@@ -2421,6 +2422,7 @@ label {
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .project-outputs {
@@ -2624,7 +2626,6 @@ label {
   height: 100%;
   object-fit: contain;
   pointer-events: none;
-}
 }
 
 .editor-text {
@@ -2959,7 +2960,6 @@ footer {
   align-items: center;
   justify-content: center;
   pointer-events: auto;
-  cursor: row-resize;
   cursor: ns-resize;
   z-index: 15;
   touch-action: none;
@@ -4344,7 +4344,6 @@ div[id*="monica-action"] {
   .beta-workspace-layout {
     display: flex !important;
     flex-direction: column !important;
-    grid-template-columns: 1fr !important;
     gap: 16px !important;
   }
 

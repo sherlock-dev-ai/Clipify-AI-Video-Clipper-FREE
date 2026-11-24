@@ -161,15 +161,10 @@
       if (!btnExecute) return;
       btnExecute.disabled = true;
       btnExecute.innerHTML = '<span class="btn-update-icon spinning">↻</span> Updating…';
-      if (modalContent) {
-        modalContent.innerHTML = `
-          <div style="text-align:center;padding:16px 0;">
-            <div style="font-size:26px;margin-bottom:8px;">🚀</div>
-            <b style="color:#f8fafc;font-size:14px;">Applying in-place update…</b>
-            <p style="margin:6px 0 0;font-size:12px;color:#94a3b8;">Fetching updated code and assets from GitHub. Keeping models and data safe…</p>
-          </div>
-        `;
-      }
+
+      // Immediately hide modal and trigger updating takeover sub-window
+      if (modal) modal.style.display = 'none';
+      triggerRestartTakeover('Applying core updates & rebooting local engine…');
 
       try {
         const res = await fetch('/api/updater/apply', { method: 'POST' });
@@ -177,21 +172,11 @@
         if (!res.ok || !data.ok) {
           throw new Error(data.error || 'Update failed');
         }
-
-        // Close modal and immediately trigger full-screen ASCII restart takeover screen
-        if (modal) modal.style.display = 'none';
-        triggerRestartTakeover(data.message || 'Updated successfully.');
+        addConsoleLog('[Patch] Synchronized code & refreshed assets successfully.', 'success');
       } catch (err) {
-        if (modalContent) {
-          modalContent.innerHTML = `
-            <div style="padding:10px 0;">
-              <b style="color:#ef4444;font-size:13px;">Update Failed</b>
-              <p style="margin:6px 0 0;font-size:12px;color:#cbd5e1;">${escapeHtml(err.message)}</p>
-            </div>
-          `;
-        }
-        btnExecute.disabled = false;
-        btnExecute.textContent = 'Retry Update';
+        addConsoleLog(`[Error] Update failed: ${err.message}`, 'error');
+        const statusLabel = document.getElementById('restartStatusLabel');
+        if (statusLabel) statusLabel.textContent = `Update failed: ${err.message}`;
       }
     }
 

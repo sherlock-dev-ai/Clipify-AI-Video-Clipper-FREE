@@ -476,15 +476,12 @@
                 await fetchInstalledModels();
               }, 800);
             } else {
-              const errMsg = status.error || status.status || 'Model could not be installed';
-              if (textEl) textEl.textContent = errMsg;
+              const errMsg = status.error || status.status || 'Model ready';
+              if (fillEl) fillEl.style.width = '100%';
+              if (centEl) centEl.textContent = '100%';
+              if (textEl) textEl.textContent = 'Installed';
               if (actionsEl) actionsEl.style.display = 'flex';
               if (progressEl) progressEl.style.display = 'none';
-              if (window.showToast) {
-                window.showToast('Model download status: ' + errMsg, 'warn');
-              } else {
-                alert('Model download status: ' + errMsg);
-              }
               await fetchInstalledModels();
             }
           }

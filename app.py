@@ -3291,6 +3291,294 @@ def beta_apply_text():
         "clean_filename": clean.name if clean.exists() else filename,
     })
 
+
+# ============================================================================
+# INSTANT CLIPPING LAB (ISOLATED ULTRA-FAST 9:16 ENGINE)
+# ============================================================================
+instant_jobs: dict[str, dict[str, Any]] = {}
+instant_jobs_lock = threading.Lock()
+
+
+def _instant_worker(
+    job_id: str,
+    input_path: Path | None,
+    target_dur: float,
+    layout: str,
+    start_mode: str,
+    custom_start: float,
+    youtube_url: str = ""
+) -> None:
+    job_dir = JOBS / job_id
+    input_dir = job_dir / "input"
+    out_dir = job_dir / "output"
+    input_dir.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    def log(msg: str) -> None:
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        entry = f"[{timestamp}] {msg}"
+        with instant_jobs_lock:
+            if job_id in instant_jobs:
+                instant_jobs[job_id]["logs"].append(entry)
+
+    def update_status(status: str, progress: int, stage: str) -> None:
+        with instant_jobs_lock:
+            if job_id in instant_jobs:
+                instant_jobs[job_id].update(status=status, progress=progress, stage=stage)
+
+    try:
+        update_status("running", 5, "Initializing engine")
+        log("⚡ Instant Engine Initialized (Isolated High-Speed Mode)")
+        log("Bypassing heavy LLM transcription & multi-stage candidate scoring...")
+
+        # If YouTube URL provided and input not downloaded yet
+        if youtube_url and (not input_path or not input_path.exists()):
+            log(f"Connecting to YouTube stream: {youtube_url}...")
+            update_status("running", 10, "Fetching YouTube stream")
+            yt_out = input_dir / f"yt_source_{job_id[:8]}.mp4"
+            yt_cmd = [
+                sys.executable, "-m", "yt_dlp",
+                "--no-playlist",
+                "-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best",
+                "--extractor-args", "youtube:player_client=android,ios,web",
+                "--no-check-certificates",
+                "-o", str(yt_out),
+                youtube_url
+            ]
+            yt_proc = _run_hidden(yt_cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180)
+            if not yt_out.exists() or yt_out.stat().st_size == 0:
+                yt_cmd_fb = [
+                    sys.executable, "-m", "yt_dlp",
+                    "--no-playlist",
+                    "-f", "18/best[ext=mp4]/best",
+                    "--no-check-certificates",
+                    "-o", str(yt_out),
+                    youtube_url
+                ]
+                _run_hidden(yt_cmd_fb, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+
+            if not yt_out.exists() or yt_out.stat().st_size == 0:
+                err_msg = yt_proc.stderr[-300:] if yt_proc.stderr else "Failed to download YouTube video."
+                log(f"ERROR: YouTube download failed: {err_msg}")
+                update_status("error", 0, "YouTube import failed")
+                return
+
+            input_path = yt_out
+            log(f"YouTube stream ready ({yt_out.stat().st_size // (1024 * 1024)} MB)")
+
+        if not input_path or not input_path.exists():
+            log("ERROR: Source video file not found.")
+            update_status("error", 0, "Source video missing")
+            return
+
+        total_dur = _media_duration_seconds(str(input_path))
+        if total_dur <= 0.0:
+            total_dur = 60.0
+        log(f"Source video verified: {input_path.name} (Duration: {total_dur:.1f}s)")
+
+        # Calculate target segment window
+        clip_len = min(target_dur, total_dur)
+        if start_mode == "start":
+            start_sec = 0.0
+        elif start_mode == "custom":
+            start_sec = max(0.0, min(custom_start, max(0.0, total_dur - clip_len)))
+        else:  # auto / golden hook window
+            if total_dur <= clip_len:
+                start_sec = 0.0
+            else:
+                start_sec = max(0.0, min(total_dur * 0.18, total_dur - clip_len))
+
+        end_sec = start_sec + clip_len
+        log(f"Target hook segment: {start_sec:.1f}s -> {end_sec:.1f}s ({clip_len:.1f}s duration)")
+
+        update_status("running", 30, "Rendering 9:16 Short")
+        out_name = f"instant_{job_id[:8]}_short.mp4"
+        out_path = out_dir / out_name
+
+        if layout == "blur_fill":
+            log("Applying Cinematic Blur Background 9:16 layout...")
+            filter_str = (
+                "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,"
+                "crop=1080:1920,boxblur=20:5[bg];"
+                "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease[fg];"
+                "[bg][fg]overlay=(W-w)/2:(H-h)/2"
+            )
+        elif layout == "split":
+            log("Applying Gaming Split (Top 50% / Bottom 50%) layout...")
+            filter_str = (
+                "[0:v]crop=iw:ih/2:0:0,scale=1080:960:flags=fast_bilinear[top];"
+                "[0:v]crop=iw:ih/2:0:ih/2,scale=1080:960:flags=fast_bilinear[bot];"
+                "[top][bot]vstack=inputs=2"
+            )
+        else:  # center_crop
+            log("Applying High-Speed Smart 9:16 Center Crop...")
+            filter_str = (
+                "crop=min(iw\\,ih*9/16):min(ih\\,iw*16/9):(iw-min(iw\\,ih*9/16))/2:(ih-min(ih\\,iw*16/9))/2,"
+                "scale=1080:1920:flags=fast_bilinear"
+            )
+
+        ffmpeg = _ffmpeg_path()
+        cmd = [
+            ffmpeg, "-y",
+            "-ss", f"{start_sec:.2f}",
+            "-i", str(input_path),
+            "-t", f"{clip_len:.2f}",
+            "-filter_complex" if layout in ("blur_fill", "split") else "-vf", filter_str,
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-crf", "22",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-movflags", "+faststart",
+            str(out_path)
+        ]
+
+        log("Encoding frames via fast CPU/GPU pipeline...")
+        proc = _run_hidden(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+
+        if proc.returncode != 0 or not out_path.exists() or out_path.stat().st_size < 1024:
+            err = proc.stderr[-400:] if proc.stderr else "FFmpeg execution failed."
+            log(f"ERROR: Render failed: {err}")
+            update_status("error", 0, "Render failed")
+            return
+
+        size_kb = out_path.stat().st_size // 1024
+        log(f"✔ Instant Short rendered successfully: {out_name} ({size_kb} KB)")
+        log("Registering project with Editor & Review Workspace...")
+
+        # Register in main jobs dict for Review Editor integration
+        with jobs_lock:
+            jobs[job_id] = {
+                "id": job_id,
+                "status": "done",
+                "progress": 100,
+                "stage": "Finished",
+                "detail": "Instant Short ready",
+                "outputs": [out_name],
+                "filename": input_path.name,
+                "branding": {"logo": None, "text": ""},
+                "mode": "instant"
+            }
+
+        with instant_jobs_lock:
+            if job_id in instant_jobs:
+                instant_jobs[job_id].update(
+                    status="done",
+                    progress=100,
+                    stage="Finished",
+                    outputs=[out_name],
+                    output_url=f"/media/{job_id}/{out_name}",
+                    filename=out_name,
+                    duration=clip_len
+                )
+        log("🎉 Instant Clipping complete! Ready to preview, download, or edit.")
+
+    except Exception as exc:
+        log(f"ERROR: Unhandled exception in instant pipeline: {exc}")
+        update_status("error", 0, str(exc))
+
+
+@app.post("/api/instant/upload")
+def instant_upload():
+    """Upload a source video directly into an isolated instant clipping workspace."""
+    if "file" not in request.files:
+        return jsonify({"ok": False, "error": "No file uploaded."}), 400
+    file = request.files["file"]
+    if not file or not file.filename:
+        return jsonify({"ok": False, "error": "No file selected."}), 400
+
+    job_id = str(uuid.uuid4())
+    job_dir = JOBS / job_id
+    input_dir = job_dir / "input"
+    output_dir = job_dir / "output"
+    input_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    safe_name = secure_filename(file.filename) or f"instant_{job_id[:8]}.mp4"
+    dest = input_dir / safe_name
+    file.save(dest)
+
+    dur = _media_duration_seconds(str(dest))
+    with instant_jobs_lock:
+        instant_jobs[job_id] = {
+            "id": job_id,
+            "status": "ready",
+            "progress": 0,
+            "stage": "Video loaded",
+            "filename": safe_name,
+            "duration": dur,
+            "logs": [f"[{datetime.now().strftime('%H:%M:%S')}] Source uploaded: {safe_name} ({dur:.1f}s)"],
+            "outputs": [],
+            "output_url": None,
+        }
+
+    return jsonify({"ok": True, "job_id": job_id, "filename": safe_name, "duration": dur})
+
+
+@app.post("/api/instant/start")
+def instant_start():
+    """Launch the isolated lightning-fast instant clipping job."""
+    data = request.get_json(silent=True) or {}
+    job_id = str(data.get("job_id", "")).strip() or str(uuid.uuid4())
+    youtube_url = str(data.get("youtube_url", "")).strip()
+    target_dur = max(5.0, min(120.0, float(data.get("duration", 30.0))))
+    layout = str(data.get("layout", "center_crop")).strip()
+    start_mode = str(data.get("start_mode", "auto")).strip()
+    custom_start = max(0.0, float(data.get("custom_start", 0.0)))
+
+    job_dir = JOBS / job_id
+    input_dir = job_dir / "input"
+    input_dir.mkdir(parents=True, exist_ok=True)
+
+    input_path = None
+    input_files = list(input_dir.glob("*.mp4")) + list(input_dir.glob("*.mov")) + list(input_dir.glob("*.mkv"))
+    if input_files:
+        input_path = max(input_files, key=lambda p: p.stat().st_mtime)
+
+    # If job_id references an existing source from projects/jobs
+    if not input_path:
+        src_job_id = str(data.get("source_job_id", "")).strip()
+        if src_job_id:
+            src_dir = JOBS / src_job_id / "input"
+            if src_dir.exists():
+                src_files = list(src_dir.glob("*.mp4")) + list(src_dir.glob("*.mov"))
+                if src_files:
+                    input_path = max(src_files, key=lambda p: p.stat().st_mtime)
+
+    if not input_path and not youtube_url:
+        return jsonify({"ok": False, "error": "No source video or YouTube URL provided."}), 400
+
+    with instant_jobs_lock:
+        instant_jobs[job_id] = {
+            "id": job_id,
+            "status": "queued",
+            "progress": 0,
+            "stage": "Queued",
+            "logs": [f"[{datetime.now().strftime('%H:%M:%S')}] Job queued."],
+            "outputs": [],
+            "output_url": None,
+            "filename": input_path.name if input_path else "",
+            "duration": target_dur
+        }
+
+    threading.Thread(
+        target=_instant_worker,
+        args=(job_id, input_path, target_dur, layout, start_mode, custom_start, youtube_url),
+        daemon=True
+    ).start()
+
+    return jsonify({"ok": True, "job_id": job_id, "status": "queued"})
+
+
+@app.get("/api/instant/status/<job_id>")
+def instant_status(job_id: str):
+    """Poll progress, logs and output of an instant clipping job."""
+    with instant_jobs_lock:
+        job = instant_jobs.get(job_id)
+        if not job:
+            return jsonify({"ok": False, "error": "Instant job not found."}), 404
+        return jsonify({"ok": True, **job})
+
 @app.get("/api/metadata/<job_id>/<path:filename>")
 def metadata(job_id: str, filename: str):
     """Return saved YouTube metadata for a generated Short."""

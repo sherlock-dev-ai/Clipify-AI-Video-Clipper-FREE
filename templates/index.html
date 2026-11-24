@@ -62,6 +62,12 @@
         </svg>
         <span>Editor</span>
       </a>
+      <a href="#instant" data-nav="instant" id="navInstantLink">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+        </svg>
+        <span>Instant Clipping</span> <span class="nav-beta-tag" style="background:rgba(234,179,8,0.18);color:#facc15;border-color:rgba(234,179,8,0.35);">BETA</span>
+      </a>
 
       <div class="sidebar-nav-divider"></div>
 
@@ -875,6 +881,170 @@
           </div><button class="primary big" id="applyEditorBrandingMain" disabled><span>Apply to Finished
               Short</span><b>→</b></button><a id="reviewDownloadMain" class="download" href="#" hidden download>Download
             Short ↓</a><button class="ghost full" id="editorToCreate">← Back to Create</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- INSTANT CLIPPING LAB (ISOLATED ULTRA-FAST 9:16 PIPELINE)          -->
+    <!-- ================================================================= -->
+    <section id="instant" class="page-section secondary-section">
+      <header class="section-page-head">
+        <div>
+          <span class="eyebrow" style="color:#eab308;display:flex;align-items:center;gap:6px;">
+            <span class="nav-beta-tag" style="font-size:0.68rem;padding:2px 6px;background:rgba(234,179,8,0.18);color:#facc15;border:1px solid rgba(234,179,8,0.35);border-radius:10px;font-weight:700;">BETA</span>
+            ULTRA-FAST ISOLATED PIPELINE
+          </span>
+          <h1>Instant Clipping</h1>
+          <p>Generate high-impact 9:16 vertical clips in seconds. Skips heavy LLM transcription &amp; multi-stage candidate scoring for instantaneous exports.</p>
+        </div>
+      </header>
+
+      <div class="instant-workspace-grid">
+        <!-- Left Column: Controls & Input -->
+        <div class="instant-col-left">
+          <!-- Card 1: Source Footage -->
+          <div class="instant-card" id="instantSourceCard">
+            <div class="instant-card-header">
+              <span class="instant-card-num">01</span>
+              <h3>Source Footage</h3>
+              <span class="instant-card-badge">MP4 / MOV / MKV / YouTube</span>
+            </div>
+
+            <!-- Drag & Drop Zone -->
+            <div class="instant-dropzone" id="instantDropzone">
+              <input type="file" id="instantFileInput" accept="video/mp4,video/quicktime,video/x-matroska,video/*" hidden>
+              <div class="instant-dropzone-icon">
+                <svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                </svg>
+              </div>
+              <p class="instant-dropzone-title">Drop source video here or <span class="instant-browse-link">click to browse</span></p>
+              <p class="instant-dropzone-sub">Direct local fast ingestion · Completely isolated</p>
+            </div>
+
+            <!-- Selected File Badge -->
+            <div id="instantSelectedFile" class="instant-file-badge" style="display:none;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              <span id="instantSelectedFileName" class="instant-file-name">source_video.mp4</span>
+              <span id="instantSelectedFileDur" class="instant-file-dur">0.0s</span>
+              <button type="button" id="btnInstantClearFile" class="instant-file-clear" title="Remove">&times;</button>
+            </div>
+
+            <!-- YouTube Link Option -->
+            <div class="instant-divider">
+              <span>OR YOUTUBE LINK</span>
+            </div>
+            <div class="instant-yt-group">
+              <input type="text" id="instantYtUrl" placeholder="https://www.youtube.com/watch?v=..." class="instant-input">
+              <button type="button" id="btnInstantFetchYt" class="btn btn-secondary instant-fetch-btn">Fetch Link</button>
+            </div>
+          </div>
+
+          <!-- Card 2: Speed Presets & Layout -->
+          <div class="instant-card" id="instantPresetCard">
+            <div class="instant-card-header">
+              <span class="instant-card-num">02</span>
+              <h3>Fast Presets &amp; Layout</h3>
+              <span class="instant-card-badge">Instant 9:16</span>
+            </div>
+
+            <!-- Duration Selector -->
+            <div class="instant-control-group">
+              <label class="instant-control-label">Target Duration</label>
+              <div class="instant-btn-group" id="instantDurationGroup">
+                <button type="button" class="instant-choice-btn" data-val="15">15s Hook</button>
+                <button type="button" class="instant-choice-btn active" data-val="30">30s Viral Short ★</button>
+                <button type="button" class="instant-choice-btn" data-val="60">60s Full Highlight</button>
+              </div>
+            </div>
+
+            <!-- Layout Selector -->
+            <div class="instant-control-group">
+              <label class="instant-control-label">Framing Layout</label>
+              <div class="instant-btn-group" id="instantLayoutGroup">
+                <button type="button" class="instant-choice-btn active" data-val="center_crop">9:16 Center Crop</button>
+                <button type="button" class="instant-choice-btn" data-val="blur_fill">Blur-Fill 9:16</button>
+                <button type="button" class="instant-choice-btn" data-val="split">Gaming Split (Top/Bot)</button>
+              </div>
+            </div>
+
+            <!-- Start Hook Segment -->
+            <div class="instant-control-group">
+              <label class="instant-control-label">Segment Selection</label>
+              <div class="instant-btn-group" id="instantStartGroup">
+                <button type="button" class="instant-choice-btn active" data-val="auto">⚡ Auto Golden Hook</button>
+                <button type="button" class="instant-choice-btn" data-val="start">⏮ Video Start (0:00)</button>
+                <button type="button" class="instant-choice-btn" data-val="custom">⏱ Custom Timestamp</button>
+              </div>
+              <div id="instantCustomStartBox" style="display:none;margin-top:10px;">
+                <label style="font-size:0.78rem;color:#94a3b8;display:flex;align-items:center;gap:8px;">
+                  Start at (seconds):
+                  <input type="number" id="instantCustomStartSec" min="0" step="1" value="0" class="instant-input" style="width:100px;padding:5px 8px;">
+                </label>
+              </div>
+            </div>
+
+            <!-- Launch Button -->
+            <button type="button" id="btnStartInstantClip" class="btn btn-primary instant-glow-btn">
+              <span>⚡ Generate Instant Short (Fast Mode)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right Column: Live Console & Output Review -->
+        <div class="instant-col-right">
+          <!-- Card 3: Review & Export -->
+          <div class="instant-card" id="instantReviewCard">
+            <div class="instant-card-header">
+              <span class="instant-card-num">03</span>
+              <h3>Review &amp; Export</h3>
+              <span id="instantStatusPill" class="instant-status-pill status-ready">Ready</span>
+            </div>
+
+            <!-- Preview Frame -->
+            <div class="instant-preview-box" id="instantPreviewFrame">
+              <video id="instantVideoPlayer" controls playsinline style="display:none;"></video>
+              <div id="instantEmptyPreview" class="instant-empty-preview">
+                <div class="instant-empty-icon">
+                  <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="5" y="2" width="14" height="20" rx="3"></rect>
+                    <polygon points="10 8 16 12 10 16 10 8" fill="currentColor"></polygon>
+                  </svg>
+                </div>
+                <p class="instant-empty-title">1080 × 1920 · 9:16 Vertical Short</p>
+                <p class="instant-empty-sub">Your finished instant clip will appear here for immediate playback.</p>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div id="instantExportActions" class="instant-export-actions" style="display:none;">
+              <a id="btnInstantDownload" class="btn btn-primary" download href="#" style="flex:1;text-align:center;text-decoration:none;">Download Short ↓</a>
+              <button type="button" id="btnInstantOpenEditor" class="btn btn-secondary" style="flex:1;">Open in Editor ✂️</button>
+            </div>
+          </div>
+
+          <!-- Card 4: Live Console Log -->
+          <div class="instant-card" id="instantConsoleCard">
+            <div class="instant-console-wrapper">
+              <div class="instant-console-header">
+                <div class="instant-console-dots">
+                  <span class="dot-red"></span>
+                  <span class="dot-yellow"></span>
+                  <span class="dot-green"></span>
+                </div>
+                <div class="instant-console-title">
+                  <span class="instant-console-live-dot">●</span> LIVE ENGINE CONSOLE [ISOLATED]
+                </div>
+                <button type="button" id="btnCopyInstantLog" class="instant-copy-btn">Copy Log</button>
+              </div>
+              <div id="instantConsoleLog" class="instant-console-body">
+                <div class="console-line info">[Instant] Ready. Drop video or enter YouTube URL to begin.</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>

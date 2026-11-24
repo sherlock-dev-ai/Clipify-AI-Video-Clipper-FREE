@@ -4482,3 +4482,356 @@ function initBetaTestingSection() {
     });
   }
 }
+
+// ============================================================================
+// INSTANT CLIPPING LAB CONTROLLER (ISOLATED ULTRA-FAST 9:16 PIPELINE)
+// ============================================================================
+function initInstantClippingSection() {
+  const dropzone = $('#instantDropzone');
+  const fileInput = $('#instantFileInput');
+  const selectedBadge = $('#instantSelectedFile');
+  const selectedName = $('#instantSelectedFileName');
+  const selectedDur = $('#instantSelectedFileDur');
+  const clearFileBtn = $('#btnInstantClearFile');
+  const ytInput = $('#instantYtUrl');
+  const ytFetchBtn = $('#btnInstantFetchYt');
+  const durationBtns = $$('#instantDurationGroup .instant-choice-btn');
+  const layoutBtns = $$('#instantLayoutGroup .instant-choice-btn');
+  const startBtns = $$('#instantStartGroup .instant-choice-btn');
+  const customStartBox = $('#instantCustomStartBox');
+  const customStartSec = $('#instantCustomStartSec');
+  const startClipBtn = $('#btnStartInstantClip');
+  const statusPill = $('#instantStatusPill');
+  const previewBox = $('#instantPreviewFrame');
+  const videoPlayer = $('#instantVideoPlayer');
+  const emptyPreview = $('#instantEmptyPreview');
+  const exportActions = $('#instantExportActions');
+  const downloadBtn = $('#btnInstantDownload');
+  const openEditorBtn = $('#btnInstantOpenEditor');
+  const consoleLog = $('#instantConsoleLog');
+  const copyLogBtn = $('#btnCopyInstantLog');
+
+  let instantState = {
+    jobId: null,
+    sourceFile: null,
+    sourceFileName: '',
+    sourceDuration: 0,
+    youtubeUrl: '',
+    duration: 30,
+    layout: 'center_crop',
+    startMode: 'auto',
+    running: false,
+    outputUrl: null,
+    outputFile: null
+  };
+
+  function addLog(msg, type = 'info') {
+    if (!consoleLog) return;
+    const line = document.createElement('div');
+    line.className = `console-line ${type}`;
+    line.textContent = msg;
+    consoleLog.appendChild(line);
+    consoleLog.scrollTop = consoleLog.scrollHeight;
+  }
+
+  // --- Button Group Helpers ---
+  function setupChoiceGroup(buttons, onSelect) {
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        onSelect(btn.dataset.val);
+      });
+    });
+  }
+
+  setupChoiceGroup(durationBtns, (val) => {
+    instantState.duration = parseFloat(val) || 30;
+    addLog(`[Instant] Target duration set to ${instantState.duration}s`);
+  });
+
+  setupChoiceGroup(layoutBtns, (val) => {
+    instantState.layout = val || 'center_crop';
+    addLog(`[Instant] Framing preset set to: ${val}`);
+  });
+
+  setupChoiceGroup(startBtns, (val) => {
+    instantState.startMode = val || 'auto';
+    if (customStartBox) {
+      customStartBox.style.display = val === 'custom' ? 'block' : 'none';
+    }
+    addLog(`[Instant] Hook selection mode: ${val}`);
+  });
+
+  // --- File Upload & Dropzone Handling ---
+  if (dropzone && fileInput) {
+    dropzone.addEventListener('click', (e) => {
+      if (e.target.closest('.instant-file-clear')) return;
+      fileInput.click();
+    });
+
+    ['dragenter', 'dragover'].forEach(name => {
+      dropzone.addEventListener(name, (e) => {
+        e.preventDefault();
+        dropzone.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(name => {
+      dropzone.addEventListener(name, (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+      });
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) {
+        handleFileSelection(files[0]);
+      }
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files && fileInput.files.length > 0) {
+        handleFileSelection(fileInput.files[0]);
+      }
+    });
+  }
+
+  async function handleFileSelection(file) {
+    if (!file || !file.type.startsWith('video/')) {
+      alert('Please select a valid video file (.mp4, .mov, .mkv).');
+      return;
+    }
+    instantState.sourceFile = file;
+    instantState.sourceFileName = file.name;
+    if (selectedBadge) selectedBadge.style.display = 'flex';
+    if (selectedName) selectedName.textContent = file.name;
+    if (selectedDur) selectedDur.textContent = 'Uploading...';
+    addLog(`[Instant] Uploading ${file.name} to isolated workspace...`);
+
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch('/api/instant/upload', {
+        method: 'POST',
+        body: form
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Upload failed');
+
+      instantState.jobId = data.job_id;
+      instantState.sourceDuration = data.duration || 0;
+      if (selectedDur) selectedDur.textContent = `${(data.duration || 0).toFixed(1)}s`;
+      addLog(`[Instant] Video ready: ${data.filename} (${(data.duration || 0).toFixed(1)}s)`, 'success');
+      if (ytInput) ytInput.value = '';
+      instantState.youtubeUrl = '';
+    } catch (err) {
+      addLog(`[Instant] Upload error: ${err.message}`, 'warn');
+      alert(`Upload failed: ${err.message}`);
+    }
+  }
+
+  if (clearFileBtn) {
+    clearFileBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      instantState.sourceFile = null;
+      instantState.jobId = null;
+      instantState.sourceFileName = '';
+      instantState.sourceDuration = 0;
+      if (fileInput) fileInput.value = '';
+      if (selectedBadge) selectedBadge.style.display = 'none';
+      addLog('[Instant] Source video cleared.');
+    });
+  }
+
+  // --- YouTube Fetch ---
+  if (ytFetchBtn && ytInput) {
+    ytFetchBtn.addEventListener('click', () => {
+      const url = ytInput.value.trim();
+      if (!url) {
+        alert('Please paste a YouTube URL first.');
+        return;
+      }
+      if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
+        alert('Please enter a valid YouTube video link.');
+        return;
+      }
+      instantState.youtubeUrl = url;
+      instantState.sourceFile = null;
+      if (selectedBadge) selectedBadge.style.display = 'none';
+      addLog(`[Instant] YouTube stream link loaded: ${url}`, 'step');
+      alert('YouTube link ready! Choose your preset and click "Generate Instant Short".');
+    });
+  }
+
+  // --- Copy Console Log ---
+  if (copyLogBtn && consoleLog) {
+    copyLogBtn.addEventListener('click', async () => {
+      const text = consoleLog.innerText || consoleLog.textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        copyLogBtn.textContent = 'Copied! ✓';
+        setTimeout(() => { copyLogBtn.textContent = 'Copy Log'; }, 1800);
+      } catch (_) {
+        alert('Could not copy log text.');
+      }
+    });
+  }
+
+  // --- Start Instant Clip Execution ---
+  if (startClipBtn) {
+    startClipBtn.addEventListener('click', async () => {
+      if (instantState.running) return;
+
+      const ytUrl = ytInput ? ytInput.value.trim() : '';
+      if (!instantState.jobId && !ytUrl && !instantState.sourceFile) {
+        // Fallback: check if active project video exists
+        if (state.jobId) {
+          instantState.jobId = state.jobId;
+          addLog(`[Instant] Reusing active project video: ${state.jobId}`);
+        } else {
+          alert('Please drop a source video or enter a YouTube link before generating.');
+          return;
+        }
+      }
+
+      instantState.running = true;
+      startClipBtn.disabled = true;
+      startClipBtn.innerHTML = '<span>⚡ Rendering Instant Short (0%)...</span>';
+      if (statusPill) {
+        statusPill.className = 'instant-status-pill status-running';
+        statusPill.textContent = 'Processing...';
+      }
+      addLog('[Instant] Launching isolated high-speed render...', 'step');
+
+      try {
+        const payload = {
+          job_id: instantState.jobId,
+          youtube_url: ytUrl || instantState.youtubeUrl,
+          duration: instantState.duration,
+          layout: instantState.layout,
+          start_mode: instantState.startMode,
+          custom_start: customStartSec ? parseFloat(customStartSec.value) || 0 : 0
+        };
+
+        const res = await fetch('/api/instant/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to start instant pipeline');
+
+        const activeJobId = data.job_id;
+        instantState.jobId = activeJobId;
+        addLog(`[Instant] Worker thread active for Job: ${activeJobId}`);
+
+        // Poll instant status
+        let seenLogs = 0;
+        const pollInterval = setInterval(async () => {
+          try {
+            const pollRes = await fetch(`/api/instant/status/${activeJobId}`, { cache: 'no-store' });
+            if (!pollRes.ok) return;
+            const statusData = await pollRes.json();
+            if (!statusData.ok) return;
+
+            // Stream new logs
+            if (Array.isArray(statusData.logs) && statusData.logs.length > seenLogs) {
+              const newLines = statusData.logs.slice(seenLogs);
+              newLines.forEach(l => {
+                let type = 'info';
+                if (l.includes('ERROR:')) type = 'warn';
+                else if (l.includes('✔') || l.includes('🎉')) type = 'success';
+                else if (l.includes('⚡') || l.includes('Applying')) type = 'step';
+                addLog(l, type);
+              });
+              seenLogs = statusData.logs.length;
+            }
+
+            // Update button label
+            if (statusData.progress) {
+              startClipBtn.innerHTML = `<span>⚡ Rendering Instant Short (${statusData.progress}%)...</span>`;
+            }
+
+            if (statusData.status === 'done') {
+              clearInterval(pollInterval);
+              instantState.running = false;
+              startClipBtn.disabled = false;
+              startClipBtn.innerHTML = '<span>⚡ Generate Another Instant Short</span>';
+              if (statusPill) {
+                statusPill.className = 'instant-status-pill status-done';
+                statusPill.textContent = 'Finished ✔';
+              }
+
+              // Display Video
+              const outUrl = statusData.output_url || `/media/${activeJobId}/${statusData.outputs[0]}`;
+              const outName = statusData.filename || (statusData.outputs && statusData.outputs[0]) || 'instant_short.mp4';
+              instantState.outputUrl = outUrl;
+              instantState.outputFile = outName;
+
+              if (videoPlayer) {
+                videoPlayer.src = outUrl;
+                videoPlayer.style.display = 'block';
+                videoPlayer.load();
+                videoPlayer.play().catch(() => {});
+              }
+              if (emptyPreview) emptyPreview.style.display = 'none';
+
+              // Configure Action Buttons
+              if (exportActions) exportActions.style.display = 'flex';
+              if (downloadBtn) {
+                downloadBtn.href = `${outUrl}?download=1`;
+                downloadBtn.download = outName;
+              }
+
+              addLog(`[Instant] ✔ Output Short ready: ${outName}`, 'success');
+            } else if (statusData.status === 'error') {
+              clearInterval(pollInterval);
+              instantState.running = false;
+              startClipBtn.disabled = false;
+              startClipBtn.innerHTML = '<span>⚡ Retry Instant Short</span>';
+              if (statusPill) {
+                statusPill.className = 'instant-status-pill status-ready';
+                statusPill.textContent = 'Failed';
+              }
+              alert(`Instant render failed: ${statusData.detail || statusData.error || 'Unknown error'}`);
+            }
+          } catch (err) {
+            console.error('[Instant] Status poll error:', err);
+          }
+        }, 1000);
+
+      } catch (err) {
+        instantState.running = false;
+        startClipBtn.disabled = false;
+        startClipBtn.innerHTML = '<span>⚡ Make Instant Short Now</span>';
+        if (statusPill) {
+          statusPill.className = 'instant-status-pill status-ready';
+          statusPill.textContent = 'Ready';
+        }
+        addLog(`[Instant] Launch error: ${err.message}`, 'warn');
+        alert(`Could not start instant clipping: ${err.message}`);
+      }
+    });
+  }
+
+  // --- Open in Editor Action ---
+  if (openEditorBtn) {
+    openEditorBtn.addEventListener('click', () => {
+      if (!instantState.jobId || !instantState.outputFile) {
+        alert('No instant short rendered yet.');
+        return;
+      }
+      state.jobId = instantState.jobId;
+      state.reviewFile = instantState.outputFile;
+      if (typeof selectReview === 'function') {
+        selectReview(instantState.jobId, instantState.outputFile);
+      }
+      navigateTo('editor');
+    });
+  }
+}
+
+// Auto-initialize Instant Clipping Lab
+initInstantClippingSection();

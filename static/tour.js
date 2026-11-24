@@ -234,6 +234,43 @@
   ];
 
   // ==========================================
+  // 4b. INSTANT CLIPPING STEPS (/instant)
+  // ==========================================
+  const INSTANT_STEPS = [
+    {
+      target: '#instantSourceCard, #instantDropzone',
+      title: '1. Source Media Input',
+      desc: 'Drop local video files here or paste any YouTube URL to instantly import footage without touching other workspaces.',
+      pos: 'right'
+    },
+    {
+      target: '#instantPresetCard, #instantDurationGroup',
+      title: '2. Lightning Fast Presets',
+      desc: 'Choose target duration (15s, 30s, or 60s) and framing layout. Bypasses heavy multi-stage LLM ranking and diarization to finish in seconds!',
+      pos: 'right'
+    },
+    {
+      target: '#btnStartInstantClip',
+      title: '3. Isolated Instant Generation',
+      desc: 'Click <b>⚡ Make Instant Short</b> to immediately kick off accelerated hardware-direct 9:16 rendering. Completely isolated so your other jobs stay safe.',
+      pos: 'top'
+    },
+    {
+      target: '#instantConsoleCard, #instantConsoleLog',
+      title: '4. Live Dark Terminal Log',
+      desc: 'Watch real-time frame-by-frame encoding and stream analysis in the themed dark console with zero delay or freeze.',
+      pos: 'left'
+    },
+    {
+      target: '#instantReviewCard, #instantVideoPlayer',
+      title: '5. Instant Review, Download & Editor',
+      desc: 'Play your finished 9:16 vertical short immediately, download the MP4 file directly, or jump straight to the Editor for fine-tuning.',
+      pos: 'left',
+      isFinal: true
+    }
+  ];
+
+  // ==========================================
   // 5. LIVE STUDIO STEPS (/live)
   // ==========================================
   const LIVE_STEPS = [
@@ -433,6 +470,16 @@
 
   // Distinct section theming colors (designed for aesthetic, non-AI craft look)
   const CONTEXT_THEMES = {
+    instant: {
+      name: 'Instant Clipping Lab',
+      label: '⚡ Instant Clipping',
+      steps: INSTANT_STEPS,
+      accent: '#eab308',
+      accentLight: '#fde047',
+      accentGlow: 'rgba(234, 179, 8, 0.45)',
+      badgeBg: 'rgba(234, 179, 8, 0.12)',
+      badgeBorder: 'rgba(234, 179, 8, 0.35)',
+    },
     beta: {
       name: 'Beta Testing Lab',
       label: '🧪 Beta Lab',
@@ -501,7 +548,7 @@
     if (p.includes('/live')) return 'live';
     if (p.includes('/narrate')) return 'narrate';
 
-    const sections = ['beta', 'projects', 'editor', 'create'];
+    const sections = ['instant', 'beta', 'projects', 'editor', 'create'];
 
     // 1. Check hash first
     const h = (window.location.hash || '').replace('#', '').split('?')[0].toLowerCase();
@@ -533,7 +580,9 @@
     const parts = selectorString.split(',');
 
     let sectionContainer = null;
-    if (currentContext === 'beta') {
+    if (currentContext === 'instant') {
+      sectionContainer = document.querySelector('#instant');
+    } else if (currentContext === 'beta') {
       sectionContainer = document.querySelector('#beta');
     } else if (currentContext === 'projects') {
       sectionContainer = document.querySelector('#projects');
@@ -987,7 +1036,7 @@
   let promotersStarsCleanup = null;
 
   // 34 Verified Real GitHub Accounts (Sherlock Dev community / supporters)
-  const REAL_STARGAZERS = [
+  let REAL_STARGAZERS = [
     { login: 'Lerreu', avatar_url: 'https://avatars.githubusercontent.com/u/75152710?v=4' },
     { login: 'maxwellhammer', avatar_url: 'https://avatars.githubusercontent.com/u/82539786?v=4' },
     { login: 'Aaryan-0s', avatar_url: 'https://avatars.githubusercontent.com/u/84567585?v=4' },
@@ -1145,6 +1194,12 @@
 
           <div class="galaxy-hud-footer">
             <span class="galaxy-live-dot">●</span> <span id="galaxyStargazerCountText">34 Real Supporters in Orbit</span>
+            <button type="button" class="galaxy-btn-refresh" id="btnRefreshSupporters" title="Refresh live supporters in orbit">
+              <svg id="galaxyRefreshIcon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+              </svg>
+              <span>Reload</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1154,6 +1209,22 @@
     supportModalOverlayEl.querySelector('#btnOpenPromotersFromSupport')?.addEventListener('click', () => {
       closeSupportModal();
       setTimeout(showPromotersModal, 120);
+    });
+
+    supportModalOverlayEl.querySelector('#btnRefreshSupporters')?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const btn = supportModalOverlayEl.querySelector('#btnRefreshSupporters');
+      const icon = supportModalOverlayEl.querySelector('#galaxyRefreshIcon');
+      if (icon) icon.style.animation = 'galaxySpin 0.75s linear infinite';
+      if (btn) btn.disabled = true;
+      try {
+        await loadAndRenderStargazers(true);
+      } finally {
+        setTimeout(() => {
+          if (icon) icon.style.animation = 'none';
+          if (btn) btn.disabled = false;
+        }, 650);
+      }
     });
 
     supportModalOverlayEl.addEventListener('click', (e) => {
@@ -1178,10 +1249,27 @@
     loadAndRenderStargazers();
   }
 
-  async function loadAndRenderStargazers() {
+  async function loadAndRenderStargazers(forceFetch = false) {
     const field = document.getElementById('stargazersField');
     if (!field) return;
     field.innerHTML = '';
+
+    if (forceFetch && navigator.onLine) {
+      try {
+        const res = await fetch('https://api.github.com/repos/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/stargazers?per_page=100', {
+          headers: { 'Accept': 'application/vnd.github.v3+json' },
+          cache: 'no-store'
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            REAL_STARGAZERS = data.map(u => ({ login: u.login, avatar_url: u.avatar_url }));
+          }
+        }
+      } catch (err) {
+        console.log('[Galaxy] Offline fallback preserved for supporters', err);
+      }
+    }
 
     // Always use real verified GitHub community creators
     let items = REAL_STARGAZERS;

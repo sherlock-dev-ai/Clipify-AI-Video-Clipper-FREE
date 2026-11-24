@@ -1770,52 +1770,109 @@ async function watchJob(jobId) {
     try { state.es.close() } catch { }
   }
   let terminal = false;
-  const stream = new EventSource('/api/events/' + jobId);
-  state.es = stream;
+  let stream = null;
+  try {
+    stream = new EventSource('/api/events/' + jobId);
+    state.es = stream;
+  } catch (err) {
+    console.warn('[SSE] EventSource init failed, using polling fallback:', err);
+  }
 
-  stream.onmessage = event => {
+  // Dual-track resilient status polling fallback:
+  // If EventSource drops, hangs, or runs in a restricted mobile WebView without SSE,
+  // this polling loop queries /api/status/:id every 800ms to drive progress smoothly to 100%.
+  const pollInterval = setInterval(async () => {
+    if (terminal) {
+      clearInterval(pollInterval);
+      return;
+    }
     try {
-      const d = JSON.parse(event.data);
-      const failed = d.kind === 'error' || (d.kind === 'status' && d.status === 'error');
-      const succeeded = (d.kind === 'complete' && d.pipeline === true) || d.kind === 'done' || (d.kind === 'status' && d.status === 'done');
+      const res = await fetch(`/api/status/${jobId}`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const d = await res.json();
+      if (terminal) return;
 
-      if (d.kind === 'log') {
-        addLog(d.message);
-        return;
+      if (d && typeof d.progress === 'number') {
+        updateProgress(d);
       }
-      if (failed) {
+      if (d && Array.isArray(d.events)) {
+        d.events.forEach(evt => {
+          if (evt && evt.kind === 'log' && evt.message) addLog(evt.message);
+        });
+      }
+
+      if (d && (d.status === 'done' || d.status === 'complete' || d.progress >= 100)) {
+        terminal = true;
+        clearInterval(pollInterval);
+        if (state.es) {
+          try { state.es.close(); } catch (_) {}
+          state.es = null;
+        }
+        setPipelineComplete();
+        loadJobResult(jobId);
+      } else if (d && (d.status === 'error' || d.status === 'failed')) {
+        terminal = true;
+        clearInterval(pollInterval);
+        if (state.es) {
+          try { state.es.close(); } catch (_) {}
+          state.es = null;
+        }
         const detail = d.detail || d.message || d.error || 'The pipeline stopped before a Short was created.';
         addLog('[Error] ' + detail);
         setPipelineFailure(detail);
-        terminal = true;
-        stream.close();
-        if (state.es === stream) state.es = null;
         create.disabled = false;
-        return;
       }
-      if (succeeded) {
-        setPipelineComplete();
+    } catch (_) {}
+  }, 800);
+
+  if (stream) {
+    stream.onmessage = event => {
+      try {
+        const d = JSON.parse(event.data);
+        const failed = d.kind === 'error' || (d.kind === 'status' && d.status === 'error');
+        const succeeded = (d.kind === 'complete' && d.pipeline === true) || d.kind === 'done' || (d.kind === 'status' && d.status === 'done');
+
+        if (d.kind === 'log') {
+          addLog(d.message);
+          return;
+        }
+        if (failed) {
+          const detail = d.detail || d.message || d.error || 'The pipeline stopped before a Short was created.';
+          addLog('[Error] ' + detail);
+          setPipelineFailure(detail);
+          terminal = true;
+          clearInterval(pollInterval);
+          stream.close();
+          if (state.es === stream) state.es = null;
+          create.disabled = false;
+          return;
+        }
+        if (succeeded) {
+          setPipelineComplete();
+          terminal = true;
+          clearInterval(pollInterval);
+          stream.close();
+          if (state.es === stream) state.es = null;
+          loadJobResult(jobId);
+          return;
+        }
+        if (d.kind === 'progress' || d.kind === 'status') updateProgress(d);
+      } catch (error) {
+        console.error('[SSE]', error);
+      }
+    };
+
+    stream.onerror = () => {
+      if (!terminal && stream.readyState === EventSource.CLOSED) {
         terminal = true;
+        clearInterval(pollInterval);
         stream.close();
         if (state.es === stream) state.es = null;
-        loadJobResult(jobId);
-        return;
+        setPipelineFailure('Connection to the local processing service was lost before the job finished.');
+        create.disabled = false;
       }
-      if (d.kind === 'progress' || d.kind === 'status') updateProgress(d);
-    } catch (error) {
-      console.error('[SSE]', error);
-    }
-  };
-
-  stream.onerror = () => {
-    if (!terminal && stream.readyState === EventSource.CLOSED) {
-      terminal = true;
-      stream.close();
-      if (state.es === stream) state.es = null;
-      setPipelineFailure('Connection to the local processing service was lost before the job finished.');
-      create.disabled = false;
-    }
-  };
+    };
+  }
 }
 
 async function loadJobResult(jobId) {

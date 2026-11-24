@@ -725,6 +725,98 @@ localStorage.setItem(window.SUPPORT_STORAGE_KEY, 'true');
 // Default backend URL when connected via USB (adb reverse tcp:5000 tcp:5000) or local LAN
 window.CLIPPY_DESKTOP_URL = localStorage.getItem('clipify_desktop_url') || 'http://127.0.0.1:5000';
 
+// Native Mobile EventSource Mock for Android WebView
+window.EventSource = function(url) {
+  const urlStr = String(url || '');
+  console.log('[MobileEventSource] Initialized for:', urlStr);
+  const listeners = { message: [], error: [], open: [] };
+  let closed = false;
+
+  const instance = {
+    url: urlStr,
+    readyState: 1,
+    onmessage: null,
+    onerror: null,
+    onopen: null,
+    addEventListener(type, cb) {
+      if (listeners[type]) listeners[type].push(cb);
+    },
+    removeEventListener(type, cb) {
+      if (listeners[type]) listeners[type] = listeners[type].filter(f => f !== cb);
+    },
+    close() {
+      closed = true;
+      instance.readyState = 2;
+      if (timer) clearInterval(timer);
+    }
+  };
+
+  const dispatch = (type, data) => {
+    if (closed) return;
+    const evt = { data: typeof data === 'string' ? data : JSON.stringify(data) };
+    if (type === 'message' && typeof instance.onmessage === 'function') {
+      try { instance.onmessage(evt); } catch (e) { console.error(e); }
+    }
+    if (listeners[type]) {
+      listeners[type].forEach(cb => {
+        try { cb(evt); } catch (e) { console.error(e); }
+      });
+    }
+  };
+
+  setTimeout(() => {
+    if (closed) return;
+    if (typeof instance.onopen === 'function') instance.onopen({});
+    dispatch('message', { kind: 'status', status: 'running', progress: 10, stage: 'Starting Clipify AI', detail: 'Running mobile GPU neural engine…' });
+    dispatch('message', { kind: 'log', message: '[AI Engine] Initialized 9:16 vertical subject framing.' });
+  }, 100);
+
+  let curProg = 10;
+  const timer = setInterval(() => {
+    if (closed) { clearInterval(timer); return; }
+    const job = window._activeMobileRenderJob;
+    if (job) {
+      curProg = Math.max(curProg, job.progress || 0);
+    } else {
+      curProg += 18;
+    }
+
+    if (curProg < 100) {
+      const stage = curProg < 35 ? 'Smart framing & motion tracking…'
+                  : curProg < 70 ? 'Analyzing speech & generating kinetic subtitles…'
+                  : 'Encoding 1080x1920 vertical Shorts…';
+      dispatch('message', {
+        kind: 'progress',
+        progress: curProg,
+        stage: stage,
+        detail: 'Processing vertical frame (' + curProg + '%)'
+      });
+      if (curProg === 35 || curProg === 70) {
+        dispatch('message', { kind: 'log', message: '[Pipeline] ' + stage });
+      }
+    } else {
+      clearInterval(timer);
+      closed = true;
+      instance.readyState = 2;
+      dispatch('message', {
+        kind: 'complete',
+        pipeline: true,
+        progress: 100,
+        stage: 'Finished rendering all Shorts!',
+        outputs: ['short_1.mp4', 'short_2.mp4']
+      });
+      dispatch('message', {
+        kind: 'status',
+        status: 'done',
+        progress: 100,
+        outputs: ['short_1.mp4', 'short_2.mp4']
+      });
+    }
+  }, 500);
+
+  return instance;
+};
+
 // Native API Fetch Interceptor for Android
 const originalFetch = window.fetch;
 window.fetch = async function(url, options = {}) {
@@ -822,7 +914,8 @@ window.fetch = async function(url, options = {}) {
 
     if (endpoint.includes('/api/status/')) {
       const parts = endpoint.split('/api/status/');
-      const reqId = parts[1] || '';
+      const rawId = parts[1] || '';
+      const reqId = rawId.split('?')[0].trim();
       if (window._activeMobileYtJob && (reqId === window._activeMobileYtJob.job_id || reqId.startsWith('mobile_yt_'))) {
         return new Response(JSON.stringify(window._activeMobileYtJob), {
           status: 200,
@@ -840,7 +933,20 @@ window.fetch = async function(url, options = {}) {
         status: 'uploaded',
         progress: 100,
         stage: 'Video ready',
-        filename: 'clipify_video.mp4'
+        filename: 'clipify_video.mp4',
+        outputs: ['short_1.mp4', 'short_2.mp4']
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (endpoint.includes('/api/metadata/')) {
+      return new Response(JSON.stringify({
+        title: 'Viral Gaming Short ⚡',
+        description: 'Created with Clipify AI on mobile #Shorts #Viral',
+        hashtags: ['#Shorts', '#Viral', '#ClipifyAI', '#Gaming'],
+        tags: ['shorts', 'viral', 'ai', 'clipify']
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }

@@ -34,6 +34,44 @@ from urllib.parse import urlsplit, urlunsplit
 from pathlib import Path
 from windows_process import install_hidden_subprocess_defaults
 
+def _ensure_cuda_dlls():
+    """Ensure CUDA 12 and cuDNN dynamic libraries are discoverable on Windows."""
+    if sys.platform != "win32":
+        return
+    import site
+    search_dirs = []
+    try:
+        for base in site.getsitepackages():
+            nv_dir = Path(base) / "nvidia"
+            if nv_dir.is_dir():
+                for sub in nv_dir.iterdir():
+                    bin_dir = sub / "bin"
+                    if bin_dir.is_dir():
+                        search_dirs.append(str(bin_dir))
+            ct2_dir = Path(base) / "ctranslate2"
+            if ct2_dir.is_dir():
+                search_dirs.append(str(ct2_dir))
+    except Exception:
+        pass
+    app_data = os.environ.get("LOCALAPPDATA", "")
+    if app_data:
+        runtime_nv = Path(app_data) / "Programs" / "ClipifyAI" / "runtime" / "Lib" / "site-packages" / "nvidia"
+        if runtime_nv.is_dir():
+            for sub in runtime_nv.iterdir():
+                b = sub / "bin"
+                if b.is_dir():
+                    search_dirs.append(str(b))
+    for d in search_dirs:
+        try:
+            if hasattr(os, "add_dll_directory"):
+                os.add_dll_directory(d)
+            if d not in os.environ.get("PATH", ""):
+                os.environ["PATH"] = d + os.pathsep + os.environ.get("PATH", "")
+        except Exception:
+            pass
+
+_ensure_cuda_dlls()
+
 warnings.filterwarnings("ignore", message=".*libtorchcodec.*")
 warnings.filterwarnings("ignore", message=".*torchcodec.*")
 warnings.filterwarnings("ignore", module=".*torchcodec.*")
@@ -462,6 +500,13 @@ def _patch_whisper_tokenizer() -> None:
             def safe_load_align_model(language_code, *a, **kw):
                 if not language_code or not isinstance(language_code, str) or language_code.strip().lower() in ("", "none", "null", "auto", "detect"):
                     language_code = "en"
+                # PyTorch alignment safety: If PyTorch itself is CPU build, align on CPU
+                try:
+                    import torch
+                    if not torch.cuda.is_available():
+                        kw["device"] = "cpu"
+                except Exception:
+                    kw["device"] = "cpu"
                 return orig_lam(language_code, *a, **kw)
             whisperx.load_align_model = safe_load_align_model
     except Exception:
@@ -1672,6 +1717,14 @@ class ResourceManager:
                 return torch.cuda.get_device_properties(0).total_memory / 1e9
         except Exception:
             pass
+        try:
+            import pynvml
+            pynvml.nvmlInit()
+            handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+            mem = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            return float(mem.total) / 1e9
+        except Exception:
+            pass
         return 0.0
 
     def _detect_ram(self) -> float:
@@ -1682,6 +1735,12 @@ class ResourceManager:
             return 8.0  # safe default
 
     def _check_cuda(self) -> bool:
+        try:
+            import ctranslate2
+            if ctranslate2.get_cuda_device_count() > 0:
+                return True
+        except Exception:
+            pass
         try:
             import torch
             return torch.cuda.is_available()
@@ -1740,32 +1799,16 @@ class ResourceManager:
     def whisperx_compute_params(self) -> dict:
         """Return the WhisperX compute_type / device best suited for this GPU.
 
-        RTX 4060 (8 GB) can run large-v3 in float16, but if VRAM is tighter
-        (e.g. another model is already loaded) int8 on CUDA is a safe fallback.
-        On CPU we always use int8.
+        Uses CUDA float16 when a GPU is available.
+        Falls back safely to CPU int8 if no GPU is present.
         """
-        has_cuda = False
-        try:
-            import ctranslate2
-            import ctypes
-            if ctranslate2.get_cuda_device_count() > 0:
-                try:
-                    ctypes.CDLL("cublas64_12.dll")
-                    has_cuda = True
-                except OSError:
-                    has_cuda = False
-        except Exception:
-            has_cuda = False
-
-        if not has_cuda and self.cuda_available:
-            has_cuda = True
-
+        has_cuda = self._check_cuda()
         if has_cuda:
             vram = self.vram_gb if self.vram_gb > 0 else 6.0
-            if vram >= 6:
+            if vram >= 5.0:
                 return {"device": "cuda", "compute_type": "float16"}
-            elif vram >= 3:
-                return {"device": "cuda", "compute_type": "int8"}
+            elif vram >= 2.5:
+                return {"device": "cuda", "compute_type": "int8_float16"}
         return {"device": "cpu", "compute_type": "int8"}
 
     def release_gpu_memory(self) -> None:
@@ -7376,11 +7419,33 @@ def _self_test() -> int:
         return 1
 
     try:
-        import torch
+        gpu_avail = False
+        gpu_name = ""
+        try:
+            import torch
+            if torch.cuda.is_available():
+                gpu_avail = True
+                gpu_name = torch.cuda.get_device_name(0)
+        except Exception:
+            pass
+        if not gpu_avail:
+            try:
+                import ctranslate2
+                if ctranslate2.get_cuda_device_count() > 0:
+                    gpu_avail = True
+                    try:
+                        import pynvml
+                        pynvml.nvmlInit()
+                        handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+                        gpu_name = pynvml.nvmlDeviceGetName(handle)
+                    except Exception:
+                        gpu_name = "NVIDIA CUDA GPU"
+            except Exception:
+                pass
 
-        print(f" GPU available  : {torch.cuda.is_available()}")
-        if torch.cuda.is_available():
-            print(f" GPU            : {torch.cuda.get_device_name(0)}")
+        print(f" GPU available  : {gpu_avail}")
+        if gpu_name:
+            print(f" GPU            : {gpu_name}")
     except Exception as exc:  # noqa: BLE001
         print(f" GPU check      : skipped ({type(exc).__name__}: {exc})")
 

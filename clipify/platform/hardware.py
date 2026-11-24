@@ -56,15 +56,23 @@ class HardwareAccelerator:
                 return {"encoder": self._detected_encoder, "args": self._hwaccel_args}
 
         elif self.os_type == "win32": # Windows
-            if "h264_nvenc" in available_encoders:
+            def _probe_encoder(enc, extra_args):
+                try:
+                    c = [ffmpeg, "-y", "-f", "lavfi", "-i", "color=c=black:s=64x64:d=0.04", "-c:v", enc] + extra_args + ["-f", "null", "-"]
+                    t = subprocess.run(c, capture_output=True, timeout=4)
+                    return t.returncode == 0
+                except Exception:
+                    return False
+
+            if "h264_nvenc" in available_encoders and _probe_encoder("h264_nvenc", ["-preset", "p4"]):
                 self._detected_encoder = "h264_nvenc"
                 self._hwaccel_args = ["-hwaccel", "cuda", "-preset", "p4", "-b:v", "6500k"]
                 return {"encoder": self._detected_encoder, "args": self._hwaccel_args}
-            elif "h264_qsv" in available_encoders:
+            elif "h264_qsv" in available_encoders and _probe_encoder("h264_qsv", ["-b:v", "4000k"]):
                 self._detected_encoder = "h264_qsv"
                 self._hwaccel_args = ["-b:v", "6500k"]
                 return {"encoder": self._detected_encoder, "args": self._hwaccel_args}
-            elif "h264_amf" in available_encoders:
+            elif "h264_amf" in available_encoders and _probe_encoder("h264_amf", ["-b:v", "4000k"]):
                 self._detected_encoder = "h264_amf"
                 self._hwaccel_args = ["-b:v", "6500k"]
                 return {"encoder": self._detected_encoder, "args": self._hwaccel_args}

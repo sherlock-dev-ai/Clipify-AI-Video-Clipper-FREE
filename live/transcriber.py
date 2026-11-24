@@ -24,6 +24,61 @@ def _hidden_flags() -> int:
     return getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 
 
+def _ensure_cuda_dlls():
+    """Ensure CUDA 12 and cuDNN dynamic libraries are discoverable on Windows."""
+    import sys
+    if sys.platform != "win32":
+        return
+    import site
+    search_dirs = []
+    try:
+        for base in site.getsitepackages():
+            nv_dir = Path(base) / "nvidia"
+            if nv_dir.is_dir():
+                for sub in nv_dir.iterdir():
+                    bin_dir = sub / "bin"
+                    if bin_dir.is_dir():
+                        search_dirs.append(str(bin_dir))
+            ct2_dir = Path(base) / "ctranslate2"
+            if ct2_dir.is_dir():
+                search_dirs.append(str(ct2_dir))
+    except Exception:
+        pass
+    app_data = os.environ.get("LOCALAPPDATA", "")
+    if app_data:
+        runtime_nv = Path(app_data) / "Programs" / "ClipifyAI" / "runtime" / "Lib" / "site-packages" / "nvidia"
+        if runtime_nv.is_dir():
+            for sub in runtime_nv.iterdir():
+                b = sub / "bin"
+                if b.is_dir():
+                    search_dirs.append(str(b))
+    for d in search_dirs:
+        try:
+            if hasattr(os, "add_dll_directory"):
+                os.add_dll_directory(d)
+            if d not in os.environ.get("PATH", ""):
+                os.environ["PATH"] = d + os.pathsep + os.environ.get("PATH", "")
+        except Exception:
+            pass
+
+
+def _detect_default_device() -> str:
+    _ensure_cuda_dlls()
+    try:
+        import ctranslate2
+        if ctranslate2.get_cuda_device_count() > 0:
+            return "cuda"
+    except Exception:
+        pass
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return "cuda"
+    except Exception:
+        pass
+    return "cpu"
+
+
 @dataclass
 class LiveTranscriptSegment:
     start_sec: float
@@ -41,13 +96,13 @@ class LiveTranscriber:
         python_bin: str,
         ffmpeg_bin: str,
         model_name: str = "tiny",
-        device: str = "cpu",
+        device: Optional[str] = None,
         on_segment: Optional[Callable[[LiveTranscriptSegment], None]] = None,
     ):
         self.python_bin = python_bin
         self.ffmpeg_bin = ffmpeg_bin
         self.model_name = model_name or "tiny"
-        self.device = device
+        self.device = device or _detect_default_device()
         self.on_segment = on_segment
 
         self.audio_queue: queue.Queue[tuple[Path, float, float]] = queue.Queue(maxsize=150)
@@ -93,16 +148,24 @@ class LiveTranscriber:
             return " ".join(s.text for s in self.transcripts)
 
     def _get_model(self) -> Any:
-        """Lazy-load the in-memory faster-whisper model."""
+        """Lazy-load the in-memory faster-whisper model on GPU with CPU fallback."""
         if not self._model_loaded:
+            _ensure_cuda_dlls()
             try:
                 from faster_whisper import WhisperModel
-                # Use tiny/base with int8 quantization for instant real-time decoding
-                compute_type = "int8" if self.device == "cpu" else "float16"
                 m_name = "tiny" if self.model_name in ("tiny", "default", "") else "base"
-                logger.info("Initializing in-memory WhisperModel (%s, %s)...", m_name, compute_type)
-                self._model_instance = WhisperModel(m_name, device=self.device, compute_type=compute_type)
-                logger.info("WhisperModel successfully initialized in-memory.")
+                compute_type = "float16" if self.device == "cuda" else "int8"
+                logger.info("Initializing in-memory WhisperModel (%s, %s, device=%s)...", m_name, compute_type, self.device)
+                try:
+                    self._model_instance = WhisperModel(m_name, device=self.device, compute_type=compute_type)
+                except Exception as cuda_exc:
+                    if self.device == "cuda":
+                        logger.warning("CUDA WhisperModel initialization failed (%s); falling back to CPU int8", cuda_exc)
+                        self.device = "cpu"
+                        self._model_instance = WhisperModel(m_name, device="cpu", compute_type="int8")
+                    else:
+                        raise cuda_exc
+                logger.info("WhisperModel successfully initialized in-memory on %s.", self.device)
             except Exception as e:
                 logger.warning("In-memory faster-whisper load failed (%s); will fallback to subproc", e)
                 self._model_instance = None
@@ -184,8 +247,15 @@ class LiveTranscriber:
         code = f"""
 import os, sys, json
 try:
+    from live.transcriber import _ensure_cuda_dlls, _detect_default_device
+    _ensure_cuda_dlls()
+    dev = _detect_default_device()
+    ctype = 'float16' if dev == 'cuda' else 'int8'
     from faster_whisper import WhisperModel
-    m = WhisperModel('tiny', device='cpu', compute_type='int8')
+    try:
+        m = WhisperModel('tiny', device=dev, compute_type=ctype)
+    except Exception:
+        m = WhisperModel('tiny', device='cpu', compute_type='int8')
     segs, _ = m.transcribe(r'{str(wav_path)}', beam_size=1)
     res = [{'start': s.start, 'end': s.end, 'text': s.text.strip()} for s in segs if s.text.strip()]
     print('JSON:' + json.dumps(res))

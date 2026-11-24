@@ -24,6 +24,44 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit, urlunsplit
 from windows_process import clear_ffmpeg_report_environment, install_hidden_subprocess_defaults
 
+def _ensure_cuda_dlls():
+    """Ensure CUDA 12 and cuDNN dynamic libraries are discoverable on Windows."""
+    if sys.platform != "win32":
+        return
+    import site
+    search_dirs = []
+    try:
+        for base in site.getsitepackages():
+            nv_dir = Path(base) / "nvidia"
+            if nv_dir.is_dir():
+                for sub in nv_dir.iterdir():
+                    bin_dir = sub / "bin"
+                    if bin_dir.is_dir():
+                        search_dirs.append(str(bin_dir))
+            ct2_dir = Path(base) / "ctranslate2"
+            if ct2_dir.is_dir():
+                search_dirs.append(str(ct2_dir))
+    except Exception:
+        pass
+    app_data = os.environ.get("LOCALAPPDATA", "")
+    if app_data:
+        runtime_nv = Path(app_data) / "Programs" / "ClipifyAI" / "runtime" / "Lib" / "site-packages" / "nvidia"
+        if runtime_nv.is_dir():
+            for sub in runtime_nv.iterdir():
+                b = sub / "bin"
+                if b.is_dir():
+                    search_dirs.append(str(b))
+    for d in search_dirs:
+        try:
+            if hasattr(os, "add_dll_directory"):
+                os.add_dll_directory(d)
+            if d not in os.environ.get("PATH", ""):
+                os.environ["PATH"] = d + os.pathsep + os.environ.get("PATH", "")
+        except Exception:
+            pass
+
+_ensure_cuda_dlls()
+
 # Early application root fallback for unhandled exceptions during bootstrap
 ROOT = Path(__file__).resolve().parent
 
@@ -1408,6 +1446,13 @@ def apply_branding_to_file(input_video: str, output_video: str, branding: dict[s
 
 
 def _is_cuda_available() -> bool:
+    try:
+        _ensure_cuda_dlls()
+        import ctranslate2
+        if ctranslate2.get_cuda_device_count() > 0:
+            return True
+    except Exception:
+        pass
     try:
         import torch
         return torch.cuda.is_available()
@@ -3315,11 +3360,16 @@ instant_jobs_lock = threading.Lock()
 def _fast_generate_captions(audio_path: Path, ass_path: Path, clip_dur: float, layout: str) -> bool:
     """Generate dynamic kinetic ASS captions for an isolated instant short in seconds using faster-whisper."""
     try:
+        _ensure_cuda_dlls()
         from faster_whisper import WhisperModel
-        import torch
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        compute_type = "float16" if device == "cuda" else "int8"
-        model = WhisperModel("tiny", device=device, compute_type=compute_type)
+        use_cuda = _is_cuda_available()
+        device = "cuda" if use_cuda else "cpu"
+        compute_type = "float16" if use_cuda else "int8"
+        try:
+            model = WhisperModel("tiny", device=device, compute_type=compute_type)
+        except Exception:
+            # Automatic fallback to CPU if CUDA initialization fails
+            model = WhisperModel("tiny", device="cpu", compute_type="int8")
         segments, _ = model.transcribe(str(audio_path), word_timestamps=True, beam_size=1, vad_filter=True)
         words = []
         for segment in segments:
@@ -5290,6 +5340,24 @@ def diagnostic():
                 cuda_version = getattr(getattr(torch, "version", None), "cuda", "") or ""
         except Exception as te:
             gpu_name = str(te)
+        if not cuda_available:
+            try:
+                import ctranslate2
+                if ctranslate2.get_cuda_device_count() > 0:
+                    cuda_available = True
+                    cuda_version = "12.x (CTranslate2/Faster-Whisper)"
+                    try:
+                        import pynvml
+                        pynvml.nvmlInit()
+                        handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+                        gpu_name = pynvml.nvmlDeviceGetName(handle)
+                        mem = pynvml.nvmlDeviceGetMemoryInfo(handle)
+                        vram_total_gb = round(mem.total / 1e9, 2)
+                        vram_free_gb = round(mem.free / 1e9, 2)
+                    except Exception:
+                        gpu_name = "NVIDIA CUDA GPU"
+            except Exception:
+                pass
         report["gpu"] = {
             "cuda_available": cuda_available,
             "cuda_version": cuda_version,

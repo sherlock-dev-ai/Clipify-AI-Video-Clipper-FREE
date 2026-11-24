@@ -155,7 +155,6 @@
               autocorrect="off"
               autocapitalize="off"
               spellcheck="false"
-              data-monica="false"
               data-gramm="false"
               data-gramm_editor="false"
               data-enable-grammarly="false"
@@ -278,6 +277,14 @@
       e.preventDefault();
       sendMessage();
     });
+
+    const sendBtn = document.getElementById('clippySendBtn');
+    if (sendBtn) {
+      sendBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        sendMessage();
+      });
+    }
 
     // Chip click delegation
     messages.addEventListener('click', (e) => {

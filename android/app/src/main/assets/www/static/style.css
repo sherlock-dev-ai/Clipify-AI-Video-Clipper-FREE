@@ -3648,9 +3648,19 @@ footer {
    CLIPPY AI - EXTENSION BLOCKER & ZERO GREEN OVERRIDES
    ========================================================================== */
 .clippy-input-bar {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  gap: 8px !important;
+  box-sizing: border-box !important;
   position: relative !important;
   background: #141418 !important;
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 14px !important;
+  padding: 6px 8px 6px 14px !important;
   outline: none !important;
 }
 
@@ -3659,20 +3669,65 @@ footer {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15), 0 4px 18px rgba(0, 0, 0, 0.6) !important;
 }
 
+#clippyInput,
+.clippy-input {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  position: static !important;
+  left: auto !important;
+  order: 1 !important;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  color: #fafafa !important;
+  font-size: 13px !important;
+  font-family: inherit !important;
+  resize: none !important;
+  max-height: 110px !important;
+  padding: 4px 0 !important;
+  line-height: 1.45 !important;
+  margin: 0 !important;
+}
+
+#clippySendBtn,
 .clippy-send-btn {
+  display: grid !important;
+  place-items: center !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  position: static !important;
+  left: auto !important;
+  order: 2 !important;
+  flex: 0 0 32px !important;
+  width: 32px !important;
+  height: 32px !important;
+  margin-left: 8px !important;
+  border-radius: 9px !important;
   background: #ffffff !important;
   color: #09090b !important;
   border: none !important;
+  cursor: pointer !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
 }
 
 .clippy-send-btn svg {
   stroke: #09090b !important;
 }
 
-.clippy-input-bar > :not(.clippy-input):not(.clippy-send-btn),
+.clippy-input-bar > :not(#clippyInput):not(#clippySendBtn):not(.clippy-input):not(.clippy-send-btn),
 .clippy-input-bar > div[id*="monica"],
 .clippy-input-bar > div[class*="monica"],
-.clippy-input-bar [data-monica],
+.clippy-input-bar div[data-monica],
+.clippy-input-bar span[data-monica],
+.clippy-input-bar button[data-monica]:not(#clippySendBtn),
 .clippy-input-bar .sider-btn,
 .clippy-input-bar [class*="sider"],
 .clippy-panel [class*="monica"],

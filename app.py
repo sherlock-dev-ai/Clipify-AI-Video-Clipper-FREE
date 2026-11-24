@@ -4558,16 +4558,30 @@ def updater_apply():
         }
         updated_count = 0
         with zipfile.ZipFile(tf_path, "r") as zf:
+            # Check if all members are nested under a single top-level directory (e.g. GitHub branch archive)
+            # or if the zip contains top-level project files directly.
+            all_non_dirs = [m.filename.replace("\\", "/").strip("/") for m in zf.infolist() if not m.is_dir()]
+            first_dirs = [n.split("/")[0] for n in all_non_dirs if "/" in n]
+            has_single_wrapper = (
+                len(first_dirs) == len(all_non_dirs)
+                and len(set(first_dirs)) == 1
+                and all(not n.startswith(("app.py", "main.py", "static", "templates", "version.json")) for n in set(first_dirs))
+            )
+
             for member in zf.infolist():
                 if member.is_dir():
                     continue
-                rel_parts = member.filename.split("/")[1:]
-                if not rel_parts or not rel_parts[0]:
+                clean_name = member.filename.replace("\\", "/").strip("/")
+                parts = clean_name.split("/")
+                if has_single_wrapper:
+                    parts = parts[1:]
+
+                if not parts or not parts[0]:
                     continue
-                if rel_parts[0] in excluded_dirs:
+                if parts[0] in excluded_dirs:
                     continue
 
-                dest_file = ROOT / Path(*rel_parts)
+                dest_file = ROOT / Path(*parts)
                 dest_file.parent.mkdir(parents=True, exist_ok=True)
                 with zf.open(member) as source, open(dest_file, "wb") as target:
                     shutil.copyfileobj(source, target)

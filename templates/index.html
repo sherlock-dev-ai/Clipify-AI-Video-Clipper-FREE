@@ -699,7 +699,7 @@
                     ['top-left','top-center','top-right','center-left','center','center-right','bottom-left','bottom-center','bottom-right']
                     %}<option value="{{p}}">{{p|replace('-',' ')|title}}</option>{% endfor %}<option value="custom">
                       Custom / Drag in Preview</option></select></label><label>Size<input id="textSize" type="number"
-                    min="3" max="12" value="6"> %</label><label>Margin<input id="textMargin" type="number" min="20"
+                    min="2" max="25" value="6"> %</label><label>Margin<input id="textMargin" type="number" min="20"
                     max="500" value="110"> px</label></div>
             </div>
             <div class="text-style-row"><label>Text color<input id="textColor" type="color"
@@ -727,7 +727,16 @@
                 <img id="previewLogoImg" alt="" style="display:none;">
                 <span id="previewLogoPlaceholder" class="preview-logo-placeholder" style="display:none;">Logo</span>
               </div>
-              <div class="preview-text draggable-overlay" id="previewText">Your text</div>
+              <div class="preview-text draggable-overlay" id="previewText" data-x="50" data-y="75">
+                <span class="editor-text-content" id="previewTextContent">Your text</span>
+                <div class="overlay-quick-controls" id="previewTextControls">
+                  <button type="button" class="ctrl-btn-size" id="previewTextSizeDec" title="Decrease font size (−)">−</button>
+                  <span class="ctrl-size-badge" id="previewTextSizeBadge">6%</span>
+                  <button type="button" class="ctrl-btn-size" id="previewTextSizeInc" title="Increase font size (+)">+</button>
+                  <span class="ctrl-drag-icon" title="Drag to move">✥</span>
+                </div>
+                <div class="overlay-resize-handle" id="previewTextResizeHandle" title="Drag corner to resize text">⤡</div>
+              </div>
               <div class="preview-watermark-overlay" id="previewWatermark"
                 style="display:none;position:absolute;pointer-events:none;z-index:4;font-family:inherit;font-weight:900;text-shadow:0 2px 8px rgba(0,0,0,0.6);white-space:nowrap;">
               </div>
@@ -837,7 +846,16 @@
               <img id="editorLogoImg" alt="" style="display:none;">
               <span id="editorLogoPlaceholder" class="preview-logo-placeholder" style="display:none;">Logo</span>
             </div>
-            <div id="editorText" class="editor-overlay editor-text">Your text</div>
+            <div id="editorText" class="editor-overlay editor-text" data-x="50" data-y="75">
+              <span class="editor-text-content" id="editorTextContent">Your text</span>
+              <div class="overlay-quick-controls" id="editorTextControls">
+                <button type="button" class="ctrl-btn-size" id="editorTextSizeDec" title="Decrease font size (−)">−</button>
+                <span class="ctrl-size-badge" id="editorTextSizeBadge">6%</span>
+                <button type="button" class="ctrl-btn-size" id="editorTextSizeInc" title="Increase font size (+)">+</button>
+                <span class="ctrl-drag-icon" title="Drag to move">✥</span>
+              </div>
+              <div class="overlay-resize-handle" id="editorTextResizeHandle" title="Drag corner to resize text">⤡</div>
+            </div>
             <div id="editorDragHint">Drag logo/text · changes are applied to the exported edit</div>
           </div>
           <div id="reviewEmpty" class="empty-state">Select a generated Short from Projects or Create.</div>
@@ -909,8 +927,8 @@
                   value="0.22"></label>
             </div><label class="toggle-row"><input type="checkbox" id="editorTextEnabled"><span
                 class="switch"></span><b>Text</b></label><textarea id="editorTextValue" maxlength="100"
-              placeholder="Text overlay"></textarea><label>Text size<input id="editorTextSize" type="number" min="3"
-                max="12" value="6"></label><label>Text color<input id="editorTextColor" type="color"
+              placeholder="Text overlay"></textarea><label>Text size<input id="editorTextSize" type="number" min="2"
+                max="25" value="6"></label><label>Text color<input id="editorTextColor" type="color"
                 value="#FFFFFF"></label><label class="toggle-row compact"><input type="checkbox" id="editorTextBg"
                 checked><span class="switch"></span><b>Text
                 background</b></label><label>BG color<input id="editorTextBgColor" type="color" value="#000000"></label>
@@ -1402,9 +1420,13 @@
                 style="display:none;position:absolute;left:50%;top:25%;transform:translate(-50%,-50%);">
                 <div id="betaTextDragContent" class="beta-text-drag-content">WAIT FOR IT! 😱</div>
                 <div class="beta-drag-badge">
-                  <span>✥ Drag to Move</span> · <span id="betaDragCoordBadge">50%, 25%</span> · <span
+                  <button type="button" class="ctrl-btn-size" id="betaTextSizeDec" title="Decrease font size (−)" style="margin-right:2px;">−</button>
+                  <span id="betaTextSizeBadge" class="ctrl-size-badge" style="margin-right:2px;">42px</span>
+                  <button type="button" class="ctrl-btn-size" id="betaTextSizeInc" title="Increase font size (+)" style="margin-right:6px;">+</button>
+                  <span class="ctrl-drag-icon">✥ Drag</span> · <span id="betaDragCoordBadge">50%, 25%</span> · <span
                     id="betaDragTimeBadge">0.0s – 5.0s</span>
                 </div>
+                <div class="overlay-resize-handle" id="betaTextResizeHandle" title="Drag corner to resize text">⤡</div>
               </div>
             </div>
 

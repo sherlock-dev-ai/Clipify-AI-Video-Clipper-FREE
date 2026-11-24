@@ -1413,7 +1413,7 @@ def apply_branding_to_file(input_video: str, output_video: str, branding: dict[s
             y = f"(h-th)*{max(0,min(100,float(branding.get('text_y',75))))/100:.6f}"
         else:
             x, y = _position_expr(pos, margin, "tw", "th")
-        size = max(3, min(12, int(branding.get("text_size", 6))))
+        size = max(2, min(25, int(branding.get("text_size", 6))))
         fs = max(34, round(1080 * size / 100))
         font_path = _font_path_for_editor(font_name)
         font_expr = f":fontfile='{_ffmpeg_filter_path(font_path)}'" if font_path else ""
@@ -3128,7 +3128,7 @@ def start():
         "text_enabled": bool(branding_raw.get("text_enabled", False)),
         "text": str(branding_raw.get("text", "")).strip()[:100],
         "text_position": str(branding_raw.get("text_position", "bottom-center")),
-        "text_size": max(3, min(12, int(branding_raw.get("text_size", 6)))),
+        "text_size": max(2, min(25, int(branding_raw.get("text_size", 6)))),
         "text_color": str(branding_raw.get("text_color", "#FFFFFF")),
         "text_bg_enabled": bool(branding_raw.get("text_bg_enabled", True)),
         "text_bg_color": str(branding_raw.get("text_bg_color", "#000000")),
@@ -3216,7 +3216,7 @@ def apply_branding(job_id: str):
         "text_enabled": bool(b.get("text_enabled")),
         "text": str(b.get("text", "")).strip()[:100],
         "text_position": str(b.get("text_position", "bottom-center")),
-        "text_size": max(3, min(12, int(b.get("text_size", 6)))),
+        "text_size": max(2, min(25, int(b.get("text_size", 6)))),
         "text_color": "#" + _hex6(str(b.get("text_color", "#FFFFFF"))),
         "text_bg_enabled": bool(b.get("text_bg_enabled")),
         "text_bg_color": "#" + _hex6(str(b.get("text_bg_color", "#000000"))),

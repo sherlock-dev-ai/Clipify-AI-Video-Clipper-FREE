@@ -625,7 +625,7 @@ function applyCustom(el, x, y) {
   el.style.top = y + '%';
   el.style.right = 'auto';
   el.style.bottom = 'auto';
-  el.style.transform = 'translate(-50%,-50%)';
+  el.style.transform = `translate(-${x}%, -${y}%)`;
 
   el.dataset.x = x;
   el.dataset.y = y;
@@ -698,35 +698,39 @@ function updatePreview() {
     if (placeholder) placeholder.style.display = isLogoEnabled ? 'inline-flex' : 'none';
   }
 
-  txt.style.display =
-    $('#textEnabled').checked &&
-      $('#overlayText').value.trim()
-      ? 'block'
-      : 'none';
+  const isTxtOn = $('#textEnabled')?.checked && $('#overlayText')?.value.trim();
+  txt.style.display = isTxtOn ? 'block' : 'none';
 
-  txt.textContent =
-    $('#overlayText').value || 'Your text';
+  const previewContent = txt.querySelector('.editor-text-content');
+  const previewVal = $('#overlayText')?.value || 'Your text';
+  if (previewContent) {
+    previewContent.textContent = previewVal;
+  } else {
+    txt.textContent = previewVal;
+  }
 
-  txt.style.fontSize =
-    Math.max(
-      14,
-      Math.round(
-        120 * (+$('#textSize').value) / 12
-      )
-    ) + 'px';
+  const pFrame = txt.closest('.preview-frame, .editor-preview-frame');
+  const pFrameWidth = (pFrame && pFrame.clientWidth > 0) ? pFrame.clientWidth : 320;
+  const pSizePct = Math.max(2, Math.min(25, +(+$('#textSize')?.value || 6)));
+  // Proportional font size matching video ratio (1080p width): fs = round(1080 * size / 100)
+  const pPreviewFs = Math.max(10, Math.round(pFrameWidth * (pSizePct / 100)));
+  txt.style.fontSize = pPreviewFs + 'px';
+
+  const pBadge = txt.querySelector('.ctrl-size-badge');
+  if (pBadge) pBadge.textContent = pSizePct + '%';
 
   txt.style.color =
-    $('#textColor').value;
+    $('#textColor')?.value || '#FFFFFF';
 
   txt.style.background =
-    $('#textBgEnabled').checked
+    $('#textBgEnabled')?.checked
       ? hexAlpha(
-        $('#textBgColor').value,
-        +$('#textBgOpacity').value
+        $('#textBgColor')?.value || '#000000',
+        +($('#textBgOpacity')?.value || 65)
       )
       : 'transparent';
 
-  if ($('#textPosition').value === 'custom') {
+  if ($('#textPosition')?.value === 'custom') {
 
     applyCustom(
       txt,
@@ -738,8 +742,8 @@ function updatePreview() {
 
     applyPresetPosition(
       txt,
-      $('#textPosition').value,
-      +$('#textMargin').value
+      $('#textPosition')?.value || 'bottom-center',
+      +($('#textMargin')?.value || 110)
     );
   }
 
@@ -785,6 +789,11 @@ function beginDrag(el, e) {
     getComputedStyle(el).display === 'none'
   ) return;
 
+  if (
+    e.target.closest?.('.ctrl-btn-size') ||
+    e.target.closest?.('.overlay-resize-handle')
+  ) return;
+
   e.preventDefault();
 
   const frame =
@@ -822,37 +831,14 @@ function dragMove(e) {
   const d = state.drag;
   const er = d.el.getBoundingClientRect();
 
-  const x = Math.max(
-    0,
-    Math.min(
-      d.frameW - er.width,
-      d.startLeft + (e.clientX - d.startX)
-    )
-  );
+  const maxLeft = Math.max(0, d.frameW - er.width);
+  const maxTop = Math.max(0, d.frameH - er.height);
 
-  const y = Math.max(
-    0,
-    Math.min(
-      d.frameH - er.height,
-      d.startTop + (e.clientY - d.startY)
-    )
-  );
+  const x = Math.max(0, Math.min(maxLeft, d.startLeft + (e.clientX - d.startX)));
+  const y = Math.max(0, Math.min(maxTop, d.startTop + (e.clientY - d.startY)));
 
-  const px = Math.max(
-    0,
-    Math.min(
-      100,
-      (x + er.width / 2) / d.frameW * 100
-    )
-  );
-
-  const py = Math.max(
-    0,
-    Math.min(
-      100,
-      (y + er.height / 2) / d.frameH * 100
-    )
-  );
+  const px = maxLeft > 0 ? Math.round((x / maxLeft) * 100) : 50;
+  const py = maxTop > 0 ? Math.round((y / maxTop) * 100) : 75;
 
   applyCustom(d.el, px, py);
 
@@ -985,22 +971,30 @@ function editorPreviewUpdate() {
     if (placeholder) placeholder.style.display = isLogoEnabled ? 'inline-flex' : 'none';
   }
 
-  txt.style.display =
+  const isEditorTxtOn =
     $('#editorTextEnabled')?.checked &&
       $('#editorTextValue')?.value.trim()
       ? 'block'
       : 'none';
+  txt.style.display = isEditorTxtOn;
 
-  txt.textContent =
-    $('#editorTextValue')?.value || 'Your text';
+  const editorContent = txt.querySelector('.editor-text-content');
+  const editorVal = $('#editorTextValue')?.value || 'Your text';
+  if (editorContent) {
+    editorContent.textContent = editorVal;
+  } else {
+    txt.textContent = editorVal;
+  }
 
-  txt.style.fontSize =
-    Math.max(
-      14,
-      Math.round(
-        120 * (+($('#editorTextSize')?.value || 6)) / 12
-      )
-    ) + 'px';
+  const eFrame = txt.closest('.editor-preview-frame, .preview-frame');
+  const eFrameWidth = (eFrame && eFrame.clientWidth > 0) ? eFrame.clientWidth : 320;
+  const eSizePct = Math.max(2, Math.min(25, +($('#editorTextSize')?.value || 6)));
+  // Proportional font size matching video ratio (1080p width): fs = round(1080 * size / 100)
+  const ePreviewFs = Math.max(10, Math.round(eFrameWidth * (eSizePct / 100)));
+  txt.style.fontSize = ePreviewFs + 'px';
+
+  const eBadge = txt.querySelector('.ctrl-size-badge');
+  if (eBadge) eBadge.textContent = eSizePct + '%';
 
   txt.style.color =
     $('#editorTextColor')?.value || '#FFFFFF';
@@ -1044,6 +1038,169 @@ function editorPreviewUpdate() {
   $('#' + id)?.addEventListener('input', editorPreviewUpdate);
   $('#' + id)?.addEventListener('change', editorPreviewUpdate);
 });
+
+function setupOverlayTextInteractions() {
+  function attachResizeHandle(handleId, sizeInputId, isBeta, onUpdate) {
+    const handle = $('#' + handleId);
+    const sizeInput = $('#' + sizeInputId);
+    if (!handle || !sizeInput) return;
+
+    let isResizing = false;
+    let startX = 0;
+    let startY = 0;
+    let startVal = 0;
+
+    const onDown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      isResizing = true;
+      startX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+      startY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+      startVal = +sizeInput.value || (isBeta ? 42 : 6);
+      document.body.style.cursor = 'nwse-resize';
+      try { handle.setPointerCapture?.(e.pointerId); } catch {}
+    };
+
+    const onMove = (e) => {
+      if (!isResizing) return;
+      const clientX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+      const clientY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+      const delta = (clientX - startX) + (clientY - startY);
+      if (isBeta) {
+        const change = Math.round(delta / 4);
+        const newVal = Math.max(16, Math.min(96, startVal + change));
+        if (newVal !== +sizeInput.value) {
+          sizeInput.value = newVal;
+          sizeInput.dispatchEvent(new Event('input', { bubbles: true }));
+          sizeInput.dispatchEvent(new Event('change', { bubbles: true }));
+          if (onUpdate) onUpdate();
+        }
+      } else {
+        const change = Math.round(delta / 12);
+        const newVal = Math.max(2, Math.min(25, startVal + change));
+        if (newVal !== +sizeInput.value) {
+          sizeInput.value = newVal;
+          sizeInput.dispatchEvent(new Event('input', { bubbles: true }));
+          sizeInput.dispatchEvent(new Event('change', { bubbles: true }));
+          if (onUpdate) onUpdate();
+        }
+      }
+    };
+
+    const onUp = () => {
+      if (isResizing) {
+        isResizing = false;
+        document.body.style.cursor = '';
+      }
+    };
+
+    handle.addEventListener('pointerdown', onDown);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  }
+
+  function attachButtons(decId, incId, sizeInputId, isBeta, onUpdate) {
+    const decBtn = $('#' + decId);
+    const incBtn = $('#' + incId);
+    const sizeInput = $('#' + sizeInputId);
+    if (!sizeInput) return;
+
+    const step = isBeta ? 2 : 1;
+    const min = isBeta ? 16 : 2;
+    const max = isBeta ? 96 : 25;
+
+    if (decBtn) {
+      decBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const cur = +sizeInput.value || (isBeta ? 42 : 6);
+        const newVal = Math.max(min, Math.min(max, cur - step));
+        sizeInput.value = newVal;
+        sizeInput.dispatchEvent(new Event('input', { bubbles: true }));
+        sizeInput.dispatchEvent(new Event('change', { bubbles: true }));
+        if (onUpdate) onUpdate();
+      });
+      decBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+    }
+
+    if (incBtn) {
+      incBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const cur = +sizeInput.value || (isBeta ? 42 : 6);
+        const newVal = Math.max(min, Math.min(max, cur + step));
+        sizeInput.value = newVal;
+        sizeInput.dispatchEvent(new Event('input', { bubbles: true }));
+        sizeInput.dispatchEvent(new Event('change', { bubbles: true }));
+        if (onUpdate) onUpdate();
+      });
+      incBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+    }
+  }
+
+  function attachWheel(overlayId, sizeInputId, isBeta, onUpdate) {
+    const el = $('#' + overlayId);
+    const sizeInput = $('#' + sizeInputId);
+    if (!el || !sizeInput) return;
+
+    el.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const step = isBeta ? 2 : 1;
+      const min = isBeta ? 16 : 2;
+      const max = isBeta ? 96 : 25;
+      const cur = +sizeInput.value || (isBeta ? 42 : 6);
+      const dir = e.deltaY < 0 ? 1 : -1;
+      const newVal = Math.max(min, Math.min(max, cur + (dir * step)));
+      if (newVal !== cur) {
+        sizeInput.value = newVal;
+        sizeInput.dispatchEvent(new Event('input', { bubbles: true }));
+        sizeInput.dispatchEvent(new Event('change', { bubbles: true }));
+        if (onUpdate) onUpdate();
+      }
+    }, { passive: false });
+  }
+
+  // Preview overlay (Create panel)
+  attachButtons('previewTextSizeDec', 'previewTextSizeInc', 'textSize', false, updatePreview);
+  attachResizeHandle('previewTextResizeHandle', 'textSize', false, updatePreview);
+  attachWheel('previewText', 'textSize', false, updatePreview);
+
+  // Editor overlay
+  attachButtons('editorTextSizeDec', 'editorTextSizeInc', 'editorTextSize', false, editorPreviewUpdate);
+  attachResizeHandle('editorTextResizeHandle', 'editorTextSize', false, editorPreviewUpdate);
+  attachWheel('editorText', 'editorTextSize', false, editorPreviewUpdate);
+
+  // Beta Lab overlay
+  attachButtons('betaTextSizeDec', 'betaTextSizeInc', 'betaTextSize', true, () => {
+    if (typeof syncTextOverlayStyles === 'function') syncTextOverlayStyles();
+  });
+  attachResizeHandle('betaTextResizeHandle', 'betaTextSize', true, () => {
+    if (typeof syncTextOverlayStyles === 'function') syncTextOverlayStyles();
+  });
+  attachWheel('betaTextDragOverlay', 'betaTextSize', true, () => {
+    if (typeof syncTextOverlayStyles === 'function') syncTextOverlayStyles();
+  });
+
+  // ResizeObserver for aspect-ratio responsive scaling
+  try {
+    const ro = new ResizeObserver(() => {
+      if (typeof updatePreview === 'function') updatePreview();
+      if (typeof editorPreviewUpdate === 'function') editorPreviewUpdate();
+      if (typeof syncTextOverlayStyles === 'function') syncTextOverlayStyles();
+    });
+    ['previewFrame', 'editorPreviewFrame', 'betaPreviewFrame'].forEach(id => {
+      const el = $('#' + id);
+      if (el) ro.observe(el);
+    });
+  } catch {}
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupOverlayTextInteractions);
+} else {
+  setupOverlayTextInteractions();
+}
 
 $('#editorLogoInput')?.addEventListener(
   'change',
@@ -4140,7 +4297,14 @@ function initBetaTestingSection() {
 
     const sizeVal = betaTextSize ? +betaTextSize.value : 42;
     if (betaTextSizeOut) betaTextSizeOut.textContent = `${sizeVal}px`;
-    betaTextDragContent.style.fontSize = `${(sizeVal / 32).toFixed(2)}rem`;
+    const frame = betaPreviewFrame || $('#betaPreviewFrame');
+    const frameWidth = (frame && frame.clientWidth > 0) ? frame.clientWidth : 320;
+    // In FFmpeg app.py: fs_canvas = max(24, round(sizeVal * 2.4)) on 1080px canvas
+    // Proportional video aspect ratio match:
+    const betaFs = Math.max(11, Math.round(frameWidth * ((sizeVal * 2.4) / 1080)));
+    betaTextDragContent.style.fontSize = `${betaFs}px`;
+    const betaBadge = $('#betaTextSizeBadge');
+    if (betaBadge) betaBadge.textContent = `${sizeVal}px`;
 
     if (betaTextColor) betaTextDragContent.style.color = betaTextColor.value;
     if (betaTextFont) betaTextDragContent.style.fontFamily = `"${betaTextFont.value}", Impact, sans-serif`;
@@ -4235,6 +4399,7 @@ function initBetaTestingSection() {
       }
     }
   }
+  window.syncTextOverlayStyles = syncTextOverlayStyles;
 
   // Draggable logic for text overlay
   if (betaTextDragOverlay && betaPreviewFrame) {
@@ -4283,6 +4448,9 @@ function initBetaTestingSection() {
     };
 
     betaTextDragOverlay.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.ctrl-btn-size') || e.target.closest('.overlay-resize-handle')) {
+        return;
+      }
       e.preventDefault();
       onTextDragStart(e.clientX, e.clientY);
     });
@@ -4298,6 +4466,9 @@ function initBetaTestingSection() {
 
     // Touch support for drag
     betaTextDragOverlay.addEventListener('touchstart', (e) => {
+      if (e.target.closest('.ctrl-btn-size') || e.target.closest('.overlay-resize-handle')) {
+        return;
+      }
       if (e.touches && e.touches[0]) {
         onTextDragStart(e.touches[0].clientX, e.touches[0].clientY);
       }
@@ -5020,16 +5191,6 @@ function initInstantClippingSection() {
       if (instantState.running) return;
       instantState.clipIteration += 1;
       runInstantClip(true);
-    });
-  }
-        startClipBtn.innerHTML = '<span>⚡ Make Instant Short Now</span>';
-        if (statusPill) {
-          statusPill.className = 'instant-status-pill status-ready';
-          statusPill.textContent = 'Ready';
-        }
-        addLog(`[Instant] Launch error: ${err.message}`, 'warn');
-        alert(`Could not start instant clipping: ${err.message}`);
-      }
     });
   }
 

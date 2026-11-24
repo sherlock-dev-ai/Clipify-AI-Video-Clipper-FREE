@@ -245,26 +245,32 @@
     },
     {
       target: '#instantPresetCard, #instantDurationGroup',
-      title: '2. Lightning Fast Presets',
-      desc: 'Choose target duration (15s, 30s, or 60s) and framing layout. Bypasses heavy multi-stage LLM ranking and diarization to finish in seconds!',
+      title: '2. Lightning Fast Presets & Multi-Clip Count',
+      desc: 'Choose target duration (15s, 30s, or 60s) and batch generate 1, 2, 3, or 5 vertical clips at once. Completely skips heavy LLM candidate ranking to finish in seconds!',
+      pos: 'right'
+    },
+    {
+      target: '#instantLayoutGroup, #instantCaptionsGroup',
+      title: '3. Framing Layout & Kinetic Captions',
+      desc: 'Choose from 9:16 Center Crop, Blur-Fill, or Split Screen layouts (Top/Bottom 50/50 & Gaming/Facecam), and toggle dynamic Kinetic Captions.',
       pos: 'right'
     },
     {
       target: '#btnStartInstantClip',
-      title: '3. Isolated Instant Generation',
+      title: '4. Isolated Instant Generation',
       desc: 'Click <b>⚡ Make Instant Short</b> to immediately kick off accelerated hardware-direct 9:16 rendering. Completely isolated so your other jobs stay safe.',
       pos: 'top'
     },
     {
       target: '#instantConsoleCard, #instantConsoleLog',
-      title: '4. Live Dark Terminal Log',
+      title: '5. Live Dark Terminal Log',
       desc: 'Watch real-time frame-by-frame encoding and stream analysis in the themed dark console with zero delay or freeze.',
       pos: 'left'
     },
     {
       target: '#instantReviewCard, #instantVideoPlayer',
-      title: '5. Instant Review, Download & Editor',
-      desc: 'Play your finished 9:16 vertical short immediately, download the MP4 file directly, or jump straight to the Editor for fine-tuning.',
+      title: '6. Multi-Clip Review, Download & Editor',
+      desc: 'Switch between generated clips, preview high-bitrate vertical video, download MP4s individually or all at once, or send to Editor.',
       pos: 'left',
       isFinal: true
     }
@@ -474,11 +480,11 @@
       name: 'Instant Clipping Lab',
       label: '⚡ Instant Clipping',
       steps: INSTANT_STEPS,
-      accent: '#eab308',
-      accentLight: '#fde047',
-      accentGlow: 'rgba(234, 179, 8, 0.45)',
-      badgeBg: 'rgba(234, 179, 8, 0.12)',
-      badgeBorder: 'rgba(234, 179, 8, 0.35)',
+      accent: '#ffffff',
+      accentLight: '#e4e4e7',
+      accentGlow: 'rgba(255, 255, 255, 0.45)',
+      badgeBg: 'rgba(255, 255, 255, 0.12)',
+      badgeBorder: 'rgba(255, 255, 255, 0.35)',
     },
     beta: {
       name: 'Beta Testing Lab',

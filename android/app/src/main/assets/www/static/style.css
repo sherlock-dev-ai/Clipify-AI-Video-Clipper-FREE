@@ -5262,12 +5262,13 @@ div[id*="monica-action"] {
 .instant-card-num {
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.72rem;
-  font-weight: 700;
-  color: #eab308;
-  background: rgba(234, 179, 8, 0.12);
-  border: 1px solid rgba(234, 179, 8, 0.28);
+  font-weight: 800;
+  color: #000000;
+  background: #ffffff;
+  border: 1px solid #ffffff;
   padding: 2px 7px;
   border-radius: 6px;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.25);
 }
 
 .instant-card-header h3 {
@@ -5281,32 +5282,33 @@ div[id*="monica-action"] {
   margin-left: auto;
   font-size: 0.72rem;
   font-weight: 600;
-  color: #94a3b8;
+  color: #a1a1aa;
   background: rgba(255, 255, 255, 0.05);
   padding: 2px 8px;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Dropzone */
 .instant-dropzone {
-  border: 2px dashed rgba(234, 179, 8, 0.35);
-  background: rgba(234, 179, 8, 0.03);
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.02);
   border-radius: 14px;
   padding: 28px 18px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .instant-dropzone:hover, .instant-dropzone.dragover {
-  border-color: #facc15;
-  background: rgba(234, 179, 8, 0.08);
+  border-color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
   transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 0 16px rgba(255, 255, 255, 0.04);
 }
 
 .instant-dropzone-icon {
-  color: #eab308;
+  color: #ffffff;
   margin-bottom: 10px;
 }
 
@@ -5318,8 +5320,9 @@ div[id*="monica-action"] {
 }
 
 .instant-browse-link {
-  color: #facc15;
+  color: #ffffff;
   text-decoration: underline;
+  font-weight: 600;
 }
 
 .instant-dropzone-sub {
@@ -5333,12 +5336,12 @@ div[id*="monica-action"] {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: rgba(234, 179, 8, 0.12);
-  border: 1px solid rgba(234, 179, 8, 0.35);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 10px;
   padding: 8px 12px;
   margin-top: 12px;
-  color: #facc15;
+  color: #ffffff;
 }
 
 .instant-file-name {
@@ -5463,31 +5466,34 @@ div[id*="monica-action"] {
 }
 
 .instant-choice-btn.active {
-  background: rgba(234, 179, 8, 0.16);
-  border-color: #eab308;
-  color: #facc15;
-  box-shadow: 0 0 14px rgba(234, 179, 8, 0.25);
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+  color: #000000 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.4) !important;
 }
 
-/* Glow Launch Button */
+/* Glow Launch Button - Obsidian High Contrast */
 .instant-glow-btn {
   width: 100%;
   padding: 13px 18px;
   font-size: 0.98rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%) !important;
-  color: #000000 !important;
-  border: none !important;
+  background: #ffffff !important;
+  color: #09090b !important;
+  border: 1px solid rgba(255, 255, 255, 0.9) !important;
   border-radius: 12px !important;
   cursor: pointer;
-  box-shadow: 0 4px 20px rgba(234, 179, 8, 0.35) !important;
-  transition: all 0.2s ease !important;
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.22), 0 2px 6px rgba(0, 0, 0, 0.6) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
   margin-top: 6px;
+  letter-spacing: -0.01em;
 }
 
 .instant-glow-btn:hover {
+  background: #f4f4f5 !important;
   transform: translateY(-1px);
-  box-shadow: 0 6px 26px rgba(234, 179, 8, 0.5) !important;
+  box-shadow: 0 6px 28px rgba(255, 255, 255, 0.4) !important;
 }
 
 .instant-glow-btn:disabled {
@@ -5512,9 +5518,9 @@ div[id*="monica-action"] {
 }
 
 .instant-status-pill.status-running {
-  background: rgba(234, 179, 8, 0.16);
-  color: #facc15;
-  border: 1px solid rgba(234, 179, 8, 0.4);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
   animation: liveDotPulse 1.5s infinite;
 }
 
@@ -5522,6 +5528,41 @@ div[id*="monica-action"] {
   background: rgba(34, 197, 94, 0.16);
   color: #4ade80;
   border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+/* Multi-Clip Switcher Bar */
+.instant-multiclip-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.instant-clip-tab {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #a1a1aa;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+}
+
+.instant-clip-tab:hover {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.instant-clip-tab.active {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
 }
 
 .instant-preview-box {

@@ -3312,6 +3312,70 @@ instant_jobs: dict[str, dict[str, Any]] = {}
 instant_jobs_lock = threading.Lock()
 
 
+def _fast_generate_captions(audio_path: Path, ass_path: Path, clip_dur: float, layout: str) -> bool:
+    """Generate dynamic kinetic ASS captions for an isolated instant short in seconds using faster-whisper."""
+    try:
+        from faster_whisper import WhisperModel
+        import torch
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        compute_type = "float16" if device == "cuda" else "int8"
+        model = WhisperModel("tiny", device=device, compute_type=compute_type)
+        segments, _ = model.transcribe(str(audio_path), word_timestamps=True, beam_size=1, vad_filter=True)
+        words = []
+        for segment in segments:
+            for w in getattr(segment, "words", []):
+                word_text = w.word.strip()
+                if word_text:
+                    words.append({
+                        "word": word_text,
+                        "start": max(0.0, float(w.start)),
+                        "end": min(clip_dur, float(w.end))
+                    })
+        if not words:
+            return False
+
+        margin_v = 920 if ("split" in layout) else 280
+        style_header = (
+            "[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\n"
+            "WrapStyle: 0\nScaledBorderAndShadow: yes\nYCbCr Matrix: TV.709\n\n"
+            "[V4+ Styles]\n"
+            "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+            f"Style: Kinetic,Arial,72,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,2,2,60,60,{margin_v},1\n\n"
+            "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        )
+
+        def to_ass_time(sec: float) -> str:
+            h = int(sec // 3600)
+            m = int((sec % 3600) // 60)
+            s = int(sec % 60)
+            cs = int(round((sec - int(sec)) * 100))
+            return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+        beats = []
+        chunk = []
+        for w in words:
+            chunk.append(w)
+            if len(chunk) >= 3 or (chunk and chunk[-1]["word"].endswith((".", "!", "?", ","))):
+                beats.append(chunk)
+                chunk = []
+        if chunk:
+            beats.append(chunk)
+
+        with open(ass_path, "w", encoding="utf-8-sig") as f:
+            f.write(style_header)
+            for beat in beats:
+                b_start = beat[0]["start"]
+                b_end = max(b_start + 0.3, beat[-1]["end"])
+                text = " ".join(w["word"] for w in beat).upper()
+                pop = "{\\fscx90\\fscy90\\t(0,70,\\fscx108\\fscy108)\\t(70,140,\\fscx100\\fscy100)}"
+                f.write(f"Dialogue: 0,{to_ass_time(b_start)},{to_ass_time(b_end)},Kinetic,,0,0,0,,{pop}{text}\n")
+
+        return ass_path.exists() and ass_path.stat().st_size > 100
+    except Exception as e:
+        print(f"[FastCaptions] Notice: {e}")
+        return False
+
+
 def _instant_worker(
     job_id: str,
     input_path: Path | None,
@@ -3319,7 +3383,9 @@ def _instant_worker(
     layout: str,
     start_mode: str,
     custom_start: float,
-    youtube_url: str = ""
+    youtube_url: str = "",
+    num_clips: int = 1,
+    captions: str = "yes"
 ) -> None:
     job_dir = JOBS / job_id
     input_dir = job_dir / "input"
@@ -3405,74 +3471,155 @@ def _instant_worker(
             total_dur = 60.0
         log(f"Source video verified: {input_path.name} (Duration: {total_dur:.1f}s)")
 
-        # Calculate target segment window
+        # Calculate segment windows for num_clips
         clip_len = min(target_dur, total_dur)
-        if start_mode == "start":
-            start_sec = 0.0
-        elif start_mode == "custom":
-            start_sec = max(0.0, min(custom_start, max(0.0, total_dur - clip_len)))
-        else:  # auto / golden hook window
-            if total_dur <= clip_len:
-                start_sec = 0.0
+        usable_span = max(0.0, total_dur - clip_len)
+        segments: list[tuple[float, float]] = []
+
+        if num_clips <= 1:
+            if start_mode == "start":
+                s = 0.0
+            elif start_mode == "custom":
+                s = max(0.0, min(custom_start, usable_span))
+            else:  # auto / golden hook window
+                s = 0.0 if total_dur <= clip_len else max(0.0, min(total_dur * 0.18, usable_span))
+            segments.append((s, s + clip_len))
+        else:
+            if usable_span <= 0.0:
+                for _ in range(num_clips):
+                    segments.append((0.0, clip_len))
             else:
-                start_sec = max(0.0, min(total_dur * 0.18, total_dur - clip_len))
+                step = usable_span / (num_clips + 1)
+                for i in range(num_clips):
+                    if start_mode == "start" and i == 0:
+                        s = 0.0
+                    elif start_mode == "custom" and i == 0:
+                        s = max(0.0, min(custom_start, usable_span))
+                    else:
+                        s = max(0.0, min(usable_span, step * (i + 1)))
+                    segments.append((s, s + clip_len))
 
-        end_sec = start_sec + clip_len
-        log(f"Target hook segment: {start_sec:.1f}s -> {end_sec:.1f}s ({clip_len:.1f}s duration)")
-
-        update_status("running", 30, "Rendering 9:16 Short")
-        out_name = f"instant_{job_id[:8]}_short.mp4"
-        out_path = out_dir / out_name
-
-        if layout == "blur_fill":
-            log("Applying Cinematic Blur Background 9:16 layout...")
-            filter_str = (
-                "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,"
-                "crop=1080:1920,boxblur=20:5[bg];"
-                "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease[fg];"
-                "[bg][fg]overlay=(W-w)/2:(H-h)/2"
-            )
-        elif layout == "split":
-            log("Applying Gaming Split (Top 50% / Bottom 50%) layout...")
-            filter_str = (
-                "[0:v]crop=iw:ih/2:0:0,scale=1080:960:flags=fast_bilinear[top];"
-                "[0:v]crop=iw:ih/2:0:ih/2,scale=1080:960:flags=fast_bilinear[bot];"
-                "[top][bot]vstack=inputs=2"
-            )
-        else:  # center_crop
-            log("Applying High-Speed Smart 9:16 Center Crop...")
-            filter_str = (
-                "crop=min(iw\\,ih*9/16):min(ih\\,iw*16/9):(iw-min(iw\\,ih*9/16))/2:(ih-min(ih\\,iw*16/9))/2,"
-                "scale=1080:1920:flags=fast_bilinear"
-            )
-
+        outputs = []
         ffmpeg = _ffmpeg_path()
-        cmd = [
-            ffmpeg, "-y",
-            "-ss", f"{start_sec:.2f}",
-            "-i", str(input_path),
-            "-t", f"{clip_len:.2f}",
-            "-filter_complex" if layout in ("blur_fill", "split") else "-vf", filter_str,
-            "-c:v", "libx264",
-            "-preset", "veryfast",
-            "-crf", "22",
-            "-c:a", "aac",
-            "-b:a", "192k",
-            "-movflags", "+faststart",
-            str(out_path)
-        ]
+        fonts_dir = str((ROOT / "fonts").resolve()).replace("\\", "/").replace(":", "\\:")
 
-        log("Encoding frames via fast CPU/GPU pipeline...")
-        proc = _run_hidden(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+        for c_idx, (start_sec, end_sec) in enumerate(segments):
+            c_dur = end_sec - start_sec
+            log(f"Rendering Clip {c_idx + 1}/{num_clips} (window: {start_sec:.1f}s -> {end_sec:.1f}s, {c_dur:.1f}s)...")
+            prog = int(25 + 65 * (c_idx / num_clips))
+            update_status("running", prog, f"Rendering Clip {c_idx + 1}/{num_clips}")
 
-        if proc.returncode != 0 or not out_path.exists() or out_path.stat().st_size < 1024:
-            err = proc.stderr[-400:] if proc.stderr else "FFmpeg execution failed."
-            log(f"ERROR: Render failed: {err}")
+            # Check if captions requested
+            ass_path = None
+            if captions == "yes":
+                try:
+                    chunk_wav = job_dir / f"chunk_{job_id[:8]}_{c_idx}.wav"
+                    audio_cmd = [
+                        ffmpeg, "-y",
+                        "-ss", f"{start_sec:.2f}",
+                        "-i", str(input_path),
+                        "-t", f"{c_dur:.2f}",
+                        "-vn", "-ac", "1", "-ar", "16000",
+                        str(chunk_wav)
+                    ]
+                    _run_hidden(audio_cmd, timeout=30)
+                    if chunk_wav.exists() and chunk_wav.stat().st_size > 1000:
+                        candidate_ass = job_dir / f"subs_{job_id[:8]}_{c_idx}.ass"
+                        if _fast_generate_captions(chunk_wav, candidate_ass, c_dur, layout):
+                            ass_path = candidate_ass
+                            log(f"✔ Kinetic captions generated for Clip {c_idx + 1}")
+                    chunk_wav.unlink(missing_ok=True)
+                except Exception as e:
+                    log(f"Notice: Fast captions skipped for clip {c_idx + 1} ({e})")
+
+            ass_filter_frag = ""
+            if ass_path and ass_path.exists():
+                ass_esc = str(ass_path.resolve()).replace("\\", "/").replace(":", "\\:")
+                ass_filter_frag = f"ass='{ass_esc}':fontsdir='{fonts_dir}'"
+
+            is_complex = False
+            if layout == "blur_fill":
+                is_complex = True
+                log("Applying Cinematic Blur Background 9:16 layout...")
+                base_chain = (
+                    "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,"
+                    "crop=1080:1920,boxblur=20:5[bg];"
+                    "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease[fg];"
+                    "[bg][fg]overlay=(W-w)/2:(H-h)/2"
+                )
+                if ass_filter_frag:
+                    filter_str = f"{base_chain}[vstacked];[vstacked]{ass_filter_frag}"
+                else:
+                    filter_str = base_chain
+            elif layout == "gaming_split":
+                is_complex = True
+                log("Applying Gaming Facecam + Gameplay Split Screen layout...")
+                base_chain = (
+                    "[0:v]crop=iw*0.5:ih*0.5:(iw-iw*0.5)/2:0,scale=1080:720:flags=fast_bilinear[top];"
+                    "[0:v]crop=iw:ih*0.75:0:ih*0.25,scale=1080:1200:flags=fast_bilinear[bot];"
+                    "[top][bot]vstack=inputs=2"
+                )
+                if ass_filter_frag:
+                    filter_str = f"{base_chain}[vstacked];[vstacked]{ass_filter_frag}"
+                else:
+                    filter_str = base_chain
+            elif layout == "split":
+                is_complex = True
+                log("Applying 50/50 Vertical Split Screen (Top & Bottom) layout...")
+                base_chain = (
+                    "[0:v]crop=iw:ih/2:0:0,scale=1080:960:flags=fast_bilinear[top];"
+                    "[0:v]crop=iw:ih/2:0:ih/2,scale=1080:960:flags=fast_bilinear[bot];"
+                    "[top][bot]vstack=inputs=2"
+                )
+                if ass_filter_frag:
+                    filter_str = f"{base_chain}[vstacked];[vstacked]{ass_filter_frag}"
+                else:
+                    filter_str = base_chain
+            else:  # center_crop
+                log("Applying High-Speed Smart 9:16 Center Crop...")
+                crop_chain = (
+                    "crop=min(iw\\,ih*9/16):min(ih\\,iw*16/9):(iw-min(iw\\,ih*9/16))/2:(ih-min(ih\\,iw*16/9))/2,"
+                    "scale=1080:1920:flags=fast_bilinear"
+                )
+                if ass_filter_frag:
+                    filter_str = f"{crop_chain},{ass_filter_frag}"
+                else:
+                    filter_str = crop_chain
+
+            out_name = f"instant_{job_id[:8]}_short_{c_idx + 1}.mp4" if num_clips > 1 else f"instant_{job_id[:8]}_short.mp4"
+            out_path = out_dir / out_name
+
+            cmd = [
+                ffmpeg, "-y",
+                "-ss", f"{start_sec:.2f}",
+                "-i", str(input_path),
+                "-t", f"{c_dur:.2f}",
+                "-filter_complex" if is_complex else "-vf", filter_str,
+                "-c:v", "libx264",
+                "-preset", "veryfast",
+                "-crf", "22",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-movflags", "+faststart",
+                str(out_path)
+            ]
+
+            proc = _run_hidden(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+
+            if proc.returncode != 0 or not out_path.exists() or out_path.stat().st_size < 1024:
+                err = proc.stderr[-400:] if proc.stderr else "FFmpeg execution failed."
+                log(f"ERROR: Clip {c_idx + 1} render failed: {err}")
+                continue
+
+            outputs.append(out_name)
+            size_kb = out_path.stat().st_size // 1024
+            log(f"✔ Clip {c_idx + 1}/{num_clips} rendered successfully: {out_name} ({size_kb} KB)")
+
+        if not outputs:
+            log("ERROR: All requested clips failed to render.")
             update_status("error", 0, "Render failed")
             return
 
-        size_kb = out_path.stat().st_size // 1024
-        log(f"✔ Instant Short rendered successfully: {out_name} ({size_kb} KB)")
         log("Registering project with Editor & Review Workspace...")
 
         # Register in main jobs dict for Review Editor integration
@@ -3482,8 +3629,8 @@ def _instant_worker(
                 "status": "done",
                 "progress": 100,
                 "stage": "Finished",
-                "detail": "Instant Short ready",
-                "outputs": [out_name],
+                "detail": f"Instant Shorts ready ({len(outputs)} clips)",
+                "outputs": outputs,
                 "filename": input_path.name,
                 "branding": {"logo": None, "text": ""},
                 "mode": "instant"
@@ -3495,12 +3642,12 @@ def _instant_worker(
                     status="done",
                     progress=100,
                     stage="Finished",
-                    outputs=[out_name],
-                    output_url=f"/media/{job_id}/{out_name}",
-                    filename=out_name,
+                    outputs=outputs,
+                    output_url=f"/media/{job_id}/{outputs[0]}",
+                    filename=outputs[0],
                     duration=clip_len
                 )
-        log("🎉 Instant Clipping complete! Ready to preview, download, or edit.")
+        log(f"🎉 Instant Clipping complete! Created {len(outputs)} Short{'s' if len(outputs) > 1 else ''}. Ready to preview, download, or edit.")
 
     except Exception as exc:
         log(f"ERROR: Unhandled exception in instant pipeline: {exc}")
@@ -3552,12 +3699,16 @@ def instant_start():
     youtube_url = str(data.get("youtube_url", "")).strip()
     target_dur = max(5.0, min(120.0, float(data.get("duration", 30.0))))
     layout = str(data.get("layout", "center_crop")).strip()
+    captions = str(data.get("captions", "yes")).strip().lower()
+    num_clips = max(1, min(10, int(data.get("num_clips", data.get("clips", 1)))))
     start_mode = str(data.get("start_mode", "auto")).strip()
     custom_start = max(0.0, float(data.get("custom_start", 0.0)))
 
     job_dir = JOBS / job_id
     input_dir = job_dir / "input"
+    out_dir = job_dir / "output"
     input_dir.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     input_path = None
     input_files = list(input_dir.glob("*.mp4")) + list(input_dir.glob("*.mov")) + list(input_dir.glob("*.mkv"))
@@ -3587,12 +3738,14 @@ def instant_start():
             "outputs": [],
             "output_url": None,
             "filename": input_path.name if input_path else "",
-            "duration": target_dur
+            "duration": target_dur,
+            "num_clips": num_clips,
+            "captions": captions
         }
 
     threading.Thread(
         target=_instant_worker,
-        args=(job_id, input_path, target_dur, layout, start_mode, custom_start, youtube_url),
+        args=(job_id, input_path, target_dur, layout, start_mode, custom_start, youtube_url, num_clips, captions),
         daemon=True
     ).start()
 

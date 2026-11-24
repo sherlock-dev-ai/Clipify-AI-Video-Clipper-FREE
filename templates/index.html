@@ -77,8 +77,7 @@
           stroke-linecap="round" stroke-linejoin="round">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
         </svg>
-        <span>Instant Clipping</span> <span class="nav-beta-tag"
-          style="background:rgba(234,179,8,0.18);color:#facc15;border-color:rgba(234,179,8,0.35);">BETA</span>
+        <span>Instant Clipping</span> <span class="nav-beta-tag">BETA</span>
       </a>
 
       <div class="sidebar-nav-divider"></div>
@@ -942,9 +941,8 @@
     <section id="instant" class="page-section secondary-section">
       <header class="section-page-head">
         <div>
-          <span class="eyebrow" style="color:#eab308;display:flex;align-items:center;gap:6px;">
-            <span class="nav-beta-tag"
-              style="font-size:0.68rem;padding:2px 6px;background:rgba(234,179,8,0.18);color:#facc15;border:1px solid rgba(234,179,8,0.35);border-radius:10px;font-weight:700;">BETA</span>
+          <span class="eyebrow" style="display:flex;align-items:center;gap:6px;">
+            <span class="nav-beta-tag">BETA</span>
             ULTRA-FAST ISOLATED PIPELINE
           </span>
           <h1>Instant Clipping</h1>
@@ -1018,13 +1016,34 @@
               </div>
             </div>
 
-            <!-- Layout Selector -->
+            <!-- Layout Selector (With Split Screen Options) -->
             <div class="instant-control-group">
               <label class="instant-control-label">Framing Layout</label>
               <div class="instant-btn-group" id="instantLayoutGroup">
                 <button type="button" class="instant-choice-btn active" data-val="center_crop">9:16 Center Crop</button>
                 <button type="button" class="instant-choice-btn" data-val="blur_fill">Blur-Fill 9:16</button>
-                <button type="button" class="instant-choice-btn" data-val="split">Gaming Split (Top/Bot)</button>
+                <button type="button" class="instant-choice-btn" data-val="split">⚡ Split Screen (Top / Bot)</button>
+                <button type="button" class="instant-choice-btn" data-val="gaming_split">Gaming / Facecam Split</button>
+              </div>
+            </div>
+
+            <!-- Captions Selection -->
+            <div class="instant-control-group">
+              <label class="instant-control-label">Kinetic Captions</label>
+              <div class="instant-btn-group" id="instantCaptionsGroup">
+                <button type="button" class="instant-choice-btn active" data-val="yes">⚡ Kinetic Captions</button>
+                <button type="button" class="instant-choice-btn" data-val="no">No Captions (Clean)</button>
+              </div>
+            </div>
+
+            <!-- Number of Clips -->
+            <div class="instant-control-group">
+              <label class="instant-control-label">Number of Clips</label>
+              <div class="instant-btn-group" id="instantClipsCountGroup">
+                <button type="button" class="instant-choice-btn active" data-val="1">1 Clip</button>
+                <button type="button" class="instant-choice-btn" data-val="2">2 Clips</button>
+                <button type="button" class="instant-choice-btn" data-val="3">3 Clips</button>
+                <button type="button" class="instant-choice-btn" data-val="5">5 Clips</button>
               </div>
             </div>
 
@@ -1047,7 +1066,7 @@
 
             <!-- Launch Button -->
             <button type="button" id="btnStartInstantClip" class="btn btn-primary instant-glow-btn">
-              <span>⚡ Generate Instant Short (Fast Mode)</span>
+              <span>⚡ Generate Instant Shorts (Fast Mode)</span>
             </button>
           </div>
         </div>
@@ -1061,6 +1080,9 @@
               <h3>Review &amp; Export</h3>
               <span id="instantStatusPill" class="instant-status-pill status-ready">Ready</span>
             </div>
+
+            <!-- Multi-Clip Selector Bar -->
+            <div id="instantMultiClipBar" class="instant-multiclip-bar" style="display:none;"></div>
 
             <!-- Preview Frame -->
             <div class="instant-preview-box" id="instantPreviewFrame">
@@ -1081,6 +1103,7 @@
             <div id="instantExportActions" class="instant-export-actions" style="display:none;">
               <a id="btnInstantDownload" class="btn btn-primary" download href="#"
                 style="flex:1;text-align:center;text-decoration:none;">Download Short ↓</a>
+              <button type="button" id="btnInstantDownloadAll" class="btn btn-secondary" style="flex:1;display:none;">Download All Clips ↓</button>
               <button type="button" id="btnInstantOpenEditor" class="btn btn-secondary" style="flex:1;">Open in Editor
                 ✂️</button>
             </div>

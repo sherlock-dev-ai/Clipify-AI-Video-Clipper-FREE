@@ -4554,6 +4554,8 @@ function initInstantClippingSection() {
   const ytFetchBtn = $('#btnInstantFetchYt');
   const durationBtns = $$('#instantDurationGroup .instant-choice-btn');
   const layoutBtns = $$('#instantLayoutGroup .instant-choice-btn');
+  const captionsBtns = $$('#instantCaptionsGroup .instant-choice-btn');
+  const clipsCountBtns = $$('#instantClipsCountGroup .instant-choice-btn');
   const startBtns = $$('#instantStartGroup .instant-choice-btn');
   const customStartBox = $('#instantCustomStartBox');
   const customStartSec = $('#instantCustomStartSec');
@@ -4562,8 +4564,10 @@ function initInstantClippingSection() {
   const previewBox = $('#instantPreviewFrame');
   const videoPlayer = $('#instantVideoPlayer');
   const emptyPreview = $('#instantEmptyPreview');
+  const multiClipBar = $('#instantMultiClipBar');
   const exportActions = $('#instantExportActions');
   const downloadBtn = $('#btnInstantDownload');
+  const downloadAllBtn = $('#btnInstantDownloadAll');
   const openEditorBtn = $('#btnInstantOpenEditor');
   const consoleLog = $('#instantConsoleLog');
   const copyLogBtn = $('#btnCopyInstantLog');
@@ -4576,10 +4580,14 @@ function initInstantClippingSection() {
     youtubeUrl: '',
     duration: 30,
     layout: 'center_crop',
+    captions: 'yes',
+    numClips: 1,
     startMode: 'auto',
     running: false,
     outputUrl: null,
-    outputFile: null
+    outputFile: null,
+    outputs: [],
+    activeClipIndex: 0
   };
 
   function addLog(msg, type = 'info') {
@@ -4610,6 +4618,16 @@ function initInstantClippingSection() {
   setupChoiceGroup(layoutBtns, (val) => {
     instantState.layout = val || 'center_crop';
     addLog(`[Instant] Framing preset set to: ${val}`);
+  });
+
+  setupChoiceGroup(captionsBtns, (val) => {
+    instantState.captions = val || 'yes';
+    addLog(`[Instant] Captions mode set to: ${val === 'yes' ? 'Kinetic Captions (Animated)' : 'Clean (No Captions)'}`);
+  });
+
+  setupChoiceGroup(clipsCountBtns, (val) => {
+    instantState.numClips = parseInt(val, 10) || 1;
+    addLog(`[Instant] Number of output clips set to: ${instantState.numClips}`);
   });
 
   setupChoiceGroup(startBtns, (val) => {
@@ -4768,6 +4786,8 @@ function initInstantClippingSection() {
           youtube_url: ytUrl || instantState.youtubeUrl,
           duration: instantState.duration,
           layout: instantState.layout,
+          captions: instantState.captions,
+          num_clips: instantState.numClips,
           start_mode: instantState.startMode,
           custom_start: customStartSec ? parseFloat(customStartSec.value) || 0 : 0
         };
@@ -4808,41 +4828,92 @@ function initInstantClippingSection() {
 
             // Update button label
             if (statusData.progress) {
-              startClipBtn.innerHTML = `<span>⚡ Rendering Instant Short (${statusData.progress}%)...</span>`;
+              startClipBtn.innerHTML = `<span>⚡ Rendering Instant Shorts (${statusData.progress}%)...</span>`;
             }
 
             if (statusData.status === 'done') {
               clearInterval(pollInterval);
               instantState.running = false;
               startClipBtn.disabled = false;
-              startClipBtn.innerHTML = '<span>⚡ Generate Another Instant Short</span>';
+              startClipBtn.innerHTML = '<span>⚡ Generate More Instant Shorts</span>';
               if (statusPill) {
                 statusPill.className = 'instant-status-pill status-done';
                 statusPill.textContent = 'Finished ✔';
               }
 
-              // Display Video
-              const outUrl = statusData.output_url || `/media/${activeJobId}/${statusData.outputs[0]}`;
-              const outName = statusData.filename || (statusData.outputs && statusData.outputs[0]) || 'instant_short.mp4';
-              instantState.outputUrl = outUrl;
-              instantState.outputFile = outName;
+              // Multi-clip and display setup
+              const outputs = Array.isArray(statusData.outputs) && statusData.outputs.length > 0 
+                ? statusData.outputs 
+                : [statusData.filename || 'instant_short.mp4'];
+              instantState.outputs = outputs;
+              instantState.activeClipIndex = 0;
 
-              if (videoPlayer) {
-                videoPlayer.src = outUrl;
-                videoPlayer.style.display = 'block';
-                videoPlayer.load();
-                videoPlayer.play().catch(() => {});
+              function selectClip(idx) {
+                instantState.activeClipIndex = idx;
+                const filename = outputs[idx];
+                const clipUrl = `/media/${activeJobId}/${filename}`;
+                instantState.outputUrl = clipUrl;
+                instantState.outputFile = filename;
+
+                if (videoPlayer) {
+                  videoPlayer.src = clipUrl;
+                  videoPlayer.style.display = 'block';
+                  videoPlayer.load();
+                  videoPlayer.play().catch(() => {});
+                }
+                if (emptyPreview) emptyPreview.style.display = 'none';
+
+                if (downloadBtn) {
+                  downloadBtn.href = `${clipUrl}?download=1`;
+                  downloadBtn.download = filename;
+                  downloadBtn.textContent = outputs.length > 1 ? `Download Clip ${idx + 1} ↓` : `Download Short ↓`;
+                }
+
+                if (multiClipBar) {
+                  multiClipBar.querySelectorAll('.instant-clip-tab').forEach((tab, tIdx) => {
+                    tab.classList.toggle('active', tIdx === idx);
+                  });
+                }
               }
-              if (emptyPreview) emptyPreview.style.display = 'none';
 
-              // Configure Action Buttons
+              if (multiClipBar) {
+                if (outputs.length > 1) {
+                  multiClipBar.style.display = 'flex';
+                  multiClipBar.innerHTML = '';
+                  outputs.forEach((out, i) => {
+                    const tab = document.createElement('button');
+                    tab.type = 'button';
+                    tab.className = `instant-clip-tab ${i === 0 ? 'active' : ''}`;
+                    tab.textContent = `Clip ${i + 1}`;
+                    tab.addEventListener('click', () => selectClip(i));
+                    multiClipBar.appendChild(tab);
+                  });
+
+                  if (downloadAllBtn) {
+                    downloadAllBtn.style.display = 'block';
+                    downloadAllBtn.onclick = () => {
+                      outputs.forEach((out, i) => {
+                        setTimeout(() => {
+                          const a = document.createElement('a');
+                          a.href = `/media/${activeJobId}/${out}?download=1`;
+                          a.download = out;
+                          document.body.appendChild(a);
+                          a.click();
+                          a.remove();
+                        }, i * 350);
+                      });
+                    };
+                  }
+                } else {
+                  multiClipBar.style.display = 'none';
+                  if (downloadAllBtn) downloadAllBtn.style.display = 'none';
+                }
+              }
+
               if (exportActions) exportActions.style.display = 'flex';
-              if (downloadBtn) {
-                downloadBtn.href = `${outUrl}?download=1`;
-                downloadBtn.download = outName;
-              }
+              selectClip(0);
 
-              addLog(`[Instant] ✔ Output Short ready: ${outName}`, 'success');
+              addLog(`[Instant] ✔ Output ready (${outputs.length} clip${outputs.length > 1 ? 's' : ''})!`, 'success');
             } else if (statusData.status === 'error') {
               clearInterval(pollInterval);
               instantState.running = false;

@@ -2709,9 +2709,10 @@ def import_youtube():
             command = [*yt_dlp_cmd, "--no-playlist", "--no-warnings", "--newline", "--progress",
                        "--progress-template", "download:[clip-prog] %(progress._percent_str)s|%(progress.downloaded_bytes)s|%(progress.total_bytes|progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s",
                        "--restrict-filenames", "--merge-output-format", "mp4",
+                       "--extractor-args", "youtube:player_client=android,ios,web",
                        "--socket-timeout", "60", "--retries", "10", "--fragment-retries", "10",
                        "--concurrent-fragments", "4", "--buffer-size", "16M", "--http-chunk-size", "10M",
-                       "-f", "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo[height<=480]+bestaudio/best[height<=480]/best",
+                       "-f", "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/18/bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo[height<=480]+bestaudio/best[height<=480]/best",
                        "--ffmpeg-location", str(Path(ffmpeg_path).parent)]
             node_binary = shutil.which("node") or shutil.which("node.exe")
             if node_binary:
@@ -2903,7 +2904,34 @@ def import_youtube():
                         if message.startswith("ERROR:"):
                             last_error = message
                             break
+
+                # If YouTube gave a bot verification challenge, automatically retry with iOS/Android mobile stream client
+                if "bot" in last_error.lower() or "sign in" in last_error.lower():
+                    emit(job_id, "log", "[YouTube] Detected bot challenge on standard client. Retrying with mobile stream client…")
+                    retry_cmd = [*yt_dlp_cmd, "--no-playlist", "--no-warnings", "--newline",
+                                 "--restrict-filenames", "--merge-output-format", "mp4",
+                                 "--extractor-args", "youtube:player_client=ios,android",
+                                 "--socket-timeout", "60", "--retries", "10",
+                                 "-f", "18/best[height<=720]/best",
+                                 "--ffmpeg-location", str(Path(ffmpeg_path).parent),
+                                 "-o", output_template, source_url]
+                    r_proc = subprocess.Popen(retry_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                              text=True, encoding="utf-8", errors="replace", bufsize=1,
+                                              creationflags=_hidden_creationflags())
+                    if r_proc.stdout:
+                        for r_raw in r_proc.stdout:
+                            r_line = r_raw.strip()
+                            if r_line:
+                                emit(job_id, "log", f"[YouTube] {r_line}")
+                    r_proc.wait()
+                    videos = [p for p in input_dir.iterdir() if p.is_file() and p.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm"} and p.stat().st_size >= 1024]
+                    if videos:
+                        return_code = 0
+
+            if return_code != 0 and not videos:
                 detail = last_error or ("yt-dlp failed to download the video." if return_code != 0 else "yt-dlp finished but no valid video was created.")
+                if "bot" in detail.lower() or "sign in" in detail.lower():
+                    detail = "YouTube requires bot verification for this specific video. Please try again or download via browser."
                 with jobs_lock:
                     jobs[job_id].update(status="error", stage="YouTube download failed", detail=detail)
                     jobs[job_id]["events"].append({"kind":"error","message":detail})

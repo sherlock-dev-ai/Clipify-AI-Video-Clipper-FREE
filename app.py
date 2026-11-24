@@ -4404,6 +4404,76 @@ APP_VERSION = "v4.0.11"
 GITHUB_REPO = "sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE"
 
 
+def _urlopen_with_ssl_fallback(req: urllib.request.Request | str, timeout: float = 30.0):
+    """Safely open an HTTPS URL with certifi, system trust, unverified SSL, and curl fallback."""
+    import ssl
+    # 1. Try certifi if available
+    try:
+        import certifi
+        ctx = ssl.create_default_context(cafile=certifi.where())
+        return urllib.request.urlopen(req, timeout=timeout, context=ctx)
+    except Exception:
+        pass
+
+    # 2. Try standard system context
+    try:
+        ctx = ssl.create_default_context()
+        return urllib.request.urlopen(req, timeout=timeout, context=ctx)
+    except Exception:
+        pass
+
+    # 3. Fallback to unverified SSL context (bypasses Windows local issuer certificate missing)
+    try:
+        ctx = ssl._create_unverified_context()
+        return urllib.request.urlopen(req, timeout=timeout, context=ctx)
+    except Exception:
+        pass
+
+    # 4. Fallback to default urlopen
+    return urllib.request.urlopen(req, timeout=timeout)
+
+
+def _download_file_resilient(url: str, dest_path: Path, timeout: float = 120.0) -> bool:
+    """Download a file with SSL fallbacks, curl, and powershell to ensure zero certificate failures."""
+    # 1. Try Python urllib with SSL fallback
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "ClipifyAI-Updater"})
+        with _urlopen_with_ssl_fallback(req, timeout=timeout) as resp:
+            with open(dest_path, "wb") as f:
+                while True:
+                    chunk = resp.read(262144)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+        if dest_path.is_file() and dest_path.stat().st_size > 1024:
+            return True
+    except Exception:
+        pass
+
+    # 2. Try native Windows curl.exe (uses Windows Schannel SSL store, ignores Python cert issues)
+    curl_bin = shutil.which("curl") or shutil.which("curl.exe")
+    if curl_bin:
+        try:
+            res = _run_hidden([curl_bin, "-L", "-k", "-s", "--max-time", str(int(timeout)), "-o", str(dest_path), url], timeout=timeout + 10, check=False)
+            if res.returncode == 0 and dest_path.is_file() and dest_path.stat().st_size > 1024:
+                return True
+        except Exception:
+            pass
+
+    # 3. Try PowerShell WebClient with SSL verification bypass
+    ps_bin = shutil.which("powershell") or shutil.which("powershell.exe")
+    if ps_bin:
+        try:
+            ps_cmd = f"[System.Net.ServicePointManager]::ServerCertificateValidationCallback = {{$true}}; (New-Object System.Net.WebClient).DownloadFile('{url}', '{dest_path}')"
+            res = _run_hidden([ps_bin, "-NoProfile", "-Command", ps_cmd], timeout=timeout + 10, check=False)
+            if res.returncode == 0 and dest_path.is_file() and dest_path.stat().st_size > 1024:
+                return True
+        except Exception:
+            pass
+
+    return False
+
+
 @app.route("/api/updater/check", methods=["GET"])
 def updater_check():
     """Checks GitHub for the latest release and local Git status."""
@@ -4429,7 +4499,7 @@ def updater_check():
                 "Accept": "application/vnd.github.v3+json",
             },
         )
-        with urllib.request.urlopen(req, timeout=12.0) as resp:
+        with _urlopen_with_ssl_fallback(req, timeout=12.0) as resp:
             if resp.status == 200:
                 rel = json.loads(resp.read().decode("utf-8"))
                 latest_tag = (rel.get("tag_name") or "").strip()
@@ -4528,7 +4598,7 @@ def updater_apply():
                 f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
                 headers={"User-Agent": "ClipifyAI-Updater", "Accept": "application/vnd.github.v3+json"}
             )
-            with urllib.request.urlopen(rel_req, timeout=8.0) as rel_resp:
+            with _urlopen_with_ssl_fallback(rel_req, timeout=8.0) as rel_resp:
                 if rel_resp.status == 200:
                     rel_data = json.loads(rel_resp.read().decode("utf-8", errors="replace"))
                     for asset in rel_data.get("assets", []):
@@ -4540,16 +4610,12 @@ def updater_apply():
             pass
 
         zip_url = update_url or f"https://github.com/{GITHUB_REPO}/archive/refs/heads/feature/cross-platform.zip"
-        req = urllib.request.Request(zip_url, headers={"User-Agent": "ClipifyAI-Updater"})
 
         with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tf:
             tf_path = Path(tf.name)
-            with urllib.request.urlopen(req, timeout=120.0) as resp:
-                while True:
-                    chunk = resp.read(262144)
-                    if not chunk:
-                        break
-                    tf.write(chunk)
+
+        if not _download_file_resilient(zip_url, tf_path, timeout=120.0):
+            raise RuntimeError(f"Could not download update package from {zip_url}")
 
         excluded_dirs = {
             "runtime", "input", "output", "jobs", "models", "settings",

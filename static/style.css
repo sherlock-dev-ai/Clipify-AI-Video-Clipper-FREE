@@ -144,16 +144,157 @@ select {
   line-height: 1.1;
 }
 
+.brand-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
 .brand-copy b {
   font-size: 15px;
   letter-spacing: -0.06em;
+  color: #ffffff;
 }
 
-.brand-copy span {
+.brand-copy > span:not(.brand-title-wrap),
+.brand-copy .brand-subtitle {
   margin-top: 5px;
   font-size: 9px;
   letter-spacing: 0.22em;
   color: var(--muted-2);
+}
+
+/* ==========================================================================
+   COOL ANIMATED TOP VERSION BADGE
+   ========================================================================== */
+.cool-version-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7.5px 2px 6.5px;
+  border-radius: 999px;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+  background: rgba(14, 14, 18, 0.95);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: badgeFloat 3.6s ease-in-out infinite;
+  text-decoration: none;
+  margin-top: 0 !important;
+}
+
+/* Moving Aurora Border Beam */
+.cool-version-badge::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 999px;
+  padding: 1px;
+  background: linear-gradient(90deg, #38bdf8, #818cf8, #ec4899, #f59e0b, #10b981, #38bdf8);
+  background-size: 300% 100%;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: borderAuroraFlow 4s linear infinite;
+  pointer-events: none;
+}
+
+/* Glowing Pulsing Status Dot */
+.cool-version-badge .version-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+  position: relative;
+  flex: 0 0 5px;
+  animation: dotPulse 2s ease-in-out infinite;
+}
+
+.cool-version-badge .version-dot::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1px solid rgba(16, 185, 129, 0.6);
+  animation: dotRipple 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+
+/* Liquid Moving Gradient Text */
+.cool-version-badge .version-num {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+  background: linear-gradient(90deg, #ffffff 0%, #38bdf8 30%, #c084fc 60%, #ffffff 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: textShineFlow 3s linear infinite;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Sweeping Luminous Beam */
+.cool-version-badge .version-shimmer-sweep {
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 80%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 100%
+  );
+  transform: skewX(-25deg);
+  animation: shimmerSweep 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+
+.cool-version-badge:hover {
+  transform: translateY(-1.5px) scale(1.06);
+  box-shadow: 0 4px 16px rgba(56, 189, 248, 0.45), 0 0 0 1px rgba(56, 189, 248, 0.5);
+}
+
+.cool-version-badge:active {
+  transform: translateY(0) scale(0.97);
+}
+
+@keyframes borderAuroraFlow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
+}
+
+@keyframes shimmerSweep {
+  0% { left: -120%; }
+  35% { left: 160%; }
+  100% { left: 160%; }
+}
+
+@keyframes dotPulse {
+  0%, 100% { transform: scale(1); opacity: 1; box-shadow: 0 0 6px #10b981; }
+  50% { transform: scale(1.3); opacity: 0.85; box-shadow: 0 0 10px #38bdf8; }
+}
+
+@keyframes dotRipple {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+@keyframes textShineFlow {
+  0% { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes badgeFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.5px); }
 }
 
 .sidebar-github {

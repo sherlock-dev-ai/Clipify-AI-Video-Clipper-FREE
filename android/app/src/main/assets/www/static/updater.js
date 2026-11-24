@@ -62,6 +62,8 @@
 
         if (badge) badge.textContent = data.current_version || 'v5.0.0';
         if (navVersionTag) navVersionTag.textContent = data.current_version || 'v5.0.0';
+        const topBadgeNum = document.querySelector('#topBrandVersionBadge .version-num');
+        if (topBadgeNum) topBadgeNum.textContent = data.current_version || 'v5.0.0';
 
         if (updateState.updateAvailable) {
           if (card) card.classList.add('has-update');
@@ -704,6 +706,19 @@
 
     if (navUpdateLink) {
       navUpdateLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (updateState.checked && updateState.updateAvailable) {
+          openModalWithRelease(updateState);
+        } else {
+          openModalUpToDate(updateState);
+          checkUpdate(true);
+        }
+      });
+    }
+
+    const topBrandBadge = document.getElementById('topBrandVersionBadge');
+    if (topBrandBadge) {
+      topBrandBadge.addEventListener('click', (e) => {
         e.preventDefault();
         if (updateState.checked && updateState.updateAvailable) {
           openModalWithRelease(updateState);

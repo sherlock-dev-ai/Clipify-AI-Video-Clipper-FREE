@@ -5668,33 +5668,77 @@ def _get_fastest_ollama_model() -> tuple[str, str | None]:
     return sorted_models[0], None
 
 
-_CLIPPY_SYSTEM_PROMPT = """You are the official in-app AI assistant for Clipify AI.
-You talk naturally, concisely, warmly, and helpfully like a knowledgeable human assistant.
-Never dump overwhelming bulleted feature lists for simple greetings (like "hi", "hello") or casual comments (like "im bored"). Reply normally and ask what they'd like to create!
+_CLIPPY_SYSTEM_PROMPT = """You are the official in-app AI assistant for Clipify AI (Version 5.0.0).
+You talk naturally, concisely, warmly, and helpfully like a creative video editing expert.
+Never dump overwhelming bulleted lists for simple greetings (like "hi", "hello") or casual comments. Reply normally and ask what they'd like to create!
 
-Key User Requests & Links:
-1. If the user asks for help, support, community, Instagram, or the group chat link, ALWAYS provide the official Instagram group chat link:
-   👉 [**Join Official Instagram Creator Community**](https://ig.me/j/AQj1lYCWh_iV_S7J/)
-   and creator contact `@sherlock.fy`.
-2. If the user asks about updates, what's new, or the latest version:
-   Explain that they are running **Clipify AI v4.0.11**! Highlight Live Studio (OBS RTMP stream clipping), Smart Podcast Split (auto 2-speaker with solo fallback), Anti-Burst Lanczos Upscaler, and Beta Lab text overlays. Tell them they can click the "Update" button on the left sidebar to check and install 1-click in-place updates.
-3. When the user asks how to use any feature (e.g. clipping live streams, adding text overlays in Beta Lab, creating AI voiceovers, or generating vertical shorts):
-   - Give a simple, clear explanation in plain English.
-   - Remind the user to click the "App Guide" button on the left sidebar if they want a guided, step-by-step interactive walkthrough.
-   - Include an action navigation tag on its own line:
-     - For live streaming / OBS: [NAVIGATE:live]
-     - For beta features / draggable text overlays: [NAVIGATE:beta]
-     - For narration / voiceovers: [NAVIGATE:narrate]
-     - For creating shorts / importing videos: [NAVIGATE:create]
-     - For video editing / branding / projects: [NAVIGATE:editor]
+Key In-App Features & Knowledge:
+1. Instant Clipping ([NAVIGATE:instant] or #instant):
+   - Ultra-fast isolated pipeline that cuts high-impact 9:16 vertical shorts in seconds.
+   - Completely skips heavy LLM transcription and multi-stage candidate scoring for instant results.
+   - Accepts YouTube links or local video files (drag-and-drop or file picker).
+   - Framing Layouts: 9:16 Center Crop, Blur-Fill 9:16, Split Screen (Top/Bottom), and Gaming Split (Facecam / Gameplay).
+   - Target Durations: 15s Hook, 30s Viral Short, 60s Full Highlight.
+   - Segment Selection: Auto Golden Hook (peaks excitement), Video Start (0:00), or Custom Timestamp.
+   - Dynamic Kinetic Subtitle Captions: optional animated word captions overlay.
+   - Multi-Clip Count: choose how many clips to generate at once.
+   - Fresh URL Ingestion: pasting a new YouTube URL or dropping a new file immediately resets and starts a clean, isolated job (never re-uses previous footage).
+   - "⚡ Generate Another Clip": when a clip is done, users can click "Generate Another Clip" to cut a completely different, non-overlapping hook from the video without re-downloading or re-processing!
 
-App facts:
-- Version: v4.0.11
-- Clipify AI is 100% free, private, local-first. No API keys or paid tiers.
-- Live Studio (/live): Ingests OBS RTMP stream at rtmp://localhost:1935/live for instant highlight clipping.
-- Narration Studio (/narrate): Pairs Kokoro neural voices with gameplay backgrounds.
-- Beta Lab (#beta): Draggable & timed custom text overlays burned non-destructively.
-- Create Shorts (#create): AI highlight detection (WhisperX + ClipsAI + face tracking).
+2. GPU Acceleration & Hardware Performance:
+   - Built-in hardware acceleration for NVIDIA GPUs (RTX / GTX with CUDA 12).
+   - Whisper transcription uses GPU (CTranslate2 float16) automatically when available, falling back to CPU (int8) only if no GPU is present. This completely eliminates CPU transcription delays!
+   - Video rendering utilizes hardware NVENC, AMF, or Intel QSV encoders with graceful fallback to libx264.
+
+3. Live Studio ([NAVIGATE:live] or /live):
+   - Real-time OBS RTMP live stream clipping.
+   - Stream directly to rtmp://localhost:1935/live from OBS Studio.
+   - Automatic live excitement scoring and instant vertical highlight generation while broadcasting.
+
+4. Narration Studio ([NAVIGATE:narrate] or /narrate):
+   - Create faceless AI voiceover videos.
+   - Pairs neural voice models (like Kokoro TTS) with satisfying gameplay and aesthetic background loops.
+
+5. Beta Lab ([NAVIGATE:beta] or #beta):
+   - Custom draggable and timed text overlays burned onto the 9:16 vertical frame with exact start and end timestamps.
+
+6. Create Shorts ([NAVIGATE:create] or #create):
+   - Full AI highlight generation engine with WhisperX transcription, multi-speaker diarization, smart podcast split, and face tracking.
+
+7. Editor & Projects ([NAVIGATE:editor] or #editor):
+   - Interactive timeline, trim adjustments, watermark & logo branding, and social publishing.
+
+8. Models & Engine Hub ([NAVIGATE:models]):
+   - Local AI models manager for Ollama and local Whisper.
+   - Recommends lightweight ultra-fast models like qwen2.5:3b or qwen2.5:1.5b.
+
+9. Promoters Spotlight ([NAVIGATE:promoters]):
+   - Creator spotlight modal celebrating top promoters, viral creators, and community supporters.
+
+10. Update Manager ([NAVIGATE:update]):
+   - 1-click in-place updater directly from GitHub releases to Clipify AI v5.0.0.
+
+11. Forest Runner Mascot & Mini-Game:
+   - Interactive creature mascot card on the sidebar ("need help?") triggering the Instagram community link or the playable retro Forest Runner game.
+
+12. Support & Community ([NAVIGATE:support]):
+   - Official Instagram Creator Community group chat:
+     👉 [**Join Official Instagram Creator Community**](https://ig.me/j/AQj1lYCWh_iV_S7J/)
+   - Creator contact: `@sherlock.fy`.
+   - Star on GitHub.
+
+Navigation Action Tags:
+When recommending or directing a user to a specific feature, always include the matching navigation tag on its own line:
+- [NAVIGATE:instant] -> For Instant Clipping, fast 9:16 shorts, split screen, generate another clip
+- [NAVIGATE:live] -> For Live Studio, OBS, RTMP stream clipping
+- [NAVIGATE:narrate] -> For Narration Studio, AI voiceovers, Kokoro
+- [NAVIGATE:beta] -> For Beta Lab, draggable text overlays
+- [NAVIGATE:create] -> For Create Shorts, YouTube import, full AI highlight detection
+- [NAVIGATE:editor] -> For Editor, video trimming, watermarks, branding
+- [NAVIGATE:models] -> For Models & Engine Hub, Ollama, Whisper
+- [NAVIGATE:update] -> For Update Manager, v5.0.0, checking updates
+- [NAVIGATE:promoters] -> For Promoters Spotlight
+- [NAVIGATE:support] -> For Support Us, GitHub star, Instagram
 """
 
 
@@ -5702,34 +5746,95 @@ def _clippy_builtin_fallback(user_query: str) -> str:
     """Provides natural, human-like responses when Ollama is offline or uninstalled."""
     q = user_query.lower().strip()
 
-    # Community & Instagram Support
-    if any(k in q for k in ("instagram", "insta", "group", "community", "help", "support", "contact", "chat link", "need help")):
+    # Instant Clipping & Variations
+    if any(k in q for k in (
+        "instant", "quick clip", "fast clip", "fast mode", "instant clipping", 
+        "split screen", "gaming split", "blur-fill", "blur fill", "center crop",
+        "generate another", "another clip", "different clip", "new clip", "diverse"
+    )):
         return (
+            "[NAVIGATE:instant]\n"
+            "I've opened **Instant Clipping** for you! ⚡\n\n"
+            "Instant Clipping creates high-impact 9:16 vertical shorts in seconds by skipping heavy LLM transcription:\n"
+            "- 📥 **Source**: Paste any YouTube link or drag-and-drop a local video file (fresh links immediately start a clean isolated job).\n"
+            "- 📐 **Framing Presets**: Choose between **9:16 Center Crop**, **Blur-Fill 9:16**, **Split Screen (Top/Bottom)**, or **Gaming Split (Facecam / Gameplay)**.\n"
+            "- ⏱️ **Target Duration**: 15s Hook, 30s Viral Short, or 60s Full Highlight.\n"
+            "- 💬 **Kinetic Captions**: Toggle dynamic animated word subtitle overlays.\n"
+            "- 🔢 **Multi-Clips**: Select how many clips to generate at once.\n"
+            "- ⚡ **Generate Another Clip**: Once your clip is ready, click *Generate Another Clip* to automatically cut a completely different, non-overlapping hook from the video without re-downloading!\n\n"
+            "Give it a try in the Instant Clipping panel!"
+        )
+
+    # GPU Acceleration, CUDA, Hardware delays
+    if any(k in q for k in ("gpu", "cuda", "nvidia", "hardware", "cpu", "delay", "slow", "speed up", "transcribe", "nvenc")):
+        return (
+            "🚀 **GPU Acceleration & Performance in Clipify AI v5.0.0**:\n\n"
+            "- **Automatic NVIDIA CUDA Detection**: Clipify AI automatically detects your NVIDIA GPU (RTX / GTX with CUDA 12). "
+            "When detected, Whisper speech-to-text transcribes at lightning speed using CTranslate2 `float16`.\n"
+            "- **Zero CPU Bottlenecks**: The CPU is only used as a fallback if no compatible GPU is installed, preventing transcription freezes and system lag.\n"
+            "- **Hardware Video Encoding**: Exports leverage hardware acceleration (NVIDIA NVENC, AMD AMF, or Intel QSV) for ultra-fast rendering with automatic fallback to CPU libx264.\n\n"
+            "Everything is configured automatically out of the box—no manual driver setup required!"
+        )
+
+    # Promoters Spotlight
+    if any(k in q for k in ("promoter", "spotlight", "supporter", "contributor")):
+        return (
+            "[NAVIGATE:promoters]\n"
+            "I've opened the **Promoters Spotlight** for you! 🌟\n\n"
+            "This showcases our top community promoters, viral creators, and supporters who help Clipify AI grow. "
+            "Check out their channels and see how you can get featured in our creator spotlight!"
+        )
+
+    # Models & Engine Hub
+    if any(k in q for k in ("model", "models", "engine", "ollama", "whisper", "qwen", "llama")):
+        return (
+            "[NAVIGATE:models]\n"
+            "I've opened the **Models & Engine Hub** for you! 🤖\n\n"
+            "Here you can manage local AI engines and check Whisper transcription status:\n"
+            "- **Fastest Recommendation**: For instant chat and analysis, we recommend `qwen2.5:3b` or `qwen2.5:1.5b` via Ollama.\n"
+            "- **Install**: Run `ollama pull qwen2.5:3b` in your terminal to enable intelligent local chatting."
+        )
+
+    # Community & Instagram Support
+    if any(k in q for k in ("instagram", "insta", "group", "community", "help", "support", "contact", "chat link", "need help", "star", "github")):
+        return (
+            "[NAVIGATE:support]\n"
             "Here is the official Clipify AI Creator Community on Instagram! 💬\n\n"
             "Join our group chat to get direct support, share your viral clips, and request features:\n"
             "👉 [**Join Instagram Community Group Chat**](https://ig.me/j/AQj1lYCWh_iV_S7J/)\n\n"
-            "You can also reach out to the creator directly on Instagram: `@sherlock.fy`"
+            "You can also reach out to the creator directly on Instagram: `@sherlock.fy`, or star the repository on GitHub!"
         )
 
-    # Updates and Version Info
-    if any(k in q for k in ("update", "version", "what's new", "whats new", "latest", "upgrade", "changelog", "patch")):
+    # Forest Runner Mascot & Mini-Game
+    if any(k in q for k in ("forest", "mascot", "game", "runner", "creature", "monkey")):
         return (
-            "You are currently running **Clipify AI v4.0.11**! 🚀\n\n"
-            "**What's new in v4.0.11:**\n"
-            "- 🔴 **Live Studio**: Real-time OBS RTMP stream clipping (`rtmp://localhost:1935/live`).\n"
-            "- 🎙️ **Smart Podcast Split**: 2-speaker tracking with clean solo fallback (never slices solo hosts in half).\n"
-            "- ✨ **Anti-Burst Lanczos Upscaler**: Lossless subclip trim + Lanczos unsharp contrast profiles.\n"
-            "- ✍️ **Beta Lab Text Overlays**: Draggable and timed text on the 9:16 frame.\n"
-            "- 🤖 **Redesigned Clippy AI**: Pinned flush edge toggle, persistent chat history, and deep-link navigation.\n\n"
-            "To check for new updates or apply an in-place patch, click the **Update** button on the left sidebar!"
+            "🌲 **Forest Runner Mascot & Mini-Game**:\n\n"
+            "See the cute little creature in the bushes at the bottom of the left sidebar? "
+            "Clicking on it lets you jump into our retro **Forest Runner** mini-game while waiting for exports, "
+            "or connects you directly with the community on Instagram!"
+        )
+
+    # Updates and Version Info (v5.0.0)
+    if any(k in q for k in ("update", "version", "what's new", "whats new", "latest", "upgrade", "changelog", "patch", "v5")):
+        return (
+            "[NAVIGATE:update]\n"
+            "You are currently running **Clipify AI v5.0.0**! 🚀\n\n"
+            "**What's new in v5.0.0:**\n"
+            "- ⚡ **Instant Clipping (#instant)**: Ultra-fast isolated pipeline, 9:16 Split Screen presets, Kinetic Subtitle Captions, multi-clip counts, and 'Generate Another Clip' diversification.\n"
+            "- 🚀 **CUDA 12 GPU Acceleration**: Auto NVIDIA GPU detection with CTranslate2 float16 & NVENC encoding; zero CPU transcription delays.\n"
+            "- 🌟 **Promoters Spotlight (#promoters)**: Creator showcase modal for top community supporters.\n"
+            "- 🖤 **Obsidian Monochrome Theme**: Unified black & white design system across Create, Live Studio, and Narration Studio.\n"
+            "- 🤖 **Intelligent Clippy AI**: Deep-link in-app navigation (`[NAVIGATE:...]`) and full feature knowledge.\n"
+            "- 📦 **1-Click Update Manager**: Seamless in-place updates verified against GitHub releases.\n\n"
+            "Click the **Update** button on the left sidebar anytime to check for fresh releases!"
         )
 
     # Casual greetings
     if q in ("hi", "hello", "hey", "yo", "sup", "howdy", "good morning", "good evening") or q.startswith(("hi ", "hello ", "hey ")):
-        return "Hey there! 👋 How can I help you today with your clips, live streams, or editing?"
+        return "Hey there! 👋 I'm your Clipify AI assistant. How can I help you create today? You can try Instant 9:16 Clipping, Live Studio, voiceovers, or standard AI shorts!"
 
     if "bored" in q:
-        return "Let's make something cool! You can import a video to create quick viral Shorts, test out voiceovers in Narration Studio, or clip highlights from Live Studio. What are you in the mood to create?"
+        return "Let's make something viral! You can generate quick 9:16 shorts with **Instant Clipping**, play the **Forest Runner** mini-game from the sidebar mascot, or create an AI story in **Narration Studio**. What would you like to do?"
 
     if any(k in q for k in ("live", "obs", "rtmp", "stream")):
         return (
@@ -5764,7 +5869,7 @@ def _clippy_builtin_fallback(user_query: str) -> str:
             "I've opened the Create section for you!\n\n"
             "Just paste any YouTube link or select a local video file, choose your preferred duration and framing, "
             "and click Start Clipping.\n\n"
-            "You can also click **App Guide** on the left menu for a complete walkthrough!"
+            "Tip: If you want ultra-fast 9:16 clips without heavy transcription, check out **Instant Clipping**!"
         )
 
     if any(k in q for k in ("edit", "editor", "project", "review", "brand", "logo", "watermark")):
@@ -5782,20 +5887,15 @@ def _clippy_builtin_fallback(user_query: str) -> str:
             "Clipify AI will clean up temporary audio extractions and working cache while preserving all your saved Shorts and projects!"
         )
 
-    if any(k in q for k in ("model", "ollama", "fastest", "speed", "qwen", "llama")):
-        return (
-            "For the fastest local AI speed, we recommend `qwen2.5:3b` or `qwen2.5:1.5b`. "
-            "They respond almost instantly while providing excellent reasoning. "
-            "You can install them by running `ollama pull qwen2.5:3b` in your terminal."
-        )
-
     if any(k in q for k in ("thank", "thanks", "awesome", "great", "cool")):
         return "You're very welcome! Let me know if you need any other help creating your clips."
 
     return (
-        "I'm here to help you get the most out of Clipify AI! "
-        "You can ask me how to clip live streams, add text in Beta Lab, generate voiceovers, or create viral shorts. "
-        "You can also click **App Guide** on the left menu anytime for an interactive walkthrough!"
+        "I'm here to help you get the most out of Clipify AI v5.0.0! "
+        "You can ask me how to use **Instant Clipping** (with Split Screen & 'Generate Another Clip'), "
+        "enable **GPU acceleration**, clip live OBS streams in **Live Studio**, create voiceovers in **Narration Studio**, "
+        "or join our **Instagram Creator Community**. "
+        "You can also click **App Guide** on the left menu anytime for an interactive tour!"
     )
 
 
@@ -5860,12 +5960,25 @@ def clippy_chat():
                     msg = chat_res.get("message", {}).get("content", "").strip()
                     if msg:
                         low_m = message.lower()
-                        if any(k in low_m for k in ("live", "obs", "rtmp", "stream")) and "[NAVIGATE:" not in msg:
+                        if any(k in low_m for k in ("instant", "fast clip", "quick clip", "instant clipping", "generate another")) and "[NAVIGATE:" not in msg:
+                            msg = f"[NAVIGATE:instant]\n{msg}\n\n*Tip: Click **App Guide** on the left menu for a step-by-step walkthrough!*"
+                        elif any(k in low_m for k in ("live", "obs", "rtmp", "stream")) and "[NAVIGATE:" not in msg:
                             msg = f"[NAVIGATE:live]\n{msg}\n\n*Tip: Click **App Guide** on the left menu for a step-by-step walkthrough!*"
                         elif any(k in low_m for k in ("beta", "text overlay", "draggable text", "overlay")) and "[NAVIGATE:" not in msg:
                             msg = f"[NAVIGATE:beta]\n{msg}\n\n*Tip: Click **App Guide** on the left menu for a step-by-step walkthrough!*"
                         elif any(k in low_m for k in ("narrat", "voiceover", "kokoro")) and "[NAVIGATE:" not in msg:
                             msg = f"[NAVIGATE:narrate]\n{msg}\n\n*Tip: Click **App Guide** on the left menu for a step-by-step walkthrough!*"
+                        elif any(k in low_m for k in ("promoter", "spotlight")) and "[NAVIGATE:" not in msg:
+                            msg = f"[NAVIGATE:promoters]\n{msg}"
+                        elif any(k in low_m for k in ("model", "engine hub")) and "[NAVIGATE:" not in msg:
+                            msg = f"[NAVIGATE:models]\n{msg}"
+                        elif any(k in low_m for k in ("update", "upgrade", "new version", "changelog")) and "[NAVIGATE:" not in msg:
+                            msg = f"[NAVIGATE:update]\n{msg}"
+                        elif any(k in low_m for k in ("support us", "support group", "get support", "instagram", "community", "donate", "patreon")):
+                            if "[NAVIGATE:" not in msg:
+                                msg = f"[NAVIGATE:support]\n{msg}"
+                            if "ig.me" not in msg:
+                                msg += "\n\n👉 [**Join Official Instagram Creator Community**](https://ig.me/j/AQj1lYCWh_iV_S7J/)\nCreator contact: `@sherlock.fy`"
                         elif any(k in low_m for k in ("create short", "import video", "how to clip")) and "[NAVIGATE:" not in msg and "live" not in low_m:
                             msg = f"[NAVIGATE:create]\n{msg}\n\n*Tip: Click **App Guide** on the left menu for a step-by-step walkthrough!*"
                         return jsonify({

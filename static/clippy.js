@@ -1,13 +1,13 @@
 /**
- * Clipify AI - Assistant Drawer & Chat (v4.0.11)
+ * Clipify AI - Assistant Drawer & Chat (v5.0.0)
  * Persistent chat history via localStorage, direct Instagram group support,
- * v4.0.11 update intelligence, modern obsidian pill UI, and smooth animations.
+ * v5.0.0 Instant Clipping & CUDA 12 GPU intelligence, modern obsidian pill UI, and smooth animations.
  */
 
 (function () {
   'use strict';
 
-  const STORAGE_KEY = 'clipify_clippy_chat_history_v3';
+  const STORAGE_KEY = 'clipify_clippy_chat_history_v5';
 
   // State
   const state = {
@@ -61,11 +61,11 @@
     welcomeDiv.innerHTML = `
       <div class="clippy-msg-bubble clippy-welcome-bubble">
         <p class="clippy-welcome-title"><strong>Hey! I'm your Clipify AI assistant.</strong></p>
-        <p class="clippy-welcome-desc">Ask me anything about clipping live streams, adding draggable text in Beta Lab, creating vertical shorts, or generating AI voiceovers.</p>
+        <p class="clippy-welcome-desc">Ask me anything about Instant 9:16 Clipping, NVIDIA CUDA 12 GPU acceleration, Live Studio streams, Narration Studio, or customizing your shorts.</p>
         <div class="clippy-chips">
-          <button class="clippy-chip" data-prompt="How do I clip a live stream?">🔴 Clip Live Stream</button>
-          <button class="clippy-chip" data-prompt="How do I add draggable text in Beta Lab?">✍️ Beta Text Overlay</button>
-          <button class="clippy-chip" data-prompt="How do I create a vertical Short from a video?">🎬 Create Short</button>
+          <button class="clippy-chip" data-prompt="How does Instant Clipping work?">⚡ Instant 9:16 Shorts</button>
+          <button class="clippy-chip" data-prompt="How does GPU acceleration work?">🚀 GPU & CUDA</button>
+          <button class="clippy-chip" data-prompt="How do I clip a live stream?">🔴 Live Studio</button>
           <button class="clippy-chip" data-prompt="How do I create an AI narration video?">🎙️ Narration Studio</button>
         </div>
       </div>

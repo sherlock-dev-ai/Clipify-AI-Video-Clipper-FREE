@@ -5740,3 +5740,34 @@ div[id*="monica-action"] {
   background: #09090c;
   scroll-behavior: smooth;
 }
+
+/* Update Modal & In-Place Updater Dynamic Moving Background */
+.update-modal-overlay {
+  background: rgba(6, 6, 10, 0.78) !important;
+  backdrop-filter: blur(24px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
+  overflow: hidden !important;
+}
+
+.update-modal-ascii-canvas {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+  opacity: 0.45 !important;
+}
+
+.update-modal-card {
+  position: relative !important;
+  z-index: 10 !important;
+  background: rgba(16, 18, 24, 0.94) !important;
+  backdrop-filter: blur(22px) !important;
+  -webkit-backdrop-filter: blur(22px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-radius: 22px !important;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.85), 0 0 50px rgba(129, 140, 248, 0.10) !important;
+  animation: restartModalPop 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}

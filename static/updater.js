@@ -111,6 +111,7 @@
 
     function openModalWithRelease(info) {
       if (!modal) return;
+      ensureModalAsciiBackground();
       modal.style.display = 'flex';
       if (modalTitle) modalTitle.textContent = `New Release Available: ${info.latestVersion}`;
       if (btnView) btnView.href = info.releaseUrl;
@@ -135,6 +136,7 @@
 
     function openModalUpToDate(info) {
       if (!modal) return;
+      ensureModalAsciiBackground();
       modal.style.display = 'flex';
       if (modalTitle) modalTitle.textContent = 'Clipify AI is Up to Date';
       if (btnView) btnView.href = info.releaseUrl;
@@ -165,6 +167,7 @@
       btnExecute.innerHTML = '<span class="btn-update-icon spinning">↻</span> Updating…';
 
       // Immediately hide modal and trigger updating takeover sub-window
+      stopModalAsciiBackground();
       if (modal) modal.style.display = 'none';
       triggerRestartTakeover('Applying core updates & rebooting local engine…');
 
@@ -376,11 +379,41 @@
       }, 400);
     }
 
+    let modalAsciiCtrl = null;
+    function ensureModalAsciiBackground() {
+      if (!modal) return;
+      let canvas = modal.querySelector('.update-modal-ascii-canvas');
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.id = 'updateModalAsciiCanvas';
+        canvas.className = 'restart-ascii-canvas update-modal-ascii-canvas';
+        modal.insertBefore(canvas, modal.firstChild);
+      }
+      if (!modalAsciiCtrl) {
+        modalAsciiCtrl = initAsciiMatrixBackground(canvas);
+      }
+      if (modalAsciiCtrl) {
+        modalAsciiCtrl.start();
+      }
+    }
+
+    function stopModalAsciiBackground() {
+      if (modalAsciiCtrl) {
+        modalAsciiCtrl.stop();
+      }
+    }
+
     function initRestartCanvas() {
       const canvas = document.getElementById('restartAsciiCanvas');
       if (!canvas) return;
+      const ctrl = initAsciiMatrixBackground(canvas);
+      if (ctrl) ctrl.start();
+    }
+
+    function initAsciiMatrixBackground(canvas) {
+      if (!canvas) return null;
       const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      if (!ctx) return null;
 
       const SYMBOLS = ['!', '@', '#', '$', '%', '^', '&', '*', '0', '1', '7', '8', 'X', 'Q', 'G', '~', '/', '\\', '+', '?'];
       const LOGO_SYMBOLS = ['✦', '★', '●', '■', '1', '0', '#', '*', '%', 'V'];
@@ -419,13 +452,14 @@
       }
       buildGrid();
 
-      window.addEventListener('resize', () => {
+      function onResize() {
         width = canvas.width = window.innerWidth;
         height = canvas.height = window.innerHeight;
         cols = Math.floor(width / SPACING);
         rows = Math.floor(height / SPACING);
         buildGrid();
-      });
+      }
+      window.addEventListener('resize', onResize);
 
       let mouse = { x: -9999, y: -9999, active: false };
       window.addEventListener('mousemove', (e) => {
@@ -547,7 +581,9 @@
         }
       }
 
-      let running = true;
+      let running = false;
+      let rafId = null;
+
       function animate() {
         if (!running) return;
         ctx.fillStyle = '#000000';
@@ -689,9 +725,25 @@
           ctx.shadowBlur = 0;
         }
 
-        requestAnimationFrame(animate);
+        rafId = requestAnimationFrame(animate);
       }
-      animate();
+
+      return {
+        start: () => {
+          if (running) return;
+          running = true;
+          onResize();
+          animate();
+        },
+        stop: () => {
+          running = false;
+          if (rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+          }
+        },
+        resize: onResize
+      };
     }
 
     if (btn) {
@@ -744,10 +796,21 @@
 
     closeModal?.addEventListener('click', () => {
       modal.style.display = 'none';
+      stopModalAsciiBackground();
     });
 
     modal?.addEventListener('click', (e) => {
-      if (e.target === modal) modal.style.display = 'none';
+      if (e.target === modal) {
+        modal.style.display = 'none';
+        stopModalAsciiBackground();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal && modal.style.display === 'flex') {
+        modal.style.display = 'none';
+        stopModalAsciiBackground();
+      }
     });
 
     // Check silently on startup after 3 seconds

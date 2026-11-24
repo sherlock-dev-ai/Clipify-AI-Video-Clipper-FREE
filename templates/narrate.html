@@ -363,10 +363,11 @@
   </div>
 </div>
 
-<!-- App-Themed Update Modal Popup -->
-<div id="updateModal" class="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(5,8,13,0.85);backdrop-filter:blur(10px);z-index:9999;align-items:center;justify-content:center;padding:20px;">
-  <div class="modal-card panel update-modal-card" style="background:var(--panel-strong,#12171e);border:1px solid rgba(255,255,255,0.15);border-radius:20px;max-width:520px;width:100%;box-shadow:0 30px 90px rgba(0,0,0,0.6);padding:26px;position:relative;">
-    <button type="button" class="modal-close-btn" id="closeUpdateModal" style="position:absolute;top:16px;right:18px;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1;" aria-label="Close">&times;</button>
+<!-- App-Themed Update Modal Popup with Live Moving Matrix Canvas Background -->
+<div id="updateModal" class="modal-overlay update-modal-overlay" style="display:none;position:fixed;inset:0;background:#050508;z-index:9999;align-items:center;justify-content:center;padding:20px;overflow:hidden;">
+  <canvas id="updateModalAsciiCanvas" class="restart-ascii-canvas update-modal-ascii-canvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;opacity:0.42;"></canvas>
+  <div class="modal-card panel update-modal-card" style="background:rgba(16,18,24,0.94);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,0.16);border-radius:22px;max-width:520px;width:100%;box-shadow:0 30px 90px rgba(0,0,0,0.85), 0 0 50px rgba(129,140,248,0.10);padding:26px;position:relative;z-index:10;animation:restartModalPop 0.35s cubic-bezier(0.16,1,0.3,1);">
+    <button type="button" class="modal-close-btn" id="closeUpdateModal" style="position:absolute;top:16px;right:18px;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1;z-index:25;" aria-label="Close">&times;</button>
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
       <div style="width:42px;height:42px;border-radius:12px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);display:flex;align-items:center;justify-content:center;color:#4ade80;flex-shrink:0;">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
@@ -376,7 +377,7 @@
         <p id="updateModalSubtitle" style="margin:2px 0 0;font-size:12px;color:#94a3b8;">Fast In-Place Updater (No installer required)</p>
       </div>
     </div>
-    <div id="updateModalContent" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;margin-bottom:20px;font-size:13px;color:#cbd5e1;line-height:1.5;">
+    <div id="updateModalContent" style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px;margin-bottom:20px;font-size:13px;color:#cbd5e1;line-height:1.5;">
       Checking GitHub for the latest release…
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;">

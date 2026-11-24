@@ -1,10 +1,12 @@
 package dev.sherlock.clipifyai.onboarding
 
 import android.annotation.SuppressLint
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.webkit.JavascriptInterface
@@ -16,6 +18,8 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import dev.sherlock.clipifyai.MainActivity
 import dev.sherlock.clipifyai.databinding.ActivityOnboardingBinding
+import org.json.JSONObject
+import java.util.Locale
 
 class OnboardingActivity : AppCompatActivity() {
 
@@ -35,7 +39,7 @@ class OnboardingActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupInstallerWebView() {
-        binding.installerWebview.setBackgroundColor(android.graphics.Color.parseColor("#090e0c"))
+        binding.installerWebview.setBackgroundColor(android.graphics.Color.parseColor("#090a0d"))
         binding.installerWebview.setLayerType(View.LAYER_TYPE_HARDWARE, null)
         binding.installerWebview.settings.apply {
             javaScriptEnabled = true
@@ -106,6 +110,42 @@ class OnboardingActivity : AppCompatActivity() {
         fun showToast(msg: String) {
             runOnUiThread {
                 Toast.makeText(this@OnboardingActivity, msg, Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        @JavascriptInterface
+        fun getDeviceInfoJson(): String {
+            return try {
+                val manufacturer = Build.MANUFACTURER.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+                val model = Build.MODEL
+                val brand = Build.BRAND.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+                val deviceName = if (model.startsWith(manufacturer, ignoreCase = true)) {
+                    model
+                } else if (model.startsWith(brand, ignoreCase = true)) {
+                    model
+                } else {
+                    "$brand $model"
+                }
+
+                val arch = if (Build.SUPPORTED_ABIS.isNotEmpty()) Build.SUPPORTED_ABIS[0] else "arm64-v8a"
+
+                val actManager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                val memInfo = ActivityManager.MemoryInfo()
+                actManager?.getMemoryInfo(memInfo)
+                val totalRamGb = String.format(Locale.US, "%.1f", memInfo.totalMem.toDouble() / (1024 * 1024 * 1024))
+                val androidVer = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
+
+                val obj = JSONObject()
+                obj.put("deviceName", deviceName)
+                obj.put("model", model)
+                obj.put("manufacturer", manufacturer)
+                obj.put("brand", brand)
+                obj.put("arch", arch)
+                obj.put("totalRamGb", totalRamGb)
+                obj.put("androidVer", androidVer)
+                obj.toString()
+            } catch (e: Exception) {
+                "{}"
             }
         }
     }

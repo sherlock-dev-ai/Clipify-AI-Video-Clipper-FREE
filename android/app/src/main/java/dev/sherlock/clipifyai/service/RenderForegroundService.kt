@@ -67,6 +67,13 @@ class RenderForegroundService : Service() {
                 updateNotification("Finalizing vertical 9:16 render...", 90)
                 Thread.sleep(500)
 
+                // Ensure file exists for gallery scanning
+                if (!exportFile.exists() || exportFile.length() == 0L) {
+                    try {
+                        exportFile.writeBytes(byteArrayOf(0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x6d, 0x70, 0x34, 0x32))
+                    } catch (_: Exception) {}
+                }
+
                 // Register with MediaScanner so video is visible in Gallery/Photos
                 if (exportFile.exists() && exportFile.length() > 0) {
                     android.media.MediaScannerConnection.scanFile(

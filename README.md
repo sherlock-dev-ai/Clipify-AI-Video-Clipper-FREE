@@ -27,6 +27,10 @@
 
 </div>
 
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" alt="Clipify AI Create Studio Dashboard" width="100%">
+</p>
+
 ---
 
 > [!TIP]

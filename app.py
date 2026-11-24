@@ -5211,7 +5211,7 @@ def cache_clear():
         "message": f"Successfully cleared {formatted} of disk space ({yt_deleted} YouTube video(s) and {cache_deleted} cache file(s) removed)."
     })
 
-APP_VERSION = "v5.0.2"
+APP_VERSION = "v5.0.3"
 try:
     _v_file = ROOT / "version.json"
     if _v_file.exists():
@@ -5360,24 +5360,22 @@ def updater_apply():
         time.sleep(1.2)
         try:
             creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
-            app_exe = ROOT / "Clipify AI.exe"
-            if app_exe.is_file():
-                restart_cmd = (
-                    f'powershell.exe -NoProfile -Command "'
-                    f'Start-Sleep -Milliseconds 800; '
-                    f'while (Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 400 }}; '
-                    f'Start-Process \'{str(app_exe)}\'"'
-                )
-                subprocess.Popen(restart_cmd, shell=True, creationflags=creationflags)
-            else:
-                py = sys.executable
-                restart_cmd = (
-                    f'powershell.exe -NoProfile -Command "'
-                    f'Start-Sleep -Milliseconds 800; '
-                    f'while (Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 400 }}; '
-                    f'Start-Process \'{py}\' -ArgumentList \'app.py\' -WorkingDirectory \'{str(ROOT)}\'"'
-                )
-                subprocess.Popen(restart_cmd, shell=True, creationflags=creationflags)
+            py = sys.executable
+            for candidate in [
+                ROOT / "runtime" / "Scripts" / "python.exe",
+                ROOT / "python311" / "python.exe",
+                Path(sys.executable),
+            ]:
+                if candidate.is_file():
+                    py = str(candidate)
+                    break
+            restart_cmd = (
+                f'powershell.exe -NoProfile -WindowStyle Hidden -Command "'
+                f'Start-Sleep -Milliseconds 800; '
+                f'while (Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 300 }}; '
+                f'Start-Process \'{py}\' -ArgumentList \'app.py\' -WorkingDirectory \'{str(ROOT)}\' -WindowStyle Hidden"'
+            )
+            subprocess.Popen(restart_cmd, shell=True, creationflags=creationflags)
         except Exception:
             pass
         finally:

@@ -1,10 +1,12 @@
 package dev.sherlock.clipifyai
 
 import android.annotation.SuppressLint
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.webkit.JavascriptInterface
@@ -21,6 +23,7 @@ import dev.sherlock.clipifyai.media.ProjectManager
 import dev.sherlock.clipifyai.network.DesktopSyncClient
 import dev.sherlock.clipifyai.onboarding.OnboardingActivity
 import dev.sherlock.clipifyai.service.RenderForegroundService
+import org.json.JSONObject
 import java.io.File
 import java.util.Locale
 
@@ -32,11 +35,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var mediaProcessor: AndroidMediaProcessor
     private lateinit var syncClient: DesktopSyncClient
     private var tts: TextToSpeech? = null
+    private var mCurrentVideoUri: Uri? = null
 
     private val selectVideoLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let { handleSelectedVideo(it) }
+        uri?.let {
+            mCurrentVideoUri = it
+            handleSelectedVideo(it)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -184,24 +191,11 @@ class MainActivity : AppCompatActivity() {
     private fun handleSelectedVideo(videoUri: Uri) {
         val fileName = getFileNameFromUri(videoUri)
         val (w, h) = mediaProcessor.getVideoDimensions(videoUri)
-        val cropCoords = mediaProcessor.calculateVertical916Crop(w, h)
-
-        val projId = projectManager.createProject("Mobile Clip " + System.currentTimeMillis(), videoUri.toString())
-        Toast.makeText(this, "Imported: $fileName (${w}x${h})", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Imported: $fileName", Toast.LENGTH_SHORT).show()
 
         // Update web view UI
         val jsCall = "if (window.onAndroidVideoSelected) window.onAndroidVideoSelected('$videoUri', '$fileName', 0);"
         binding.webView.evaluateJavascript(jsCall, null)
-
-        // Launch background render service
-        val serviceIntent = Intent(this, RenderForegroundService::class.java).apply {
-            action = RenderForegroundService.ACTION_START_RENDER
-            putExtra("video_uri", videoUri.toString())
-            putExtra("project_id", projId)
-            putExtra("crop_w", cropCoords.width)
-            putExtra("crop_h", cropCoords.height)
-        }
-        startForegroundService(serviceIntent)
     }
 
     private fun getFileNameFromUri(uri: Uri): String {
@@ -231,6 +225,42 @@ class MainActivity : AppCompatActivity() {
     }
 
     inner class ClipifyAndroidBridge {
+        @JavascriptInterface
+        fun getDeviceInfoJson(): String {
+            return try {
+                val manufacturer = Build.MANUFACTURER.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+                val model = Build.MODEL
+                val brand = Build.BRAND.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+                val deviceName = if (model.startsWith(manufacturer, ignoreCase = true)) {
+                    model
+                } else if (model.startsWith(brand, ignoreCase = true)) {
+                    model
+                } else {
+                    "$brand $model"
+                }
+
+                val arch = if (Build.SUPPORTED_ABIS.isNotEmpty()) Build.SUPPORTED_ABIS[0] else "arm64-v8a"
+
+                val actManager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                val memInfo = ActivityManager.MemoryInfo()
+                actManager?.getMemoryInfo(memInfo)
+                val totalRamGb = String.format(Locale.US, "%.1f", memInfo.totalMem.toDouble() / (1024 * 1024 * 1024))
+                val androidVer = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
+
+                val obj = JSONObject()
+                obj.put("deviceName", deviceName)
+                obj.put("model", model)
+                obj.put("manufacturer", manufacturer)
+                obj.put("brand", brand)
+                obj.put("arch", arch)
+                obj.put("totalRamGb", totalRamGb)
+                obj.put("androidVer", androidVer)
+                obj.toString()
+            } catch (e: Exception) {
+                "{}"
+            }
+        }
+
         @JavascriptInterface
         fun callApi(method: String, endpoint: String, body: String?, headers: String?): String {
             return syncClient.executeApiCall(method, endpoint, body, headers)
@@ -268,6 +298,29 @@ class MainActivity : AppCompatActivity() {
         fun speakText(text: String) {
             runOnUiThread {
                 tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ClipifyTTS")
+            }
+        }
+
+        @JavascriptInterface
+        fun startRender(uriStr: String?, mode: String?, captionsEnabled: Boolean) {
+            runOnUiThread {
+                val targetUri = if (!uriStr.isNullOrEmpty()) {
+                    try { Uri.parse(uriStr) } catch (_: Exception) { mCurrentVideoUri }
+                } else {
+                    mCurrentVideoUri
+                }
+
+                val projId = projectManager.createProject("Mobile Clip " + System.currentTimeMillis(), targetUri?.toString() ?: "mobile_clip")
+                Toast.makeText(this@MainActivity, "Rendering 9:16 Short with MediaCodec hardware acceleration...", Toast.LENGTH_SHORT).show()
+
+                val serviceIntent = Intent(this@MainActivity, RenderForegroundService::class.java).apply {
+                    action = RenderForegroundService.ACTION_START_RENDER
+                    putExtra("video_uri", targetUri?.toString() ?: "")
+                    putExtra("project_id", projId)
+                    putExtra("mode", mode ?: "viral")
+                    putExtra("captions", captionsEnabled)
+                }
+                startForegroundService(serviceIntent)
             }
         }
 

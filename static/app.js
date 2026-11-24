@@ -997,12 +997,19 @@ function editorPreviewUpdate() {
     if (placeholder) placeholder.style.display = isLogoEnabled ? 'inline-flex' : 'none';
   }
 
+  const capToggleVal = $('#editorCaptionsToggle') ? $('#editorCaptionsToggle').checked : true;
   const isEditorTxtOn =
+    capToggleVal &&
     $('#editorTextEnabled')?.checked &&
-      $('#editorTextValue')?.value.trim()
+      ($('#editorTextValue')?.value.trim() || 'Your text')
       ? 'block'
       : 'none';
   txt.style.display = isEditorTxtOn;
+
+  const fontVal = $('#editorTextFont')?.value;
+  if (fontVal) {
+    txt.style.fontFamily = fontVal;
+  }
 
   const editorContent = txt.querySelector('.editor-text-content');
   const editorVal = $('#editorTextValue')?.value || 'Your text';
@@ -1021,6 +1028,8 @@ function editorPreviewUpdate() {
 
   const eBadge = txt.querySelector('.ctrl-size-badge');
   if (eBadge) eBadge.textContent = eSizePct + '%';
+  const capValBadge = $('#editorCapSizeValBadge');
+  if (capValBadge) capValBadge.textContent = eSizePct + '%';
 
   txt.style.color =
     $('#editorTextColor')?.value || '#FFFFFF';
@@ -1059,7 +1068,9 @@ function editorPreviewUpdate() {
   'editorTextColor',
   'editorTextBg',
   'editorTextBgColor',
-  'editorTextBgOpacity'
+  'editorTextBgOpacity',
+  'editorTextFont',
+  'editorCaptionsToggle'
 ].forEach(id => {
   $('#' + id)?.addEventListener('input', editorPreviewUpdate);
   $('#' + id)?.addEventListener('change', editorPreviewUpdate);
@@ -2663,7 +2674,7 @@ async function applyEditorBranding() {
       .05,
 
     text_enabled:
-      $('#editorTextEnabled').checked,
+      ($('#editorCaptionsToggle') ? $('#editorCaptionsToggle').checked : true) && $('#editorTextEnabled').checked,
 
     text:
       $('#editorTextValue').value,
@@ -2757,7 +2768,7 @@ async function applyEditorBranding() {
           body: JSON.stringify({
             filename: state.reviewFile,
             branding: b,
-            font: fontSelect.value
+            font: $('#editorTextFont')?.value || fontSelect?.value || 'Arial'
           })
         }
       );
@@ -3153,6 +3164,9 @@ function navigateTo(id) {
   );
   if (target === 'projects') loadProjects();
   if (target === 'assets') loadProjects().then(loadAssets);
+  if (target === 'editor') {
+    if (typeof renderEditorShortsTray === 'function') renderEditorShortsTray();
+  }
   if (target === 'trending') {
     if (typeof window.loadTrending === 'function') window.loadTrending();
   }
@@ -5372,3 +5386,234 @@ function initInstantClippingSection() {
 
 // Auto-initialize Instant Clipping Lab
 initInstantClippingSection();
+
+// =============================================================================
+// EDITOR ADVANCED CAPTION & TYPOGRAPHY STUDIO + CLIPPED SHORTS FILMSTRIP TRAY
+// =============================================================================
+
+function initEditorCaptionStudio() {
+  const capToggle = $('#editorCaptionsToggle');
+  const capToggleLabel = $('#editorCaptionsToggleLabel');
+  const capBody = $('#editorCaptionControlsBody');
+  const txtEnabled = $('#editorTextEnabled');
+
+  if (capToggle) {
+    capToggle.addEventListener('change', () => {
+      const on = capToggle.checked;
+      if (capToggleLabel) capToggleLabel.textContent = on ? 'Captions ON' : 'Captions OFF';
+      if (txtEnabled) txtEnabled.checked = on;
+      if (capBody) capBody.style.opacity = on ? '1' : '0.45';
+      const txt = $('#editorText');
+      if (txt) txt.style.display = on ? 'block' : 'none';
+      if (typeof editorPreviewUpdate === 'function') editorPreviewUpdate();
+    });
+  }
+
+  // Presets
+  const presetPills = $$('#editorCapPresetsGrid .editor-cap-pill');
+  presetPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      presetPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+
+      const color = pill.dataset.color || '#FFE500';
+      const bg = pill.dataset.bg || '#000000';
+      const opacity = parseInt(pill.dataset.opacity, 10) || 75;
+      const font = pill.dataset.font || 'Montserrat Black';
+
+      if ($('#editorTextColor')) $('#editorTextColor').value = color;
+      if ($('#editorTextBgColor')) $('#editorTextBgColor').value = bg;
+      if ($('#editorTextBgOpacity')) $('#editorTextBgOpacity').value = opacity;
+      if ($('#editorTextBgOpacityOut')) $('#editorTextBgOpacityOut').textContent = opacity + '%';
+      if ($('#editorTextFont')) $('#editorTextFont').value = font;
+      if ($('#editorTextBg')) $('#editorTextBg').checked = true;
+      if ($('#editorTextEnabled')) $('#editorTextEnabled').checked = true;
+      if (capToggle) capToggle.checked = true;
+      if (capToggleLabel) capToggleLabel.textContent = 'Captions ON';
+
+      const txt = $('#editorText');
+      if (txt) {
+        txt.style.fontFamily = font;
+        txt.style.color = color;
+        txt.style.background = hexAlpha(bg, opacity);
+      }
+      if (typeof editorPreviewUpdate === 'function') editorPreviewUpdate();
+    });
+  });
+
+  // Arrangement / Alignment Snapping
+  const arrangeBtns = $$('.btn-arrange-pos');
+  arrangeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      arrangeBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const y = btn.dataset.y || '75';
+      const txt = $('#editorText');
+      if (txt) {
+        txt.dataset.y = y;
+        txt.dataset.x = txt.dataset.x || '50';
+      }
+      if (typeof editorPreviewUpdate === 'function') editorPreviewUpdate();
+    });
+  });
+
+  // Font Size Stepper & Quick Pills
+  const sizeMinus = $('#editorCapSizeMinus');
+  const sizePlus = $('#editorCapSizePlus');
+  const sizeValBadge = $('#editorCapSizeValBadge');
+  const sizePills = $$('.btn-size-pill');
+  const sizeInput = $('#editorTextSize');
+
+  function setEditorSize(sz) {
+    const clamped = Math.max(2, Math.min(25, sz));
+    if (sizeInput) sizeInput.value = clamped;
+    if (sizeValBadge) sizeValBadge.textContent = clamped + '%';
+    const badge = $('#editorTextSizeBadge');
+    if (badge) badge.textContent = clamped + '%';
+    sizePills.forEach(p => p.classList.toggle('active', parseInt(p.dataset.size, 10) === clamped));
+    if (typeof editorPreviewUpdate === 'function') editorPreviewUpdate();
+  }
+
+  if (sizeMinus) {
+    sizeMinus.addEventListener('click', (e) => {
+      e.preventDefault();
+      const cur = parseInt(sizeInput?.value, 10) || 6;
+      setEditorSize(cur - 1);
+    });
+  }
+  if (sizePlus) {
+    sizePlus.addEventListener('click', (e) => {
+      e.preventDefault();
+      const cur = parseInt(sizeInput?.value, 10) || 6;
+      setEditorSize(cur + 1);
+    });
+  }
+  sizePills.forEach(p => {
+    p.addEventListener('click', (e) => {
+      e.preventDefault();
+      setEditorSize(parseInt(p.dataset.size, 10) || 6);
+    });
+  });
+  if (sizeInput) {
+    sizeInput.addEventListener('input', () => {
+      const val = parseInt(sizeInput.value, 10) || 6;
+      if (sizeValBadge) sizeValBadge.textContent = val + '%';
+      sizePills.forEach(p => p.classList.toggle('active', parseInt(p.dataset.size, 10) === val));
+    });
+  }
+
+  // Font Family Dropdown
+  const fontDropdown = $('#editorTextFont');
+  if (fontDropdown) {
+    fontDropdown.addEventListener('change', () => {
+      const txt = $('#editorText');
+      if (txt) txt.style.fontFamily = fontDropdown.value;
+      if (typeof editorPreviewUpdate === 'function') editorPreviewUpdate();
+    });
+  }
+}
+
+async function renderEditorShortsTray() {
+  const filmstrip = $('#editorShortsFilmstrip');
+  const badge = $('#editorShortsCountBadge');
+  const emptyMsg = $('#emptyEditorShortsMsg');
+  const refreshBtn = $('#btnRefreshEditorShorts');
+  if (!filmstrip) return;
+
+  if (refreshBtn) {
+    refreshBtn.onclick = () => renderEditorShortsTray();
+  }
+
+  try {
+    const res = await fetch('/api/projects');
+    if (!res.ok) return;
+    const data = await res.json();
+    const projects = data.projects || [];
+
+    const clips = [];
+    projects.forEach(p => {
+      (p.outputs || []).forEach(out => {
+        clips.push({
+          jobId: p.id,
+          filename: out,
+          source: p.source || 'Uploaded footage',
+          updated: p.updated || 0,
+          meta: (p.output_metadata && p.output_metadata[out]) || {}
+        });
+      });
+    });
+
+    if (badge) badge.textContent = `${clips.length} clip${clips.length === 1 ? '' : 's'}`;
+
+    if (clips.length === 0) {
+      if (emptyMsg) emptyMsg.style.display = 'block';
+      filmstrip.innerHTML = '';
+      if (emptyMsg) filmstrip.appendChild(emptyMsg);
+      return;
+    }
+
+    if (emptyMsg) emptyMsg.style.display = 'none';
+    filmstrip.innerHTML = '';
+
+    clips.forEach(clip => {
+      const card = document.createElement('div');
+      const isSelected = (state.jobId === clip.jobId && state.reviewFile === clip.filename);
+      card.className = `editor-short-card ${isSelected ? 'active' : ''}`;
+      card.dataset.jobId = clip.jobId;
+      card.dataset.filename = clip.filename;
+
+      const dur = clip.meta.duration ? `${Math.round(clip.meta.duration)}s` : '9:16 Short';
+      const videoSrc = `/media/${clip.jobId}/${encodeURIComponent(clip.filename)}`;
+
+      card.innerHTML = `
+        <video class="card-video-thumb" src="${videoSrc}#t=0.5" preload="metadata" muted playsinline></video>
+        <span class="card-overlay-badge">${dur}</span>
+        <div class="card-play-icon">▶</div>
+        <div class="card-meta-bottom">
+          <span class="card-filename" title="${clip.filename}">${clip.filename}</span>
+          <span class="card-source-sub" title="${clip.source}">${clip.source}</span>
+        </div>
+      `;
+
+      card.addEventListener('mouseenter', () => {
+        const v = card.querySelector('video');
+        if (v && v.paused) {
+          try { v.currentTime = 0.5; v.play().catch(() => {}); } catch {}
+        }
+      });
+      card.addEventListener('mouseleave', () => {
+        const v = card.querySelector('video');
+        if (v && !v.paused) {
+          try { v.pause(); v.currentTime = 0.5; } catch {}
+        }
+      });
+
+      card.addEventListener('click', () => {
+        $$('.editor-short-card').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        if (typeof selectReview === 'function') {
+          selectReview(clip.jobId, clip.filename);
+        }
+        const editorTop = $('#editor');
+        if (editorTop) {
+          editorTop.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+
+      filmstrip.appendChild(card);
+    });
+  } catch (err) {
+    console.warn('[EditorTray] Could not load clips:', err);
+  }
+}
+
+// Auto-initialize Editor enhancements
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    initEditorCaptionStudio();
+    renderEditorShortsTray();
+  });
+} else {
+  initEditorCaptionStudio();
+  renderEditorShortsTray();
+}

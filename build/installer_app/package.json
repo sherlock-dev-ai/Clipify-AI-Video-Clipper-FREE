@@ -1,7 +1,7 @@
 {
   "name": "clipify-ai-setup",
   "productName": "Clipify AI Setup",
-  "version": "5.0.2",
+  "version": "5.0.3",
   "description": "Clipify AI installer - your local AI-powered clipping workspace",
   "author": "sherlock-dev-ai",
   "license": "MIT",
@@ -60,7 +60,7 @@
     ],
     "win": {
       "icon": "build/icon.ico",
-      "artifactName": "Clipify.AI.Setup.5.0.2.exe",
+      "artifactName": "Clipify.AI.Setup.5.0.3.exe",
       "target": [
         {
           "target": "nsis",
@@ -71,7 +71,7 @@
       ]
     },
     "nsis": {
-      "artifactName": "Clipify.AI.Setup.5.0.2.exe",
+      "artifactName": "Clipify.AI.Setup.5.0.3.exe",
       "unicode": true,
       "oneClick": true,
       "perMachine": false,

@@ -1,5 +1,6 @@
 package dev.sherlock.clipifyai.network
 
+import android.os.Build
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -11,13 +12,39 @@ import java.util.concurrent.TimeUnit
 
 class DesktopSyncClient(private var desktopHost: String = "http://127.0.0.1:5000") {
 
+    @Volatile
+    private var isDesktopAvailable: Boolean = false
+
+    @Volatile
+    private var lastCheckTime: Long = 0L
+
     private val client = OkHttpClient.Builder()
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
+        .connectTimeout(1, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
+        .writeTimeout(5, TimeUnit.SECONDS)
         .build()
 
+    private fun isEmulator(): Boolean {
+        val fp = Build.FINGERPRINT.lowercase()
+        val model = Build.MODEL.lowercase()
+        val hw = Build.HARDWARE.lowercase()
+        return fp.startsWith("generic") || fp.startsWith("unknown") ||
+                model.contains("google_sdk") || model.contains("emulator") ||
+                model.contains("android sdk built for x86") ||
+                hw.contains("goldfish") || hw.contains("ranchu")
+    }
+
     fun executeApiCall(method: String, endpoint: String, bodyStr: String?, headersJson: String?): String {
+        val now = System.currentTimeMillis()
+        // Fast fail: if desktop is known offline and checked recently, do not freeze caller thread
+        if (!isDesktopAvailable && now - lastCheckTime < 15000L) {
+            val errObj = JSONObject()
+            errObj.put("ok", false)
+            errObj.put("status", 503)
+            errObj.put("error", "Desktop server offline")
+            return errObj.toString()
+        }
+
         try {
             val url = if (endpoint.startsWith("http://") || endpoint.startsWith("https://")) {
                 endpoint
@@ -49,13 +76,20 @@ class DesktopSyncClient(private var desktopHost: String = "http://127.0.0.1:5000
             }
             val response = client.newCall(builder.build()).execute()
             val respBody = response.body?.string() ?: ""
+            isDesktopAvailable = response.isSuccessful
+            lastCheckTime = now
+
             val resObj = JSONObject()
             resObj.put("ok", response.isSuccessful)
             resObj.put("status", response.code)
             resObj.put("body", respBody)
             return resObj.toString()
         } catch (e: Exception) {
-            if (desktopHost.contains("127.0.0.1")) {
+            lastCheckTime = System.currentTimeMillis()
+            isDesktopAvailable = false
+
+            // Only retry 10.0.2.2 if on emulator
+            if (isEmulator() && desktopHost.contains("127.0.0.1")) {
                 desktopHost = "http://10.0.2.2:5000"
                 return executeApiCall(method, endpoint, bodyStr, headersJson)
             }
@@ -74,12 +108,16 @@ class DesktopSyncClient(private var desktopHost: String = "http://127.0.0.1:5000
 
         client.newCall(request).enqueue(object : okhttp3.Callback {
             override fun onFailure(call: okhttp3.Call, e: IOException) {
+                isDesktopAvailable = false
+                lastCheckTime = System.currentTimeMillis()
                 callback(false, e.localizedMessage)
             }
 
             override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
                 val successful = response.isSuccessful
                 val body = response.body?.string()
+                isDesktopAvailable = successful
+                lastCheckTime = System.currentTimeMillis()
                 callback(successful, body)
             }
         })
@@ -135,5 +173,6 @@ class DesktopSyncClient(private var desktopHost: String = "http://127.0.0.1:5000
 
     fun updateHost(newHost: String) {
         this.desktopHost = newHost.trim().removeSuffix("/")
+        this.lastCheckTime = 0L // reset so next call checks new host
     }
 }

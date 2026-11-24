@@ -27,9 +27,9 @@
       <div class="brand-copy">
         <div class="brand-title-wrap">
           <b>Clipify AI</b>
-          <span class="cool-version-badge" id="topBrandVersionBadge" title="Clipify AI v5.0.1 · Click for updates & release info">
+          <span class="cool-version-badge" id="topBrandVersionBadge" title="Clipify AI v5.0.3 · Click for updates & release info">
             <span class="version-dot"></span>
-            <span class="version-num">v5.0.1</span>
+            <span class="version-num">v5.0.3</span>
             <span class="version-shimmer-sweep"></span>
           </span>
         </div>
@@ -112,7 +112,7 @@
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
         </svg>
-        <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v5.0.1</span>
+        <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v5.0.3</span>
       </a>
       <a href="#cache" id="navClearCacheLink" title="Clear transcription cache & imported YouTube videos">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -947,15 +947,112 @@
               <label>BG key color<input id="editorLogoBgColor" type="color" value="#9B5CFF"></label>
               <label>Key tolerance<input id="editorLogoBgSimilarity" type="number" min="0.01" max="0.8" step="0.01"
                   value="0.22"></label>
-            </div><label class="toggle-row"><input type="checkbox" id="editorTextEnabled"><span
-                class="switch"></span><b>Text</b></label><textarea id="editorTextValue" maxlength="100"
-              placeholder="Text overlay"></textarea><label>Text size<input id="editorTextSize" type="number" min="2"
-                max="25" value="6"></label><label>Text color<input id="editorTextColor" type="color"
-                value="#FFFFFF"></label><label class="toggle-row compact"><input type="checkbox" id="editorTextBg"
-                checked><span class="switch"></span><b>Text
-                background</b></label><label>BG color<input id="editorTextBgColor" type="color" value="#000000"></label>
-            <div class="slider-row"><label>BG opacity <output id="editorTextBgOpacityOut">65%</output></label><input
-                id="editorTextBgOpacity" type="range" min="0" max="100" value="65"></div>
+            </div>
+
+            <!-- ADVANCED CAPTION & TYPOGRAPHY STUDIO (IN EDITOR) -->
+            <div class="editor-caption-studio-box">
+              <div class="editor-caption-studio-header">
+                <div class="cap-header-left">
+                  <span class="cap-studio-icon">✨</span>
+                  <b>Caption &amp; Subtitle Style</b>
+                  <span class="cap-studio-badge">ADVANCED</span>
+                </div>
+                <label class="toggle-row compact cap-toggle-wrap" title="Toggle caption overlay on or off">
+                  <input type="checkbox" id="editorCaptionsToggle" checked>
+                  <span class="switch"></span>
+                  <b id="editorCaptionsToggleLabel">Captions ON</b>
+                </label>
+              </div>
+
+              <div id="editorCaptionControlsBody">
+                <!-- Visual Preset Cards (7 Presets) -->
+                <div class="editor-cap-presets-label">Style Presets:</div>
+                <div class="editor-cap-presets-grid" id="editorCapPresetsGrid">
+                  <button type="button" class="editor-cap-pill active" data-preset="gold_yellow" data-color="#FFE500" data-bg="#000000" data-opacity="75" data-font="Montserrat Black" title="Viral Yellow Punch">
+                    <span class="pill-dot" style="background:#FFE500;"></span>
+                    <span>Viral Yellow</span>
+                  </button>
+                  <button type="button" class="editor-cap-pill" data-preset="lime_green" data-color="#39FF14" data-bg="#000000" data-opacity="75" data-font="Impact" title="Cyber Lime Green">
+                    <span class="pill-dot" style="background:#39FF14;"></span>
+                    <span>Cyber Lime</span>
+                  </button>
+                  <button type="button" class="editor-cap-pill" data-preset="hormozi" data-color="#FFFFFF" data-bg="#000000" data-opacity="85" data-font="Arial Black" title="Hormozi Bold White">
+                    <span class="pill-dot" style="background:#FFFFFF;"></span>
+                    <span>Hormozi</span>
+                  </button>
+                  <button type="button" class="editor-cap-pill" data-preset="cyan_sky" data-color="#00F2FE" data-bg="#05101a" data-opacity="75" data-font="Segoe UI Black" title="TikTok Cyan Pop">
+                    <span class="pill-dot" style="background:#00F2FE;"></span>
+                    <span>TikTok Cyan</span>
+                  </button>
+                  <button type="button" class="editor-cap-pill" data-preset="coral_red" data-color="#FF3344" data-bg="#1a0507" data-opacity="75" data-font="Arial Black" title="Crimson Fire">
+                    <span class="pill-dot" style="background:#FF3344;"></span>
+                    <span>Crimson Fire</span>
+                  </button>
+                  <button type="button" class="editor-cap-pill" data-preset="retro" data-color="#00FF66" data-bg="#0a0a0a" data-opacity="90" data-font="Courier Prime Mono" title="Typewriter Retro">
+                    <span class="pill-dot" style="background:#00FF66;"></span>
+                    <span>Typewriter</span>
+                  </button>
+                  <button type="button" class="editor-cap-pill" data-preset="pink_lavender" data-color="#E879F9" data-bg="#15051a" data-opacity="75" data-font="Poppins Bold" title="Neon Lavender">
+                    <span class="pill-dot" style="background:#E879F9;"></span>
+                    <span>Lavender</span>
+                  </button>
+                </div>
+
+                <!-- Alignment & Snapping -->
+                <div class="editor-cap-arrange-row">
+                  <span class="arrange-label">Arrangement:</span>
+                  <div class="arrange-btn-group">
+                    <button type="button" class="btn-arrange-pos" data-y="25" title="Top Safe Margin (25%)">Top Safe (25%)</button>
+                    <button type="button" class="btn-arrange-pos" data-y="50" title="Center Seam (50%)">Center (50%)</button>
+                    <button type="button" class="btn-arrange-pos active" data-y="75" title="Lower Safe Margin (75%)">Lower Safe (75%)</button>
+                  </div>
+                </div>
+
+                <!-- Size Stepper & Quick Pills -->
+                <div class="editor-cap-size-row">
+                  <span class="arrange-label">Size:</span>
+                  <div class="cap-size-stepper-wrap">
+                    <button type="button" class="btn-cap-size-step" id="editorCapSizeMinus" title="Decrease Size (−)">−</button>
+                    <span class="cap-size-val-badge" id="editorCapSizeValBadge">6%</span>
+                    <button type="button" class="btn-cap-size-step" id="editorCapSizePlus" title="Increase Size (+)">+</button>
+                  </div>
+                  <div class="cap-size-pills">
+                    <button type="button" class="btn-size-pill" data-size="4">S</button>
+                    <button type="button" class="btn-size-pill active" data-size="6">M</button>
+                    <button type="button" class="btn-size-pill" data-size="8">L</button>
+                    <button type="button" class="btn-size-pill" data-size="11">XL</button>
+                  </div>
+                  <span class="cap-mouse-hint" title="You can also drag corner handles or scroll mouse on preview">🖱️ Mouse Drag</span>
+                </div>
+
+                <div class="editor-text-controls-sub">
+                  <label class="toggle-row compact" style="margin-top:6px;"><input type="checkbox" id="editorTextEnabled" checked><span class="switch"></span><b>Text Overlay Enabled</b></label>
+                  <textarea id="editorTextValue" maxlength="100" placeholder="Text overlay or subtitle text..."></textarea>
+                  <div class="two">
+                    <label>Font Size %<input id="editorTextSize" type="number" min="2" max="25" value="6"></label>
+                    <label>Text Color<input id="editorTextColor" type="color" value="#FFE500"></label>
+                  </div>
+                  <div class="two">
+                    <label>Font Family
+                      <select id="editorTextFont">
+                        <option value="Montserrat Black">Montserrat Black</option>
+                        <option value="Arial Black" selected>Arial Black</option>
+                        <option value="Impact">Impact</option>
+                        <option value="Segoe UI Black">Segoe UI Black</option>
+                        <option value="Courier Prime Mono">Courier Prime Mono</option>
+                        <option value="Poppins Bold">Poppins Bold</option>
+                        <option value="Trebuchet MS">Trebuchet MS</option>
+                      </select>
+                    </label>
+                    <label class="toggle-row compact" style="align-self:flex-end;margin-bottom:6px;"><input type="checkbox" id="editorTextBg" checked><span class="switch"></span><b>Background Box</b></label>
+                  </div>
+                  <div class="two">
+                    <label>BG Color<input id="editorTextBgColor" type="color" value="#000000"></label>
+                    <div class="slider-row"><label>BG Opacity <output id="editorTextBgOpacityOut">75%</output></label><input id="editorTextBgOpacity" type="range" min="0" max="100" value="75"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
             <div style="margin: 12px 0 6px;">
               <label for="editorUpscaleQuality"
                 style="font-weight:700;display:block;margin-bottom:4px;font-size:0.82rem;">Upscale &amp; Render
@@ -971,6 +1068,25 @@
           </div><button class="primary big" id="applyEditorBrandingMain" disabled><span>Apply to Finished
               Short</span><b>→</b></button><a id="reviewDownloadMain" class="download" href="#" hidden download>Download
             Short ↓</a><button class="ghost full" id="editorToCreate">← Back to Create</button>
+        </div>
+      </div>
+
+      <!-- CLIPPED SHORTS GALLERY / FILMSTRIP TRAY -->
+      <div id="editorShortsTrayContainer" class="editor-shorts-tray-container">
+        <div class="editor-shorts-tray-header">
+          <div class="tray-title-group">
+            <span class="tray-icon">🎞️</span>
+            <h3>Clipped Shorts Gallery</h3>
+            <span class="tray-count-badge" id="editorShortsCountBadge">0 clips</span>
+          </div>
+          <div class="tray-hint">Click any clip below to load into Editor, customize captions &amp; re-export</div>
+          <button type="button" class="btn-refresh-tray" id="btnRefreshEditorShorts" title="Refresh clips">↻ Refresh Clips</button>
+        </div>
+        <div class="editor-shorts-filmstrip" id="editorShortsFilmstrip">
+          <div class="empty-tray-msg" id="emptyEditorShortsMsg">
+            <span style="font-weight:700;display:block;margin-bottom:4px;">🎬 No rendered Shorts yet.</span>
+            <small style="opacity:0.65;">Clips generated in Create, Instant Clipping, or Beta will appear here for instant re-editing.</small>
+          </div>
         </div>
       </div>
     </section>

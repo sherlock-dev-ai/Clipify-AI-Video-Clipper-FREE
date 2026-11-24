@@ -497,6 +497,140 @@
         [-5, 3], [-4, 4], [-3, 4], [-2, 4], [-1, 4], [0, 4], [1, 4], [2, 4], [3, 4], [4, 4], [5, 3]
       ];
 
+      // 5x7 ASCII bitmap definitions for the word "CLIPIFY"
+      const GLYPHS = {
+        'C': [
+          " 1111",
+          "1    ",
+          "1    ",
+          "1    ",
+          "1    ",
+          "1    ",
+          " 1111"
+        ],
+        'L': [
+          "1    ",
+          "1    ",
+          "1    ",
+          "1    ",
+          "1    ",
+          "1    ",
+          "11111"
+        ],
+        'I': [
+          "11111",
+          "  1  ",
+          "  1  ",
+          "  1  ",
+          "  1  ",
+          "  1  ",
+          "11111"
+        ],
+        'P': [
+          "1111 ",
+          "1   1",
+          "1   1",
+          "1111 ",
+          "1    ",
+          "1    ",
+          "1    "
+        ],
+        'F': [
+          "11111",
+          "1    ",
+          "1    ",
+          "1111 ",
+          "1    ",
+          "1    ",
+          "1    "
+        ],
+        'Y': [
+          "1   1",
+          "1   1",
+          " 1 1 ",
+          "  1  ",
+          "  1  ",
+          "  1  ",
+          "  1  "
+        ]
+      };
+
+      const WORD = ['C', 'L', 'I', 'P', 'I', 'F', 'Y'];
+      const WORD_MAP = [];
+      let currentOffsetCol = 0;
+      WORD.forEach((letter) => {
+        const rws = GLYPHS[letter] || GLYPHS['C'];
+        for (let r = 0; r < 7; r++) {
+          const line = rws[r] || "     ";
+          for (let c = 0; c < 5; c++) {
+            if (line[c] === '1') {
+              WORD_MAP.push({ relCol: currentOffsetCol + c, relRow: r });
+            }
+          }
+        }
+        currentOffsetCol += 6; // 5 cols + 1 col gap
+      });
+      const WORD_TOTAL_COLS = currentOffsetCol; // ~42 cols
+      const WORD_TOTAL_ROWS = 7;
+
+      // Active Clipify Word Spawns
+      let textSpawns = [];
+      let lastTextSpawn = Date.now() - 1500;
+
+      function spawnClipifyWord() {
+        if (cols < 20 || rows < 10) return;
+        const maxCol = Math.max(1, cols - WORD_TOTAL_COLS - 2);
+        const maxRow = Math.max(1, rows - WORD_TOTAL_ROWS - 2);
+
+        const startCol = Math.floor(1 + Math.random() * maxCol);
+        const startRow = Math.floor(1 + Math.random() * maxRow);
+
+        const charOverrides = {};
+        WORD_MAP.forEach((pt, idx) => {
+          charOverrides[idx] = LOGO_SYMBOLS[Math.floor(Math.random() * LOGO_SYMBOLS.length)];
+        });
+
+        textSpawns.push({
+          startCol,
+          startRow,
+          alpha: 0,
+          targetAlpha: 0.95,
+          phase: 'fadeIn',
+          timer: 0,
+          holdDuration: 3.2 + Math.random() * 1.8,
+          fadeSpeed: 1.1,
+          charOverrides
+        });
+      }
+
+      // Inline text highlights: e.g. "CLIPIFY", "CLIPIFY AI"
+      let inlineWords = [];
+      const INLINE_STRINGS = ['CLIPIFY', 'CLIPIFY AI', 'CLIP.AI', '★ CLIPIFY ★'];
+      function spawnInlineWord() {
+        if (inlineWords.length >= 4 || cols < 15) return;
+        const word = INLINE_STRINGS[Math.floor(Math.random() * INLINE_STRINGS.length)];
+        const maxC = Math.max(0, cols - word.length - 2);
+        const maxR = Math.max(0, rows - 2);
+        const startC = Math.floor(1 + Math.random() * maxC);
+        const startR = Math.floor(1 + Math.random() * maxR);
+
+        inlineWords.push({
+          word,
+          startC,
+          startR,
+          alpha: 0,
+          targetAlpha: 0.90 + Math.random() * 0.10,
+          phase: 'fadeIn',
+          timer: 0,
+          life: 3.0 + Math.random() * 2.0
+        });
+      }
+
+      // Pre-seed an initial CLIPIFY word and inline words
+      spawnClipifyWord();
+      spawnInlineWord();
+      spawnInlineWord();
+
       // Active Clipify Logo Shape Spawns
       let logoSpawns = [];
       let lastLogoSpawn = Date.now() - 1000;
@@ -596,6 +730,25 @@
         if (logoSpawns.length < 2 && (now - lastLogoSpawn) > 2800) {
           spawnLogoInstance();
           lastLogoSpawn = now;
+        }
+
+        // Spawn Clipify 5x7 ASCII word periodically
+        if (textSpawns.length < 2 && (now - lastTextSpawn) > 3500) {
+          spawnClipifyWord();
+          lastTextSpawn = now;
+        }
+
+        // Spawn inline text words
+        if (inlineWords.length < 4 && Math.random() < 0.15) {
+          spawnInlineWord();
+        }
+
+        // Occasional cyber symbol glitch / shift in "CLIPIFY"
+        if (Math.random() < 0.3) {
+          for (const ts of textSpawns) {
+            const randIdx = Math.floor(Math.random() * WORD_MAP.length);
+            ts.charOverrides[randIdx] = LOGO_SYMBOLS[Math.floor(Math.random() * LOGO_SYMBOLS.length)];
+          }
         }
 
         ctx.font = '11px "Courier New", monospace, monospace';
@@ -723,6 +876,88 @@
           ctx.shadowBlur = 8;
           ctx.fillText(h.char, h.x, h.y);
           ctx.shadowBlur = 0;
+        }
+
+        // Render 5x7 ASCII Block "CLIPIFY" Word Formations
+        for (let t = textSpawns.length - 1; t >= 0; t--) {
+          const ts = textSpawns[t];
+          ts.timer += 0.016;
+
+          if (ts.phase === 'fadeIn') {
+            ts.alpha += 0.016 * ts.fadeSpeed;
+            if (ts.alpha >= ts.targetAlpha) {
+              ts.alpha = ts.targetAlpha;
+              ts.phase = 'hold';
+              ts.timer = 0;
+            }
+          } else if (ts.phase === 'hold') {
+            if (ts.timer >= ts.holdDuration) {
+              ts.phase = 'fadeOut';
+            }
+          } else if (ts.phase === 'fadeOut') {
+            ts.alpha -= 0.016 * ts.fadeSpeed;
+            if (ts.alpha <= 0) {
+              textSpawns.splice(t, 1);
+              spawnClipifyWord();
+              continue;
+            }
+          }
+
+          if (ts.alpha > 0.02) {
+            ctx.font = 'bold 12px "Courier New", monospace';
+            ctx.shadowColor = 'rgba(160, 220, 255, 0.9)';
+            ctx.shadowBlur = 9;
+            WORD_MAP.forEach((pt, idx) => {
+              const c = ts.startCol + pt.relCol;
+              const r = ts.startRow + pt.relRow;
+              const targetPt = gridMap[`${c},${r}`];
+              if (targetPt) {
+                const ch = ts.charOverrides[idx] || '#';
+                ctx.fillStyle = `rgba(240, 248, 255, ${Math.max(0, ts.alpha).toFixed(2)})`;
+                ctx.fillText(ch, targetPt.x, targetPt.y);
+              }
+            });
+            ctx.shadowBlur = 0;
+          }
+        }
+
+        // Render Inline "CLIPIFY" Text Words
+        ctx.font = 'bold 13px "Courier New", monospace';
+        for (let w = inlineWords.length - 1; w >= 0; w--) {
+          const iw = inlineWords[w];
+          iw.timer += 0.016;
+
+          if (iw.phase === 'fadeIn') {
+            iw.alpha += 0.04;
+            if (iw.alpha >= iw.targetAlpha) {
+              iw.alpha = iw.targetAlpha;
+              iw.phase = 'hold';
+              iw.timer = 0;
+            }
+          } else if (iw.phase === 'hold') {
+            if (iw.timer >= iw.life) {
+              iw.phase = 'fadeOut';
+            }
+          } else if (iw.phase === 'fadeOut') {
+            iw.alpha -= 0.035;
+            if (iw.alpha <= 0) {
+              inlineWords.splice(w, 1);
+              continue;
+            }
+          }
+
+          if (iw.alpha > 0.02) {
+            ctx.shadowColor = 'rgba(192, 132, 252, 0.9)';
+            ctx.shadowBlur = 8;
+            for (let ci = 0; ci < iw.word.length; ci++) {
+              const pt = gridMap[`${iw.startC + ci},${iw.startR}`];
+              if (pt) {
+                ctx.fillStyle = `rgba(245, 235, 255, ${Math.max(0, iw.alpha).toFixed(2)})`;
+                ctx.fillText(iw.word[ci], pt.x, pt.y);
+              }
+            }
+            ctx.shadowBlur = 0;
+          }
         }
 
         rafId = requestAnimationFrame(animate);

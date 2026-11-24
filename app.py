@@ -4688,7 +4688,15 @@ def cache_clear():
         "message": f"Successfully cleared {formatted} of disk space ({yt_deleted} YouTube video(s) and {cache_deleted} cache file(s) removed)."
     })
 
-APP_VERSION = "v4.0.11"
+APP_VERSION = "v5.0.0"
+try:
+    _v_file = ROOT / "version.json"
+    if _v_file.exists():
+        _v_data = json.loads(_v_file.read_text(encoding="utf-8"))
+        if _v_data.get("version"):
+            APP_VERSION = str(_v_data["version"]).strip()
+except Exception:
+    pass
 GITHUB_REPO = "sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE"
 
 
@@ -4826,18 +4834,32 @@ def updater_apply():
     """Performs a fast, in-place update from GitHub without requiring a full re-install."""
     def _delayed_restart():
         import time
-        time.sleep(2.0)
+        time.sleep(1.2)
         try:
-            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
             app_exe = ROOT / "Clipify AI.exe"
             if app_exe.is_file():
-                subprocess.Popen([str(app_exe)], cwd=str(ROOT), creationflags=creationflags)
+                restart_cmd = (
+                    f'powershell.exe -NoProfile -Command "'
+                    f'Start-Sleep -Milliseconds 800; '
+                    f'while (Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 400 }}; '
+                    f'Start-Process \'{str(app_exe)}\'"'
+                )
+                subprocess.Popen(restart_cmd, shell=True, creationflags=creationflags)
             else:
                 py = sys.executable
-                subprocess.Popen([py, "app.py"], cwd=str(ROOT), creationflags=creationflags)
-            os._exit(0)
+                restart_cmd = (
+                    f'powershell.exe -NoProfile -Command "'
+                    f'Start-Sleep -Milliseconds 800; '
+                    f'while (Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 400 }}; '
+                    f'Start-Process \'{py}\' -ArgumentList \'app.py\' -WorkingDirectory \'{str(ROOT)}\'"'
+                )
+                subprocess.Popen(restart_cmd, shell=True, creationflags=creationflags)
         except Exception:
             pass
+        finally:
+            time.sleep(0.5)
+            os._exit(0)
 
     is_git = (ROOT / ".git").is_dir()
     git_bin = shutil.which("git") or shutil.which("git.exe") or "git"

@@ -862,7 +862,18 @@
     fetchClips();
     fetchTranscripts();
 
+    let idleCount = 0;
     pollInterval = setInterval(() => {
+      // Don't poll aggressively when tab is hidden or session is idle
+      if (document.hidden) return;
+      if (!isSessionActive) {
+        idleCount++;
+        // Poll status/clips every 10s instead of every 2s when idle
+        if (idleCount % 5 !== 0) return;
+      } else {
+        idleCount = 0;
+      }
+
       fetchStatus();
       if (isSessionActive) {
         fetchTranscripts();

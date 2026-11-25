@@ -27,9 +27,9 @@
       <div class="brand-copy">
         <div class="brand-title-wrap">
           <b>Clipify AI</b>
-          <span class="cool-version-badge" id="topBrandVersionBadge" title="Clipify AI v5.0.3 · Click for updates & release info">
+          <span class="cool-version-badge" id="topBrandVersionBadge" title="Clipify AI v5.0.4 · Click for updates & release info">
             <span class="version-dot"></span>
-            <span class="version-num">v5.0.3</span>
+            <span class="version-num">v5.0.4</span>
             <span class="version-shimmer-sweep"></span>
           </span>
         </div>
@@ -344,7 +344,34 @@
           <p>Turn long-form footage into polished vertical edits with local AI, smart transcription, and gaming-aware
             composition.</p>
         </div>
-        <div class="top-actions"><a class="github-watermark" href="https://github.com/sherlock-dev-ai" target="_blank"
+        <div class="top-actions">
+          <div class="gpu-dropdown-wrapper" id="gpuDropdownWrapper">
+            <button type="button" class="gpu-dropdown-btn" id="gpuDropdownBtn" title="Switch active GPU / Hardware Accelerator">
+              <span class="gpu-indicator-dot nvidia"></span>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="4" y="4" width="16" height="16" rx="2" />
+                <rect x="9" y="9" width="6" height="6" />
+                <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
+                <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
+                <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="15" x2="23" y2="15" />
+                <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="15" x2="4" y2="15" />
+              </svg>
+              <span class="gpu-current-label" id="gpuCurrentLabel">GPU: Detecting…</span>
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" class="gpu-chevron">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            <div class="gpu-dropdown-menu" id="gpuDropdownMenu">
+              <div class="gpu-menu-header">
+                <span>Hardware Accelerator</span>
+                <span class="gpu-menu-subtitle">Active Engine GPU</span>
+              </div>
+              <div class="gpu-menu-list" id="gpuMenuList">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+          </div>
+          <a class="github-watermark" href="https://github.com/sherlock-dev-ai" target="_blank"
             rel="noopener noreferrer" aria-label="Open Sherlock Dev AI on GitHub"><span aria-hidden="true">↗</span>
             GitHub</a><button class="ghost" id="openInput"
             title="Open source / raw video input folder in File Explorer">Open input</button><button class="ghost"
@@ -2365,8 +2392,9 @@
   <script src="{{ url_for('static', filename='tour.js', v='4.0.12.3') }}"></script>
   <script src="{{ url_for('static', filename='cache_manager.js', v='4.0.12') }}"></script>
   <script src="{{ url_for('static', filename='clippy.js', v='4.0.12.3') }}"></script>
-  <script src="{{ url_for('static', filename='trending.js', v='5.0.2') }}"></script>
-  <script src="{{ url_for('static', filename='caption_playground.js', v='5.0.2') }}"></script>
+  <script src="{{ url_for('static', filename='trending.js', v='5.0.4') }}"></script>
+  <script src="{{ url_for('static', filename='caption_playground.js', v='5.0.4') }}"></script>
+  <script src="{{ url_for('static', filename='gpu_selector.js', v='5.0.4') }}"></script>
   <script>
     if (window.location.search.includes('open_support=1') || window.location.hash.includes('support')) {
       window.addEventListener('load', () => setTimeout(() => window.showSupportModal && window.showSupportModal(), 300));

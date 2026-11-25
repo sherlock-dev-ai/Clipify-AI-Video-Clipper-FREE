@@ -5,15 +5,19 @@
         android:icon="@drawable/ic_nav_create"
         android:title="@string/nav_create" />
     <item
-        android:id="@+id/nav_narrate"
-        android:icon="@drawable/ic_nav_narrate"
-        android:title="@string/nav_narrate" />
+        android:id="@+id/nav_instant"
+        android:icon="@drawable/ic_nav_instant"
+        android:title="@string/nav_instant" />
     <item
-        android:id="@+id/nav_live"
-        android:icon="@drawable/ic_nav_live"
-        android:title="@string/nav_live" />
+        android:id="@+id/nav_trending"
+        android:icon="@drawable/ic_nav_trending"
+        android:title="@string/nav_trending" />
     <item
-        android:id="@+id/nav_projects"
-        android:icon="@drawable/ic_nav_projects"
-        android:title="@string/nav_projects" />
+        android:id="@+id/nav_editor"
+        android:icon="@drawable/ic_nav_editor"
+        android:title="@string/nav_editor" />
+    <item
+        android:id="@+id/nav_more"
+        android:icon="@drawable/ic_nav_more"
+        android:title="@string/nav_more" />
 </menu>

@@ -46,8 +46,8 @@
         endpoint = '/api/' + endpoint.split('/api/')[1];
       }
 
-      // If user configured a desktop bridge connection, try it first
-      if (window.CLIPPY_DESKTOP_CONNECTED && window.AndroidBridge && window.AndroidBridge.callApi) {
+      // Try desktop bridge connection if available
+      if (window.AndroidBridge && window.AndroidBridge.callApi) {
         try {
           const method = (options.method || 'GET').toUpperCase();
           let body = null;
@@ -59,18 +59,15 @@
           if (rawResult) {
             const parsed = JSON.parse(rawResult);
             if (parsed.status !== 503) {
+              window.CLIPPY_DESKTOP_CONNECTED = true;
               return new Response(parsed.body, {
                 status: parsed.status,
                 statusText: parsed.ok ? 'OK' : 'Error',
                 headers: { 'Content-Type': 'application/json' }
               });
-            } else {
-              window.CLIPPY_DESKTOP_CONNECTED = false;
             }
           }
-        } catch (_) {
-          window.CLIPPY_DESKTOP_CONNECTED = false;
-        }
+        } catch (_) {}
       }
 
       // Standalone Mobile Engine Handlers (Zero hang, instant response)

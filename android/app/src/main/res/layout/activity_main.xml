@@ -3,87 +3,106 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/clipify_bg">
+    android:background="#000000">
 
-    <!-- Top Studio Header (Matches Windows Header) -->
+    <!-- Sleek Top Studio Header (Pure Black & Crisp Typography) -->
     <LinearLayout
         android:id="@+id/header_layout"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="50dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp"
-        android:background="@color/clipify_panel"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:background="#09090b"
         app:layout_constraintTop_toTopOf="parent">
 
         <ImageView
             android:id="@+id/iv_header_logo"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
             android:src="@drawable/ic_clipify_branding"
-            android:contentDescription="Clipify AI Logo" />
+            android:contentDescription="Clipify AI" />
 
         <TextView
             android:id="@+id/tv_header_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Clipify AI"
-            android:textColor="@color/clipify_text"
+            android:textColor="#FFFFFF"
             android:textStyle="bold"
-            android:textSize="17sp"
-            android:layout_marginStart="8dp" />
+            android:textSize="16sp"
+            android:fontFamily="sans-serif-medium"
+            android:layout_marginStart="10dp" />
 
-        <TextView
-            android:id="@+id/tv_badge_live"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="PRO"
-            android:textColor="@color/clipify_cyan"
-            android:textSize="10sp"
-            android:textStyle="bold"
-            android:background="@color/clipify_line"
-            android:paddingHorizontal="6dp"
-            android:paddingVertical="2dp"
-            android:layout_marginStart="6dp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/ic_clipify_logo"
+            android:backgroundTint="#18181b"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:layout_marginStart="8dp">
+
+            <View
+                android:layout_width="6dp"
+                android:layout_height="6dp"
+                android:background="#10B981" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Studio"
+                android:textColor="#A1A1AA"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:layout_marginStart="5dp" />
+        </LinearLayout>
 
         <View
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:layout_weight="1" />
 
-        <Button
+        <ImageButton
             android:id="@+id/btn_header_tour"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="wrap_content"
+            android:layout_width="34dp"
             android:layout_height="34dp"
-            android:text="✨ AI Assistant"
-            android:textColor="@color/clipify_purple"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:paddingHorizontal="6dp"
-            android:layout_marginEnd="4dp" />
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_nav_editor"
+            android:tint="#A1A1AA"
+            android:contentDescription="Assistant"
+            android:layout_marginEnd="6dp" />
 
-        <Button
+        <ImageButton
             android:id="@+id/btn_header_github"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="wrap_content"
+            android:layout_width="34dp"
             android:layout_height="34dp"
-            android:text="⭐ Star"
-            android:textColor="@color/clipify_text"
-            android:textSize="11sp"
-            android:strokeColor="@color/clipify_line"
-            android:paddingHorizontal="8dp" />
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_nav_projects"
+            android:tint="#FFFFFF"
+            android:contentDescription="GitHub" />
     </LinearLayout>
 
-    <!-- Main Web Studio View (Renders exact Windows UI) -->
+    <!-- Thin Divider -->
+    <View
+        android:id="@+id/header_divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#18181b"
+        app:layout_constraintTop_toBottomOf="@id/header_layout" />
+
+    <!-- Main Web Studio View (Renders Sleek Mobile UI) -->
     <WebView
         android:id="@+id/web_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:nestedScrollingEnabled="true"
         android:scrollbars="vertical"
-        app:layout_constraintTop_toBottomOf="@id/header_layout"
+        android:background="#000000"
+        app:layout_constraintTop_toBottomOf="@id/header_divider"
         app:layout_constraintBottom_toTopOf="@id/bottom_navigation" />
 
     <!-- Progress Indicator Overlay -->
@@ -91,17 +110,17 @@
         android:id="@+id/web_progress"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="3dp"
+        android:layout_height="2dp"
         android:indeterminate="true"
         android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@id/header_layout" />
+        app:layout_constraintTop_toBottomOf="@id/header_divider" />
 
     <!-- Bottom Navigation Bar for Mobile Ergonomics -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_navigation"
         android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:background="@color/clipify_panel"
+        android:layout_height="58dp"
+        android:background="#09090b"
         app:itemTextColor="@color/nav_item_color"
         app:itemIconTint="@color/nav_item_color"
         app:itemActiveIndicatorStyle="@style/ClipifyNavActiveIndicator"

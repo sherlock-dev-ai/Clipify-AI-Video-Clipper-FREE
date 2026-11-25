@@ -226,7 +226,7 @@ def get_youtube_trending(query: str = "") -> Dict[str, Any]:
         import yt_dlp
         from concurrent.futures import ThreadPoolExecutor
 
-        ydl_opts = {
+        ydl_opts: Any = {
             'quiet': True,
             'extract_flat': True,
             'skip_download': True,
@@ -242,11 +242,12 @@ def get_youtube_trending(query: str = "") -> Dict[str, Any]:
                     res = ydl.extract_info(live_search, download=False)
                     for e in res.get('entries', []):
                         if not e: continue
-                        vid_id = e.get('id') or ''
-                        title = e.get('title') or 'Live Gaming Stream'
-                        channel = e.get('uploader') or e.get('channel') or 'Gaming Creator'
-                        url = e.get('url') if (e.get('url') and 'youtube.com' in e.get('url')) else f"https://www.youtube.com/watch?v={vid_id}"
-                        thumb = e.get('thumbnail') or (f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else "")
+                        vid_id = str(e.get('id') or '')
+                        title = str(e.get('title') or 'Live Gaming Stream')
+                        channel = str(e.get('uploader') or e.get('channel') or 'Gaming Creator')
+                        raw_url = str(e.get('url') or '')
+                        url = raw_url if 'youtube.com' in raw_url else f"https://www.youtube.com/watch?v={vid_id}"
+                        thumb = str(e.get('thumbnail') or (f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""))
                         results.append({
                             "id": vid_id or f"yt_live_{len(results)}",
                             "title": title,
@@ -269,11 +270,12 @@ def get_youtube_trending(query: str = "") -> Dict[str, Any]:
                     res = ydl.extract_info(video_search, download=False)
                     for e in res.get('entries', []):
                         if not e: continue
-                        vid_id = e.get('id') or ''
-                        title = e.get('title') or 'Trending Gameplay'
-                        channel = e.get('uploader') or e.get('channel') or 'Gamer'
-                        url = e.get('url') if (e.get('url') and 'youtube.com' in e.get('url')) else f"https://www.youtube.com/watch?v={vid_id}"
-                        thumb = e.get('thumbnail') or (f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else "")
+                        vid_id = str(e.get('id') or '')
+                        title = str(e.get('title') or 'Trending Gameplay')
+                        channel = str(e.get('uploader') or e.get('channel') or 'Gamer')
+                        raw_url = str(e.get('url') or '')
+                        url = raw_url if 'youtube.com' in raw_url else f"https://www.youtube.com/watch?v={vid_id}"
+                        thumb = str(e.get('thumbnail') or (f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""))
                         dur_sec = e.get('duration')
                         duration_str = f"{int(dur_sec)//60}:{int(dur_sec)%60:02d}" if dur_sec else "12:30"
                         results.append({

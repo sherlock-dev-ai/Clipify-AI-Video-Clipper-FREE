@@ -255,7 +255,8 @@ class StreamConnector:
                 self.python_bin, "-m", "yt_dlp",
                 "-g", "--no-warnings", "--no-playlist",
                 "--extractor-args", "youtube:player_client=android,web",
-                "-f", "bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b",
+                "-f", "bv*+ba/best/b",
+                "--format-sort", "res:2160,res:1440,res:1080,fps:60,vbr",
                 "--socket-timeout", "15",
                 self.source_url,
             ]
@@ -319,7 +320,8 @@ class StreamConnector:
             cmd = [
                 self.python_bin, "-m", "yt_dlp",
                 "-g", "--no-warnings", "--no-playlist",
-                "-f", "best[height<=1080]/best",
+                "-f", "best",
+                "--format-sort", "res:2160,res:1440,res:1080,fps:60,vbr",
                 "--socket-timeout", "15",
                 clean_url,
             ]
@@ -363,7 +365,8 @@ class StreamConnector:
             cmd = [
                 self.python_bin, "-m", "yt_dlp",
                 "-g", "--no-warnings", "--no-playlist",
-                "-f", "best[height<=1080]/best",
+                "-f", "best",
+                "--format-sort", "res:2160,res:1440,res:1080,fps:60,vbr",
                 "--socket-timeout", "15",
                 clean_url,
             ]
@@ -427,11 +430,12 @@ class StreamConnector:
         """Construct the FFmpeg command for the configured source."""
         out_pattern = str(self.buffer_dir / "chunk_%05d.mp4")
 
-        # High-performance encoding for rolling buffer segments
+        # High-performance encoding for rolling buffer segments (max quality, high bitrate)
         common_output = [
-            "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "14",
+            "-b:v", "16M", "-maxrate", "24M", "-bufsize", "32M",
             "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "160k", "-ar", "16000",
+            "-c:a", "aac", "-b:a", "192k", "-ar", "16000",
             "-f", "segment",
             "-segment_time", str(self.segment_duration),
             "-segment_format", "mp4",

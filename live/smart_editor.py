@@ -412,9 +412,9 @@ class SmartEditor:
             else:
                 cx, cy, cw, ch = [float(v) for v in box]
 
-            # Ensure tight webcam crop strictly focused on the streamer's person (zero gameplay bleed)
-            cw = max(0.15, min(0.22, cw))
-            ch = max(0.18, min(0.26, ch))
+            # Ensure high-fidelity webcam crop strictly focused on the streamer's person (zero gameplay bleed)
+            cw = max(0.18, min(0.30, cw))
+            ch = max(0.20, min(0.32, ch))
             cx = max(0.0, min(1.0 - cw, cx))
             cy = max(0.0, min(1.0 - ch, cy))
 
@@ -425,11 +425,11 @@ class SmartEditor:
             zoom_expr = ",crop=w='trunc(iw/1.05/2)*2':h='trunc(ih/1.05/2)*2',scale=1080:1080" if energy_zoom else ""
 
             # Top: Pure gameplay (center square crop cleanly excludes the corner facecam)
-            # Bottom: Streamer's camera only, scaled to fill 1080x800 without gameplay borders
+            # Bottom: Streamer's camera only, scaled to fill 1080x800 with Lanczos + unsharp clarity
             filters = (
                 f"{bg_stream};"
                 f"[0:v]crop=w='min(iw,ih)':h='min(iw,ih)':x='(iw-min(iw,ih))/2':y='(ih-min(iw,ih))/2',scale=1080:1080:flags=lanczos{zoom_expr}[gameplay];"
-                f"[0:v]{cam_crop},scale=1080:800:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:800[facecam];"
+                f"[0:v]{cam_crop},scale=1080:800:force_original_aspect_ratio=increase:flags=lanczos+accurate_rnd,crop=1080:800,unsharp=5:5:0.8:3:3:0.4[facecam];"
                 "[bg][gameplay]overlay=0:20[tmp1];"
                 f"[tmp1][facecam]overlay=0:1120[vcomp];"
                 f"[vcomp]null{ass_filter}[vout]"

@@ -4,6 +4,10 @@
 
     <!-- Navigation -->
     <string name="nav_create">Create</string>
+    <string name="nav_instant">Instant</string>
+    <string name="nav_trending">Trending</string>
+    <string name="nav_editor">Editor</string>
+    <string name="nav_more">More</string>
     <string name="nav_narrate">Narrate</string>
     <string name="nav_live">Live</string>
     <string name="nav_projects">Projects</string>

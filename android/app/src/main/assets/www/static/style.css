@@ -177,7 +177,7 @@ select {
   color: #ffffff;
 }
 
-.brand-copy > span:not(.brand-title-wrap),
+.brand-copy>span:not(.brand-title-wrap),
 .brand-copy .brand-subtitle {
   margin-top: 5px;
   font-size: 9px;
@@ -267,12 +267,10 @@ select {
   left: -120%;
   width: 80%;
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.4) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.4) 50%,
+      transparent 100%);
   transform: skewX(-25deg);
   animation: shimmerSweep 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   pointer-events: none;
@@ -288,34 +286,77 @@ select {
 }
 
 @keyframes borderAuroraFlow {
-  0% { background-position: 0% 50%; }
-  100% { background-position: 300% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+
+  100% {
+    background-position: 300% 50%;
+  }
 }
 
 @keyframes shimmerSweep {
-  0% { left: -120%; }
-  35% { left: 160%; }
-  100% { left: 160%; }
+  0% {
+    left: -120%;
+  }
+
+  35% {
+    left: 160%;
+  }
+
+  100% {
+    left: 160%;
+  }
 }
 
 @keyframes dotPulse {
-  0%, 100% { transform: scale(1); opacity: 1; box-shadow: 0 0 6px #10b981; }
-  50% { transform: scale(1.3); opacity: 0.85; box-shadow: 0 0 10px #38bdf8; }
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow: 0 0 6px #10b981;
+  }
+
+  50% {
+    transform: scale(1.3);
+    opacity: 0.85;
+    box-shadow: 0 0 10px #38bdf8;
+  }
 }
 
 @keyframes dotRipple {
-  0% { transform: scale(0.6); opacity: 1; }
-  100% { transform: scale(2.4); opacity: 0; }
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
 }
 
 @keyframes textShineFlow {
-  0% { background-position: 0% center; }
-  100% { background-position: 200% center; }
+  0% {
+    background-position: 0% center;
+  }
+
+  100% {
+    background-position: 200% center;
+  }
 }
 
 @keyframes badgeFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-1.5px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-1.5px);
+  }
 }
 
 .sidebar-github {
@@ -472,8 +513,15 @@ nav a.active {
 }
 
 @keyframes pulse-update-ring {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.4); }
-  50% { box-shadow: 0 0 0 5px rgba(74, 222, 128, 0); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 0 5px rgba(74, 222, 128, 0);
+  }
 }
 
 .sidebar-update-text {
@@ -562,8 +610,13 @@ nav a.active {
 }
 
 @keyframes update-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Sidebar Creature Mini-Game Card */
@@ -633,32 +686,55 @@ nav a.active {
   transform-origin: bottom center;
   transition: transform 0.3s ease;
 }
+
 .tree-left {
   animation: tree-sway-left 3.2s ease-in-out infinite alternate;
 }
+
 .tree-right {
   animation: tree-sway-right 2.8s ease-in-out infinite alternate;
 }
+
 @keyframes tree-sway-left {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(-3deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(-3deg);
+  }
 }
+
 @keyframes tree-sway-right {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(3.5deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(3.5deg);
+  }
 }
 
 .sidebar-creature-card:hover .tree-left {
   animation: tree-sway-left 0.8s ease-in-out infinite alternate;
 }
+
 .sidebar-creature-card:hover .tree-right {
   animation: tree-sway-right 0.7s ease-in-out infinite alternate;
 }
 
 @keyframes creature-run-frantic {
-  0% { transform: translateY(0px) rotate(-4deg); }
-  50% { transform: translateY(-4px) rotate(1deg); }
-  100% { transform: translateY(0px) rotate(5deg); }
+  0% {
+    transform: translateY(0px) rotate(-4deg);
+  }
+
+  50% {
+    transform: translateY(-4px) rotate(1deg);
+  }
+
+  100% {
+    transform: translateY(0px) rotate(5deg);
+  }
 }
 
 .sidebar-creature-card:hover .sidebar-creature-mascot {
@@ -666,8 +742,13 @@ nav a.active {
 }
 
 @keyframes creature-run-turbo {
-  0% { transform: translateY(0px) scale(1.03); }
-  100% { transform: translateY(-3px) scale(1.06); }
+  0% {
+    transform: translateY(0px) scale(1.03);
+  }
+
+  100% {
+    transform: translateY(-3px) scale(1.06);
+  }
 }
 
 /* Support Board Held by Creature */
@@ -701,18 +782,30 @@ nav a.active {
   transform-origin: 25px 35px;
   animation: creature-patter-left 0.18s linear infinite alternate;
 }
+
 .creature-leg-r {
   transform-origin: 35px 35px;
   animation: creature-patter-right 0.18s linear infinite alternate;
 }
 
 @keyframes creature-patter-left {
-  0% { transform: rotate(-25deg) translateY(-2px); }
-  100% { transform: rotate(30deg) translateY(2px); }
+  0% {
+    transform: rotate(-25deg) translateY(-2px);
+  }
+
+  100% {
+    transform: rotate(30deg) translateY(2px);
+  }
 }
+
 @keyframes creature-patter-right {
-  0% { transform: rotate(30deg) translateY(2px); }
-  100% { transform: rotate(-25deg) translateY(-2px); }
+  0% {
+    transform: rotate(30deg) translateY(2px);
+  }
+
+  100% {
+    transform: rotate(-25deg) translateY(-2px);
+  }
 }
 
 /* Fluttering ears */
@@ -720,18 +813,30 @@ nav a.active {
   transform-origin: 24px 28px;
   animation: creature-ear-flutter-l 0.28s ease-in-out infinite alternate;
 }
+
 .creature-ear-r {
   transform-origin: 39px 28px;
   animation: creature-ear-flutter-r 0.28s ease-in-out infinite alternate-reverse;
 }
 
 @keyframes creature-ear-flutter-l {
-  0% { transform: rotate(-8deg); }
-  100% { transform: rotate(10deg); }
+  0% {
+    transform: rotate(-8deg);
+  }
+
+  100% {
+    transform: rotate(10deg);
+  }
 }
+
 @keyframes creature-ear-flutter-r {
-  0% { transform: rotate(8deg); }
-  100% { transform: rotate(-10deg); }
+  0% {
+    transform: rotate(8deg);
+  }
+
+  100% {
+    transform: rotate(-10deg);
+  }
 }
 
 /* Darting confused eyes */
@@ -740,10 +845,23 @@ nav a.active {
 }
 
 @keyframes creature-eyes-confused {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-2.5px); }
-  50% { transform: translateX(2.5px); }
-  75% { transform: translateY(-1.5px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-2.5px);
+  }
+
+  50% {
+    transform: translateX(2.5px);
+  }
+
+  75% {
+    transform: translateY(-1.5px);
+  }
 }
 
 /* Confused question mark popping up over head */
@@ -754,10 +872,28 @@ nav a.active {
 }
 
 @keyframes creature-qmark-pop {
-  0%, 40% { opacity: 0; transform: translateY(4px) scale(0.6); }
-  50% { opacity: 1; transform: translateY(-2px) scale(1.2) rotate(8deg); }
-  65% { opacity: 1; transform: translateY(-4px) scale(1) rotate(-4deg); }
-  80%, 100% { opacity: 0; transform: translateY(-8px) scale(0.7); }
+
+  0%,
+  40% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.6);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.2) rotate(8deg);
+  }
+
+  65% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1) rotate(-4deg);
+  }
+
+  80%,
+  100% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.7);
+  }
 }
 
 /* Little sweat drop */
@@ -767,10 +903,28 @@ nav a.active {
 }
 
 @keyframes creature-sweat-anim {
-  0%, 45% { opacity: 0; transform: translateY(0); }
-  55% { opacity: 0.9; transform: translateY(1px); }
-  75% { opacity: 0.9; transform: translateY(4px); }
-  85%, 100% { opacity: 0; transform: translateY(6px); }
+
+  0%,
+  45% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+
+  55% {
+    opacity: 0.9;
+    transform: translateY(1px);
+  }
+
+  75% {
+    opacity: 0.9;
+    transform: translateY(4px);
+  }
+
+  85%,
+  100% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 .creature-glow {
@@ -779,8 +933,13 @@ nav a.active {
 }
 
 @keyframes creature-pulse {
-  0% { opacity: 0.6; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 0.6;
+  }
+
+  100% {
+    opacity: 1;
+  }
 }
 
 .sidebar-creature-info {
@@ -831,8 +990,15 @@ nav a.active {
 }
 
 @keyframes modal-fade-in {
-  from { opacity: 0; transform: scale(0.98); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .mini-game-modal-content {
@@ -1147,37 +1313,44 @@ nav a.active {
   transition: opacity 0.25s ease, transform 0.25s ease;
   max-width: 480px;
 }
+
 .folder-toast.visible {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);
 }
+
 .folder-toast-content {
   display: flex;
   align-items: center;
   gap: 14px;
 }
+
 .folder-toast-icon {
   font-size: 1.6rem;
   line-height: 1;
 }
+
 .folder-toast-text {
   display: flex;
   flex-direction: column;
   gap: 3px;
   overflow: hidden;
 }
+
 .folder-toast-text strong {
   font-size: 0.92rem;
   font-weight: 700;
   color: #f3eadf;
 }
+
 .folder-toast-text code {
   font-size: 0.76rem;
   color: rgba(255, 255, 255, 0.65);
   word-break: break-all;
   font-family: monospace;
 }
+
 .folder-toast-copy {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -1189,6 +1362,7 @@ nav a.active {
   white-space: nowrap;
   transition: background 0.15s ease;
 }
+
 .folder-toast-copy:hover {
   background: rgba(255, 255, 255, 0.18);
 }
@@ -2797,7 +2971,9 @@ label {
   padding: 6px 12px;
   border-radius: 8px;
   color: white;
-  background: rgba(0, 0, 0, 0.5);
+  background: transparent;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95), 0 0 3px #000, 1px 1px 0 #000, -1px -1px 0 #000;
+  -webkit-text-stroke: 1px rgba(0, 0, 0, 0.85);
   cursor: grab;
   touch-action: none;
   z-index: 10;
@@ -3290,7 +3466,7 @@ footer {
   background: #121215;
   color: #ffffff;
   border: 1.5px solid var(--accent, #9b5cff);
-  box-shadow: 0 0 14px rgba(155, 92, 255, 0.5), 0 4px 10px rgba(0,0,0,0.7);
+  box-shadow: 0 0 14px rgba(155, 92, 255, 0.5), 0 4px 10px rgba(0, 0, 0, 0.7);
   padding: 4px 14px;
   border-radius: 20px;
   font-size: 0.74rem;
@@ -3307,7 +3483,7 @@ footer {
 .split-divider-handle:hover .handle-badge,
 .split-divider-handle.dragging .handle-badge {
   transform: scale(1.06);
-  box-shadow: 0 0 20px rgba(155, 92, 255, 0.9), 0 6px 14px rgba(0,0,0,0.8);
+  box-shadow: 0 0 20px rgba(155, 92, 255, 0.9), 0 6px 14px rgba(0, 0, 0, 0.8);
   border-color: #ffffff;
 }
 
@@ -3581,8 +3757,17 @@ footer {
 }
 
 @keyframes clippyBadgePulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.8); }
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
 }
 
 .clippy-header-actions {
@@ -3645,8 +3830,15 @@ footer {
 }
 
 @keyframes clippyMsgFade {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .clippy-msg-ai {
@@ -3793,7 +3985,8 @@ footer {
   margin-bottom: 0;
 }
 
-.clippy-md-h3, .clippy-md-h4 {
+.clippy-md-h3,
+.clippy-md-h4 {
   margin: 6px 0 4px;
   color: #fafafa;
   font-size: 13px;
@@ -3862,15 +4055,27 @@ footer {
   animation: clippyDotPulse 1.3s infinite ease-in-out both;
 }
 
-.clippy-dot:nth-child(1) { animation-delay: -0.32s; }
-.clippy-dot:nth-child(2) { animation-delay: -0.16s; }
-.clippy-dot:nth-child(3) { animation-delay: 0s; }
+.clippy-dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.clippy-dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+.clippy-dot:nth-child(3) {
+  animation-delay: 0s;
+}
 
 @keyframes clippyDotPulse {
-  0%, 80%, 100% {
+
+  0%,
+  80%,
+  100% {
     transform: scale(0.7);
     opacity: 0.3;
   }
+
   40% {
     transform: scale(1.15);
     opacity: 1;
@@ -4034,9 +4239,9 @@ footer {
   stroke: #09090b !important;
 }
 
-.clippy-input-bar > :not(#clippyInput):not(#clippySendBtn):not(.clippy-input):not(.clippy-send-btn),
-.clippy-input-bar > div[id*="monica"],
-.clippy-input-bar > div[class*="monica"],
+.clippy-input-bar> :not(#clippyInput):not(#clippySendBtn):not(.clippy-input):not(.clippy-send-btn),
+.clippy-input-bar>div[id*="monica"],
+.clippy-input-bar>div[class*="monica"],
 .clippy-input-bar div[data-monica],
 .clippy-input-bar span[data-monica],
 .clippy-input-bar button[data-monica]:not(#clippySendBtn),
@@ -4224,13 +4429,29 @@ div[id*="monica-action"] {
 }
 
 @keyframes modalScaleUp {
-  from { opacity: 0; transform: scale(0.94); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes liveDotPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.3; transform: scale(0.85); }
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.3;
+    transform: scale(0.85);
+  }
 }
 
 /* ==========================================================================
@@ -4381,7 +4602,7 @@ div[id*="monica-action"] {
   width: 100% !important;
 }
 
-#beta > *:not(.beta-matrix-canvas) {
+#beta>*:not(.beta-matrix-canvas) {
   position: relative;
   z-index: 1;
 }
@@ -4708,6 +4929,7 @@ div[id*="monica-action"] {
    MOBILE RESPONSIVENESS OVERRIDES (<980px)
    ========================================================================== */
 @media (max-width: 980px) {
+
   #betaClipperWorkspace,
   .beta-workspace-layout {
     display: flex !important;
@@ -4742,14 +4964,18 @@ div[id*="monica-action"] {
     line-height: 1.35 !important;
   }
 
-  .toggle-row b, .toggle-row span:not(.switch) {
+  .toggle-row b,
+  .toggle-row span:not(.switch) {
     display: inline-block !important;
     white-space: normal !important;
     word-break: break-word !important;
     font-size: 13px !important;
   }
 
-  select, input[type="text"], input[type="url"], input[type="number"] {
+  select,
+  input[type="text"],
+  input[type="url"],
+  input[type="number"] {
     width: 100% !important;
     min-width: 0 !important;
     max-width: 100% !important;
@@ -4833,8 +5059,15 @@ div[id*="monica-action"] {
 }
 
 @keyframes restartModalPop {
-  0% { opacity: 0; transform: scale(0.94) translateY(12px); }
-  100% { opacity: 1; transform: scale(1) translateY(0); }
+  0% {
+    opacity: 0;
+    transform: scale(0.94) translateY(12px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .restart-modal-header {
@@ -4903,8 +5136,17 @@ div[id*="monica-action"] {
 }
 
 @keyframes restartPulse {
-  0%, 100% { opacity: 0.4; transform: scale(0.85); }
-  50% { opacity: 1; transform: scale(1.3); }
+
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
 }
 
 /* Live Terminal / Console Box */
@@ -4938,9 +5180,20 @@ div[id*="monica-action"] {
   border-radius: 50%;
 }
 
-.restart-console-dots .dot-red { background: #ef4444; opacity: 0.75; }
-.restart-console-dots .dot-yellow { background: #f59e0b; opacity: 0.75; }
-.restart-console-dots .dot-green { background: #10b981; opacity: 0.75; }
+.restart-console-dots .dot-red {
+  background: #ef4444;
+  opacity: 0.75;
+}
+
+.restart-console-dots .dot-yellow {
+  background: #f59e0b;
+  opacity: 0.75;
+}
+
+.restart-console-dots .dot-green {
+  background: #10b981;
+  opacity: 0.75;
+}
 
 .restart-console-title {
   color: #94a3b8;
@@ -4980,13 +5233,16 @@ div[id*="monica-action"] {
 .restart-console-body::-webkit-scrollbar {
   width: 5px;
 }
+
 .restart-console-body::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .restart-console-body::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 4px;
 }
+
 .restart-console-body::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.35);
 }
@@ -4998,10 +5254,23 @@ div[id*="monica-action"] {
   word-break: break-all;
 }
 
-.console-line.info { color: #94a3b8; }
-.console-line.step { color: #38bdf8; font-weight: 600; }
-.console-line.success { color: #4ade80; font-weight: 600; }
-.console-line.warn { color: #fbbf24; }
+.console-line.info {
+  color: #94a3b8;
+}
+
+.console-line.step {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.console-line.success {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.console-line.warn {
+  color: #fbbf24;
+}
 
 .restart-footer {
   display: flex;
@@ -5125,8 +5394,15 @@ div[id*="monica-action"] {
 }
 
 @keyframes restartModalPop {
-  0% { opacity: 0; transform: scale(0.94) translateY(12px); }
-  100% { opacity: 1; transform: scale(1) translateY(0); }
+  0% {
+    opacity: 0;
+    transform: scale(0.94) translateY(12px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .restart-modal-header {
@@ -5195,8 +5471,17 @@ div[id*="monica-action"] {
 }
 
 @keyframes restartPulse {
-  0%, 100% { opacity: 0.4; transform: scale(0.85); }
-  50% { opacity: 1; transform: scale(1.3); }
+
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
 }
 
 /* Live Terminal / Console Box */
@@ -5230,9 +5515,20 @@ div[id*="monica-action"] {
   border-radius: 50%;
 }
 
-.restart-console-dots .dot-red { background: #ef4444; opacity: 0.75; }
-.restart-console-dots .dot-yellow { background: #f59e0b; opacity: 0.75; }
-.restart-console-dots .dot-green { background: #10b981; opacity: 0.75; }
+.restart-console-dots .dot-red {
+  background: #ef4444;
+  opacity: 0.75;
+}
+
+.restart-console-dots .dot-yellow {
+  background: #f59e0b;
+  opacity: 0.75;
+}
+
+.restart-console-dots .dot-green {
+  background: #10b981;
+  opacity: 0.75;
+}
 
 .restart-console-title {
   color: #94a3b8;
@@ -5272,13 +5568,16 @@ div[id*="monica-action"] {
 .restart-console-body::-webkit-scrollbar {
   width: 5px;
 }
+
 .restart-console-body::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .restart-console-body::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 4px;
 }
+
 .restart-console-body::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.35);
 }
@@ -5290,10 +5589,23 @@ div[id*="monica-action"] {
   word-break: break-all;
 }
 
-.console-line.info { color: #94a3b8; }
-.console-line.step { color: #38bdf8; font-weight: 600; }
-.console-line.success { color: #4ade80; font-weight: 600; }
-.console-line.warn { color: #fbbf24; }
+.console-line.info {
+  color: #94a3b8;
+}
+
+.console-line.step {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.console-line.success {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.console-line.warn {
+  color: #fbbf24;
+}
 
 .restart-footer {
   display: flex;
@@ -5386,8 +5698,13 @@ div[id*="monica-action"] {
 }
 
 @keyframes galaxySpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ==========================================================================
@@ -5407,7 +5724,8 @@ div[id*="monica-action"] {
   }
 }
 
-.instant-col-left, .instant-col-right {
+.instant-col-left,
+.instant-col-right {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -5471,7 +5789,8 @@ div[id*="monica-action"] {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.instant-dropzone:hover, .instant-dropzone.dragover {
+.instant-dropzone:hover,
+.instant-dropzone.dragover {
   border-color: #ffffff;
   background: rgba(255, 255, 255, 0.06);
   transform: translateY(-1px);
@@ -5558,7 +5877,8 @@ div[id*="monica-action"] {
   letter-spacing: 0.08em;
 }
 
-.instant-divider::before, .instant-divider::after {
+.instant-divider::before,
+.instant-divider::after {
   content: '';
   flex: 1;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -5920,4 +6240,213 @@ div[id*="monica-action"] {
   border-radius: 22px !important;
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.85), 0 0 50px rgba(129, 140, 248, 0.10) !important;
   animation: restartModalPop 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+/* ==========================================================================
+   Hardware Accelerator & GPU Switcher Dropdown (Dark Aesthetic)
+   ========================================================================== */
+.gpu-dropdown-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  z-index: 100;
+}
+
+.gpu-dropdown-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  background: rgba(18, 18, 22, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  color: #f1f5f9;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  outline: none;
+}
+
+.gpu-dropdown-btn:hover {
+  background: rgba(28, 28, 35, 0.95);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5), 0 0 14px rgba(34, 197, 94, 0.2);
+  transform: translateY(-1px);
+}
+
+.gpu-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
+  flex-shrink: 0;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.gpu-indicator-dot.nvidia {
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.9);
+}
+
+.gpu-indicator-dot.intel {
+  background: #38bdf8;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.9);
+}
+
+.gpu-indicator-dot.cpu {
+  background: #fbbf24;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.9);
+}
+
+.gpu-current-label {
+  max-width: 175px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.gpu-chevron {
+  opacity: 0.6;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.gpu-dropdown-wrapper.open .gpu-chevron {
+  transform: rotate(180deg);
+}
+
+.gpu-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 290px;
+  background: #0d0d12;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  padding: 8px;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 9999;
+  animation: gpuDropdownFade 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes gpuDropdownFade {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.gpu-dropdown-wrapper.open .gpu-dropdown-menu {
+  display: flex;
+}
+
+.gpu-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 4px;
+}
+
+.gpu-menu-header span:first-child {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.gpu-menu-subtitle {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  color: #4ade80;
+  border-radius: 6px;
+}
+
+.gpu-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  width: 100%;
+}
+
+.gpu-menu-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.gpu-menu-item.active {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.gpu-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gpu-item-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gpu-item-meta {
+  font-size: 0.68rem;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gpu-meta-vram {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.gpu-item-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.gpu-item-badge.active {
+  background: #22c55e;
+  color: #052e16;
+}
+
+.gpu-item-badge.rec {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
 }

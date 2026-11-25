@@ -186,7 +186,7 @@ except ImportError:
 
 clear_ffmpeg_report_environment()
 
-APP_HOST = "127.0.0.1"
+APP_HOST = os.environ.get("CLIPIFY_HOST", "0.0.0.0")
 APP_PORT = configured_port()
 
 ALLOWED_EXTENSIONS = {"mp4", "mov", "mkv", "webm", "avi", "m4v"}
@@ -1634,7 +1634,7 @@ job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, ma
         "KMP_STACKSIZE": "64M",
         "DISABLE_CAPTIONS": "1" if (disable_captions or font == "none" or branding.get("disable_captions") or not branding.get("captions_enabled", True)) else "0",
         "WHISPERX_THREADS": os.getenv("WHISPERX_THREADS", str(max(4, os.cpu_count() or 4)) if fast_whisper else "4"),
-        "WHISPERX_LANGUAGE": (language if language != "auto" else (branding.get("language") if branding.get("language") != "auto" else (os.getenv("WHISPERX_LANGUAGE") or "auto"))).strip().lower(),
+        "WHISPERX_LANGUAGE": str(language if (language and language != "auto") else (branding.get("language") if (branding.get("language") and branding.get("language") != "auto") else (os.getenv("WHISPERX_LANGUAGE") or "auto"))).strip().lower(),
         "OMP_NUM_THREADS": str(max(4, os.cpu_count() or 4)) if fast_whisper else "4",
         "MKL_NUM_THREADS": str(max(4, os.cpu_count() or 4)) if fast_whisper else "4",
         "OPENBLAS_NUM_THREADS": str(max(4, os.cpu_count() or 4)) if fast_whisper else "4",
@@ -1875,7 +1875,7 @@ def api_trending(platform: str):
 
 
 def _get_live_studio_mgr():
-    from live import get_live_manager
+    from live.studio_manager import get_live_manager
     python_bin = sys.executable
     try:
         pipeline_cmd = _pipeline_command(USER_DATA_DIR)
@@ -3515,6 +3515,7 @@ def _fast_generate_captions(audio_path: Path, ass_path: Path, clip_dur: float, l
             del model
             import gc
             gc.collect()
+            import torch
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         except Exception:
@@ -5219,7 +5220,7 @@ def cache_clear():
         "message": f"Successfully cleared {formatted} of disk space ({yt_deleted} YouTube video(s) and {cache_deleted} cache file(s) removed)."
     })
 
-APP_VERSION = "v5.0.3"
+APP_VERSION = "v5.0.4"
 try:
     _v_file = ROOT / "version.json"
     if _v_file.exists():
@@ -5523,6 +5524,41 @@ def health():
         "user_data_dir": str(USER_DATA_DIR),
         "port": APP_PORT,
     })
+
+
+@app.get("/api/system/gpus")
+def api_system_gpus():
+    """Retrieve all detected physical GPUs, current accelerator selection and status."""
+    try:
+        from clipify.platform.gpu_manager import get_gpu_status
+        return jsonify(get_gpu_status())
+    except Exception as ex:
+        logger.warning("Error fetching GPU status: %s", ex)
+        return jsonify({"ok": False, "error": str(ex), "gpus": []}), 500
+
+
+@app.post("/api/system/gpus/select")
+def api_system_gpus_select():
+    """Select active accelerator GPU across PyTorch, CTranslate2, WhisperX, Ollama & FFmpeg."""
+    try:
+        data = request.get_json(silent=True) or {}
+        gpu_id = data.get("gpu_id")
+        if not gpu_id:
+            return jsonify({"ok": False, "error": "Missing gpu_id parameter"}), 400
+        from clipify.platform.gpu_manager import apply_gpu_selection, get_gpu_status
+        selected = apply_gpu_selection(gpu_id)
+        # Invalidate encoder cache so next render immediately adopts the chosen accelerator
+        try:
+            from clipify.platform.hardware import detect_best_encoder
+            detect_best_encoder(force_refresh=True)
+        except Exception:
+            pass
+        status = get_gpu_status()
+        status["selected"] = selected
+        return jsonify(status)
+    except Exception as ex:
+        logger.exception("Error selecting GPU: %s", ex)
+        return jsonify({"ok": False, "error": str(ex)}), 500
 
 
 @app.get("/api/diagnostic")
@@ -6381,6 +6417,11 @@ if __name__ == "__main__":
 
     with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
         _lf.write(f"[{datetime.now()}] Starting Flask app on {_host}:{_port}\n")
+    try:
+        from clipify.platform.gpu_manager import apply_gpu_selection, get_active_gpu_id
+        apply_gpu_selection(get_active_gpu_id())
+    except Exception as _gpu_init_err:
+        pass
     if os.environ.get("CLIPPEDAI_NO_BROWSER", "").strip() not in {"1", "true", "yes"}:
         _open_app_window(_host, _port)
     try:

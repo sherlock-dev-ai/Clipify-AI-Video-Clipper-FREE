@@ -77,13 +77,15 @@
         </svg>
         <span>Instant Clipping</span> <span class="nav-beta-tag">BETA</span>
       </a>
-      <a href="/#trending" data-nav="trending" id="navTrendingLink" title="Discover live broadcasts & trending gameplay across YouTube, Twitch & Kick">
+      <a href="/#trending" data-nav="trending" id="navTrendingLink"
+        title="Discover live broadcasts & trending gameplay across YouTube, Twitch & Kick">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
           <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
           <polyline points="17 6 23 6 23 12"></polyline>
         </svg>
-        <span>Trending</span> <span class="nav-trending-pill" style="margin-left:auto;background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:0.68rem;padding:1px 6px;border-radius:10px;font-weight:700;">LIVE</span>
+        <span>Trending</span> <span class="nav-trending-pill"
+          style="margin-left:auto;background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:0.68rem;padding:1px 6px;border-radius:10px;font-weight:700;">LIVE</span>
       </a>
 
       <div class="sidebar-nav-divider"></div>
@@ -342,6 +344,32 @@
         </p>
       </div>
       <div class="top-actions">
+        <div class="gpu-dropdown-wrapper" id="gpuDropdownWrapper">
+          <button type="button" class="gpu-dropdown-btn" id="gpuDropdownBtn" title="Switch active GPU / Hardware Accelerator">
+            <span class="gpu-indicator-dot nvidia"></span>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+              <rect x="9" y="9" width="6" height="6" />
+              <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
+              <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
+              <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="15" x2="23" y2="15" />
+              <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="15" x2="4" y2="15" />
+            </svg>
+            <span class="gpu-current-label" id="gpuCurrentLabel">GPU: Detecting…</span>
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" class="gpu-chevron">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="gpu-dropdown-menu" id="gpuDropdownMenu">
+            <div class="gpu-menu-header">
+              <span>Hardware Accelerator</span>
+              <span class="gpu-menu-subtitle">Active Engine GPU</span>
+            </div>
+            <div class="gpu-menu-list" id="gpuMenuList">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
         <div class="live-badge" id="streamLiveBadge"><span class="pulse-dot"></span> <strong
             id="streamLiveText">IDLE</strong></div>
         <button class="ghost" id="btnObsGuide" type="button">OBS Setup</button>
@@ -1091,7 +1119,8 @@
     <!-- App-Themed Update Modal Popup with Live Moving Matrix Canvas Background -->
     <div id="updateModal" class="modal-overlay update-modal-overlay"
       style="display:none;position:fixed;inset:0;background:#050508;z-index:9999;align-items:center;justify-content:center;padding:20px;overflow:hidden;">
-      <canvas id="updateModalAsciiCanvas" class="restart-ascii-canvas update-modal-ascii-canvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;opacity:0.42;"></canvas>
+      <canvas id="updateModalAsciiCanvas" class="restart-ascii-canvas update-modal-ascii-canvas"
+        style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;opacity:0.42;"></canvas>
       <div class="modal-card panel update-modal-card"
         style="background:rgba(16,18,24,0.94);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,0.16);border-radius:22px;max-width:520px;width:100%;box-shadow:0 30px 90px rgba(0,0,0,0.85), 0 0 50px rgba(129,140,248,0.10);padding:26px;position:relative;z-index:10;animation:restartModalPop 0.35s cubic-bezier(0.16,1,0.3,1);">
         <button type="button" class="modal-close-btn" id="closeUpdateModal"
@@ -1133,6 +1162,7 @@
     <script src="static/tour.js"></script>
     <script src="static/cache_manager.js"></script>
     <script src="static/clippy.js"></script>
+    <script src="static/gpu_selector.js"></script>
 </body>
 
 </html>

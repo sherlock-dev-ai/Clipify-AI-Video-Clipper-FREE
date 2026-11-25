@@ -1253,7 +1253,7 @@ class Installer extends EventEmitter {
     }
 
     const sitePackagesDir = path.join(venvDir, 'Lib', 'site-packages');
-    const pipArgs = ['-m', 'pip', 'install', '--disable-pip-version-check', '--no-input', '--timeout', '120', '--retries', '10', '--prefer-binary', '--progress-bar', 'on'];
+    const pipArgs = ['-m', 'pip', 'install', '--disable-pip-version-check', '--no-compile', '--no-warn-script-location', '--no-input', '--timeout', '120', '--retries', '10', '--prefer-binary', '--progress-bar', 'on'];
     pipArgs.push('--extra-index-url', 'https://download.pytorch.org/whl/cpu');
     if (fs.existsSync(wheelsDir)) {
       pipArgs.push('--find-links', wheelsDir);
@@ -1278,12 +1278,15 @@ class Installer extends EventEmitter {
         const timeRatio = 1 - Math.exp(-elapsedSec / 180);
         currentRuntimePercent = Math.min(55, Math.max(15, Math.round(15 + 40 * timeRatio)));
       }
+      const elapsedMin = this.taskStartedAt ? Math.floor((Date.now() - this.taskStartedAt) / 60000) : 0;
+      const elapsedSecRem = this.taskStartedAt ? Math.floor(((Date.now() - this.taskStartedAt) % 60000) / 1000) : 0;
+      const timeStr = `${elapsedMin}m ${elapsedSecRem}s`;
       this.updatePhase(
         id,
         currentRuntimePercent,
         installedCount > 0
-          ? `Installing AI packages (${installedCount} installed)`
-          : 'Downloading AI runtime (Torch, WhisperX, Mediapipe — speed depends on connection)'
+          ? `Installing AI packages (${installedCount} installed · ${timeStr})`
+          : `Downloading AI runtime (~1.8 GB: PyTorch, WhisperX · ${timeStr} · Active)`
       );
     };
 

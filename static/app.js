@@ -5426,16 +5426,18 @@ function initEditorCaptionStudio() {
       if ($('#editorTextBgOpacity')) $('#editorTextBgOpacity').value = opacity;
       if ($('#editorTextBgOpacityOut')) $('#editorTextBgOpacityOut').textContent = opacity + '%';
       if ($('#editorTextFont')) $('#editorTextFont').value = font;
-      if ($('#editorTextBg')) $('#editorTextBg').checked = true;
       if ($('#editorTextEnabled')) $('#editorTextEnabled').checked = true;
       if (capToggle) capToggle.checked = true;
       if (capToggleLabel) capToggleLabel.textContent = 'Captions ON';
 
+      const showBg = $('#editorTextBg')?.checked === true;
       const txt = $('#editorText');
       if (txt) {
         txt.style.fontFamily = font;
         txt.style.color = color;
-        txt.style.background = hexAlpha(bg, opacity);
+        txt.style.background = showBg ? hexAlpha(bg, opacity) : 'transparent';
+        txt.style.textShadow = '0 2px 8px rgba(0,0,0,0.95), 0 0 3px #000, 1px 1px 0 #000, -1px -1px 0 #000';
+        txt.style.webkitTextStroke = '1px rgba(0,0,0,0.85)';
       }
       if (typeof editorPreviewUpdate === 'function') editorPreviewUpdate();
     });

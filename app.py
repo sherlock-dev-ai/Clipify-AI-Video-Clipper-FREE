@@ -3511,6 +3511,14 @@ def _fast_generate_captions(audio_path: Path, ass_path: Path, clip_dur: float, l
                         "start": max(0.0, float(w.start)),
                         "end": min(clip_dur, float(w.end))
                     })
+        try:
+            del model
+            import gc
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
         if not words:
             return False
 

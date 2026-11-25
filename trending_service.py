@@ -224,60 +224,80 @@ def get_youtube_trending(query: str = "") -> Dict[str, Any]:
 
     try:
         import yt_dlp
+        from concurrent.futures import ThreadPoolExecutor
+
         ydl_opts = {
             'quiet': True,
             'extract_flat': True,
             'skip_download': True,
             'no_warnings': True,
-            'socket_timeout': 6
+            'socket_timeout': 4
         }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # 1. Fetch live streams
-            live_search = f"ytsearch8:{query.strip() + ' ' if query.strip() else ''}live gaming stream"
-            res_live = ydl.extract_info(live_search, download=False)
-            for e in res_live.get('entries', []):
-                if not e: continue
-                vid_id = e.get('id') or ''
-                title = e.get('title') or 'Live Gaming Stream'
-                channel = e.get('uploader') or e.get('channel') or 'Gaming Creator'
-                url = e.get('url') if (e.get('url') and 'youtube.com' in e.get('url')) else f"https://www.youtube.com/watch?v={vid_id}"
-                thumb = e.get('thumbnail') or (f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else "")
-                live_streams.append({
-                    "id": vid_id or f"yt_live_{len(live_streams)}",
-                    "title": title,
-                    "channel": channel,
-                    "viewers": format_count(e.get('view_count')),
-                    "thumbnail": thumb or "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=640&q=80",
-                    "url": url,
-                    "is_live": True,
-                    "game": "Live Stream"
-                })
 
-            # 2. Fetch trending gameplay videos
-            video_search = f"ytsearch8:{query.strip() + ' ' if query.strip() else ''}trending gameplay"
-            res_vid = ydl.extract_info(video_search, download=False)
-            for e in res_vid.get('entries', []):
-                if not e: continue
-                vid_id = e.get('id') or ''
-                title = e.get('title') or 'Trending Gameplay'
-                channel = e.get('uploader') or e.get('channel') or 'Gamer'
-                url = e.get('url') if (e.get('url') and 'youtube.com' in e.get('url')) else f"https://www.youtube.com/watch?v={vid_id}"
-                thumb = e.get('thumbnail') or (f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else "")
-                dur_sec = e.get('duration')
-                duration_str = f"{int(dur_sec)//60}:{int(dur_sec)%60:02d}" if dur_sec else "12:30"
-                gameplay_videos.append({
-                    "id": vid_id or f"yt_vid_{len(gameplay_videos)}",
-                    "title": title,
-                    "channel": channel,
-                    "duration": duration_str,
-                    "views": format_count(e.get('view_count')),
-                    "thumbnail": thumb or "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=640&q=80",
-                    "url": url,
-                    "is_live": False,
-                    "game": "Gameplay"
-                })
+        def _fetch_live():
+            results = []
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    live_search = f"ytsearch6:{query.strip() + ' ' if query.strip() else ''}live gaming stream"
+                    res = ydl.extract_info(live_search, download=False)
+                    for e in res.get('entries', []):
+                        if not e: continue
+                        vid_id = e.get('id') or ''
+                        title = e.get('title') or 'Live Gaming Stream'
+                        channel = e.get('uploader') or e.get('channel') or 'Gaming Creator'
+                        url = e.get('url') if (e.get('url') and 'youtube.com' in e.get('url')) else f"https://www.youtube.com/watch?v={vid_id}"
+                        thumb = e.get('thumbnail') or (f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else "")
+                        results.append({
+                            "id": vid_id or f"yt_live_{len(results)}",
+                            "title": title,
+                            "channel": channel,
+                            "viewers": format_count(e.get('view_count')),
+                            "thumbnail": thumb or "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=640&q=80",
+                            "url": url,
+                            "is_live": True,
+                            "game": "Live Stream"
+                        })
+            except Exception as e:
+                logger.debug("Live fetch error: %s", e)
+            return results
+
+        def _fetch_videos():
+            results = []
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    video_search = f"ytsearch6:{query.strip() + ' ' if query.strip() else ''}trending gameplay"
+                    res = ydl.extract_info(video_search, download=False)
+                    for e in res.get('entries', []):
+                        if not e: continue
+                        vid_id = e.get('id') or ''
+                        title = e.get('title') or 'Trending Gameplay'
+                        channel = e.get('uploader') or e.get('channel') or 'Gamer'
+                        url = e.get('url') if (e.get('url') and 'youtube.com' in e.get('url')) else f"https://www.youtube.com/watch?v={vid_id}"
+                        thumb = e.get('thumbnail') or (f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else "")
+                        dur_sec = e.get('duration')
+                        duration_str = f"{int(dur_sec)//60}:{int(dur_sec)%60:02d}" if dur_sec else "12:30"
+                        results.append({
+                            "id": vid_id or f"yt_vid_{len(results)}",
+                            "title": title,
+                            "channel": channel,
+                            "duration": duration_str,
+                            "views": format_count(e.get('view_count')),
+                            "thumbnail": thumb or "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=640&q=80",
+                            "url": url,
+                            "is_live": False,
+                            "game": "Gameplay"
+                        })
+            except Exception as e:
+                logger.debug("Video fetch error: %s", e)
+            return results
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            f_live = executor.submit(_fetch_live)
+            f_videos = executor.submit(_fetch_videos)
+            live_streams = f_live.result(timeout=4.5)
+            gameplay_videos = f_videos.result(timeout=4.5)
     except Exception as ex:
-        logger.warning("YouTube search encountered error: %s", ex)
+        logger.warning("YouTube search encountered error or timeout: %s", ex)
 
     # Blend with fallbacks if empty so results are always rich
     if not live_streams:
@@ -449,3 +469,4 @@ def get_kick_trending(query: str = "") -> Dict[str, Any]:
     }
     _CACHE[cache_key] = {"data": result, "ts": now}
     return result
+

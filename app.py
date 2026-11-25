@@ -1608,11 +1608,11 @@ job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, ma
         "CLIPPEDAI_TEXT_Y": str(branding.get("text_y", 75)),
         "CLIPPEDAI_PREMIUM_CAPTIONS": "1" if branding.get("premium_captions", True) else "0",
         "CLIPPEDAI_SITUATIONAL_CUES": "1" if branding.get("situational_cues", True) else "0",
-        "CLIPPEDAI_CAPTION_PRESET": str(branding.get("caption_preset", data.get("caption_preset", "center_seam" if (gaming_split or split_screen) else "lower_safe"))),
-        "CLIPPEDAI_CAPTION_ACCENT": str(branding.get("caption_accent", data.get("caption_accent", "gold_yellow"))),
-        "CLIPPEDAI_CAPTION_MARGIN_V": str(branding.get("caption_margin_v", data.get("caption_margin_v", "920" if (gaming_split or split_screen) else "300"))),
-        "CLIPPEDAI_CAPTION_FONT_SIZE": str(branding.get("caption_font_size", data.get("caption_font_size", "48"))),
-        "CLIPPEDAI_CAPTION_Y_PCT": str(branding.get("caption_y_pct", data.get("caption_y_pct", "0"))),
+        "CLIPPEDAI_CAPTION_PRESET": str(branding.get("caption_preset", "center_seam" if (gaming_split or split_screen) else "lower_safe")),
+        "CLIPPEDAI_CAPTION_ACCENT": str(branding.get("caption_accent", "gold_yellow")),
+        "CLIPPEDAI_CAPTION_MARGIN_V": str(branding.get("caption_margin_v", "920" if (gaming_split or split_screen) else "300")),
+        "CLIPPEDAI_CAPTION_FONT_SIZE": str(branding.get("caption_font_size", "48")),
+        "CLIPPEDAI_CAPTION_Y_PCT": str(branding.get("caption_y_pct", "0")),
         "CLIPPEDAI_WATERMARK_TEXT_ENABLED": "1" if branding.get("watermark_text_enabled") else "0",
         "CLIPPEDAI_WATERMARK_TEXT": str(branding.get("watermark_text", "")),
         "CLIPPEDAI_WATERMARK_TEXT_POSITION": str(branding.get("watermark_text_position", "center")),
@@ -3503,7 +3503,7 @@ def _fast_generate_captions(audio_path: Path, ass_path: Path, clip_dur: float, l
         segments, _ = model.transcribe(str(audio_path), word_timestamps=True, beam_size=1, vad_filter=True)
         words = []
         for segment in segments:
-            for w in getattr(segment, "words", []):
+            for w in (getattr(segment, "words", None) or []):
                 word_text = w.word.strip()
                 if word_text:
                     words.append({
@@ -3528,7 +3528,7 @@ def _fast_generate_captions(audio_path: Path, ass_path: Path, clip_dur: float, l
             h = int(sec // 3600)
             m = int((sec % 3600) // 60)
             s = int(sec % 60)
-            cs = int(round((sec - int(sec)) * 100))
+            cs = round((sec - int(sec)) * 100)
             return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
         beats = []
@@ -5360,22 +5360,24 @@ def updater_apply():
         time.sleep(1.2)
         try:
             creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
-            py = sys.executable
-            for candidate in [
-                ROOT / "runtime" / "Scripts" / "python.exe",
-                ROOT / "python311" / "python.exe",
-                Path(sys.executable),
-            ]:
-                if candidate.is_file():
-                    py = str(candidate)
-                    break
-            restart_cmd = (
-                f'powershell.exe -NoProfile -WindowStyle Hidden -Command "'
-                f'Start-Sleep -Milliseconds 800; '
-                f'while (Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 300 }}; '
-                f'Start-Process \'{py}\' -ArgumentList \'app.py\' -WorkingDirectory \'{str(ROOT)}\' -WindowStyle Hidden"'
-            )
-            subprocess.Popen(restart_cmd, shell=True, creationflags=creationflags)
+            app_exe = ROOT / "Clipify AI.exe"
+            if app_exe.is_file():
+                restart_cmd = (
+                    f'powershell.exe -NoProfile -Command "'
+                    f'Start-Sleep -Milliseconds 800; '
+                    f'while (Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 400 }}; '
+                    f'Start-Process \'{str(app_exe)}\'"'
+                )
+                subprocess.Popen(restart_cmd, shell=True, creationflags=creationflags)
+            else:
+                py = sys.executable
+                restart_cmd = (
+                    f'powershell.exe -NoProfile -Command "'
+                    f'Start-Sleep -Milliseconds 800; '
+                    f'while (Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 400 }}; '
+                    f'Start-Process \'{py}\' -ArgumentList \'app.py\' -WorkingDirectory \'{str(ROOT)}\'"'
+                )
+                subprocess.Popen(restart_cmd, shell=True, creationflags=creationflags)
         except Exception:
             pass
         finally:

@@ -259,7 +259,7 @@ object YouTubeStreamDownloader {
                 val cl = resp.body?.contentLength() ?: -1L
                 val body = resp.body ?: return false
                 var offset = 0L
-                var lastPct = pctStart
+                var lastEmitMs = 0L
                 FileOutputStream(targetFile).use { output ->
                     val buf = ByteArray(64 * 1024)
                     body.byteStream().use { input ->
@@ -268,13 +268,16 @@ object YouTubeStreamDownloader {
                             if (read == -1) break
                             output.write(buf, 0, read)
                             offset += read
-                            if (cl > 0) {
-                                val pct = pctStart + ((offset * pctSpan) / cl).toInt()
-                                if (pct >= lastPct + 6) {
-                                    lastPct = pct
-                                    val mbDone = String.format("%.1f", offset / (1024.0 * 1024.0))
+                            val now = System.currentTimeMillis()
+                            if (now - lastEmitMs >= 450L) {
+                                lastEmitMs = now
+                                val mbDone = String.format("%.1f", offset / (1024.0 * 1024.0))
+                                if (cl > 0) {
+                                    val pct = pctStart + ((offset * pctSpan) / cl).toInt()
                                     val mbTotal = String.format("%.1f", cl / (1024.0 * 1024.0))
-                                    onProgress(pct.coerceAtMost(pctStart + pctSpan), "$label $pct% ($mbDone / $mbTotal MB)")
+                                    onProgress(pct.coerceAtMost(pctStart + pctSpan), "$label ($mbDone / $mbTotal MB)")
+                                } else {
+                                    onProgress(pctStart + (pctSpan / 2), "$label ($mbDone MB)")
                                 }
                             }
                         }
@@ -300,11 +303,10 @@ object YouTubeStreamDownloader {
     ): Boolean {
         targetFile.parentFile?.mkdirs()
         if (targetFile.exists()) targetFile.delete()
-        // Try 2MB chunked Range requests first for adaptive/googlevideo streams
-        val chunkSize = 2L * 1024L * 1024L
+        val chunkSize = 4L * 1024L * 1024L
         var offset = 0L
         var totalBytes = -1L
-        var lastPct = pctStart
+        var lastEmitMs = 0L
         var chunkedOk = false
 
         try {
@@ -327,40 +329,43 @@ object YouTubeStreamDownloader {
                             lastHttpError = "HTTP ${resp.code}"
                             Log.w(TAG, "$label Range download failed HTTP ${resp.code} at offset=$offset")
                             failedChunk = true
-                            return@use
-                        }
-                        val cr = resp.header("Content-Range")
-                        if (cr != null && cr.contains("/")) {
-                            totalBytes = cr.substringAfter("/").trim().toLongOrNull() ?: totalBytes
-                        } else if (totalBytes < 0) {
-                            val cl = resp.body?.contentLength() ?: -1L
-                            if (cl > 0) totalBytes = cl
-                        }
-                        val body = resp.body
-                        if (body == null) {
-                            failedChunk = true
-                            return@use
-                        }
-                        body.byteStream().use { input ->
-                            while (true) {
-                                val read = input.read(buf)
-                                if (read == -1) break
-                                output.write(buf, 0, read)
-                                gotBytes += read
-                                offset += read
-                                if (totalBytes > 0) {
-                                    val pct = pctStart + ((offset * pctSpan) / totalBytes).toInt()
-                                    if (pct >= lastPct + 6) {
-                                        lastPct = pct
-                                        val mbDone = String.format("%.1f", offset / (1024.0 * 1024.0))
-                                        val mbTotal = String.format("%.1f", totalBytes / (1024.0 * 1024.0))
-                                        onProgress(pct.coerceAtMost(pctStart + pctSpan), "$label $pct% ($mbDone / $mbTotal MB)")
+                        } else {
+                            val cr = resp.header("Content-Range")
+                            if (cr != null && cr.contains("/")) {
+                                totalBytes = cr.substringAfter("/").trim().toLongOrNull() ?: totalBytes
+                            } else if (totalBytes < 0) {
+                                val cl = resp.body?.contentLength() ?: -1L
+                                if (cl > 0) totalBytes = cl
+                            }
+                            val body = resp.body
+                            if (body == null) {
+                                failedChunk = true
+                            } else {
+                                body.byteStream().use { input ->
+                                    while (true) {
+                                        val read = input.read(buf)
+                                        if (read == -1) break
+                                        output.write(buf, 0, read)
+                                        gotBytes += read
+                                        offset += read
+                                        val now = System.currentTimeMillis()
+                                        if (now - lastEmitMs >= 450L) {
+                                            lastEmitMs = now
+                                            val mbDone = String.format("%.1f", offset / (1024.0 * 1024.0))
+                                            if (totalBytes > 0) {
+                                                val pct = pctStart + ((offset * pctSpan) / totalBytes).toInt()
+                                                val mbTotal = String.format("%.1f", totalBytes / (1024.0 * 1024.0))
+                                                onProgress(pct.coerceAtMost(pctStart + pctSpan), "$label ($mbDone / $mbTotal MB)")
+                                            } else {
+                                                onProgress(pctStart + (pctSpan / 2), "$label ($mbDone MB)")
+                                            }
+                                        }
                                     }
                                 }
+                                if (resp.code == 200 || gotBytes == 0L || (totalBytes > 0 && offset >= totalBytes)) {
+                                    done = true
+                                }
                             }
-                        }
-                        if (resp.code == 200 || gotBytes == 0L || (totalBytes > 0 && offset >= totalBytes)) {
-                            done = true
                         }
                     }
                     if (failedChunk) break
@@ -378,7 +383,6 @@ object YouTubeStreamDownloader {
         if (chunkedOk && targetFile.exists() && targetFile.length() > 1024) {
             return true
         }
-        // Fallback: full plain GET (handles streams that reject Range headers)
         return downloadPlainGet(streamUrl, targetFile, userAgent, pctStart, pctSpan, label, onProgress)
     }
 

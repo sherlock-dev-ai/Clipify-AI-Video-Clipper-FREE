@@ -1634,6 +1634,73 @@ function selectedBranding() {
   };
 }
 
+async function uploadVideoResilient(file, onProgress) {
+  const CHUNK_SIZE = 16 * 1024 * 1024; // 16 MB chunks (supports 20GB+ files with zero temp spooling)
+  if (!file || file.size <= 32 * 1024 * 1024) {
+    const uploadForm = new FormData();
+    uploadForm.append('video', file);
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload');
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && e.total > 0 && onProgress) onProgress(e.loaded, e.total);
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); } catch (err) { reject(err); }
+        } else {
+          try {
+            const res = JSON.parse(xhr.responseText);
+            reject(new Error(res.error || `Upload failed (${xhr.status})`));
+          } catch { reject(new Error(`Upload failed with status ${xhr.status}`)); }
+        }
+      };
+      xhr.onerror = () => reject(new Error('Network error uploading video.'));
+      xhr.send(uploadForm);
+    });
+  }
+
+  let jobId = '';
+  let offset = 0;
+  const total = file.size;
+  while (offset < total) {
+    const end = Math.min(total, offset + CHUNK_SIZE);
+    const slice = file.slice(offset, end);
+    const isLast = end >= total ? '1' : '0';
+    let lastErr = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const qs = new URLSearchParams({
+          filename: file.name || 'video.mp4',
+          offset: String(offset),
+          is_last: isLast
+        });
+        if (jobId) qs.set('job_id', jobId);
+        const resp = await fetch(`/api/upload-chunk?${qs.toString()}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: slice
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || data.error) {
+          throw new Error(data.error || `Chunk upload failed (${resp.status})`);
+        }
+        if (data.job_id) jobId = data.job_id;
+        offset = end;
+        if (onProgress) onProgress(offset, total);
+        if (isLast === '1') return data;
+        lastErr = null;
+        break;
+      } catch (err) {
+        lastErr = err;
+        await new Promise(r => setTimeout(r, 600 * (attempt + 1)));
+      }
+    }
+    if (lastErr) throw lastErr;
+  }
+  return { ok: true, job_id: jobId, filename: file.name };
+}
+
 async function start() {
   if (state.starting || create.disabled) return;
   state.starting = true;
@@ -1714,38 +1781,12 @@ async function start() {
         $('#subStage').textContent = `${state.source.name} (${formatBytes(state.source.size)})`;
         addLog(`[Upload] Uploading ${state.source.name} (${formatBytes(state.source.size)})…`);
 
-        const uploadForm = new FormData();
-        uploadForm.append('video', state.source);
-
-        const uploadData = await new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('POST', '/api/upload');
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable && e.total > 0) {
-              const pct = Math.min(99, Math.round((e.loaded / e.total) * 100));
-              $('#progressBar').style.width = pct + '%';
-              $('#progressPercent').textContent = pct + '%';
-              $('#subStage').textContent = `${formatBytes(e.loaded)} / ${formatBytes(e.total)} (${pct}%)`;
-              create.innerHTML = `<span class="spinner-inline"></span> <span>Uploading (${pct}%)…</span>`;
-            }
-          };
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              try {
-                const res = JSON.parse(xhr.responseText);
-                resolve(res);
-              } catch (err) { reject(err); }
-            } else {
-              try {
-                const res = JSON.parse(xhr.responseText);
-                reject(new Error(res.error || `Upload failed (${xhr.status})`));
-              } catch {
-                reject(new Error(`Upload failed with status ${xhr.status}`));
-              }
-            }
-          };
-          xhr.onerror = () => reject(new Error('Network error uploading video.'));
-          xhr.send(uploadForm);
+        const uploadData = await uploadVideoResilient(state.source, (loaded, total) => {
+          const pct = Math.min(99, Math.round((loaded / Math.max(1, total)) * 100));
+          $('#progressBar').style.width = pct + '%';
+          $('#progressPercent').textContent = pct + '%';
+          $('#subStage').textContent = `${formatBytes(loaded)} / ${formatBytes(total)} (${pct}%)`;
+          create.innerHTML = `<span class="spinner-inline"></span> <span>Uploading (${pct}%)…</span>`;
         });
 
         state.jobId = uploadData.job_id;
@@ -4179,32 +4220,12 @@ function initBetaTestingSection() {
 
       try {
         if (!betaState.jobId && betaState.sourceFile) {
-          const upForm = new FormData();
-          upForm.append('video', betaState.sourceFile);
           stageText.textContent = `Uploading ${betaState.sourceFile.name}… (0%)`;
-          const upData = await new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/api/upload');
-            xhr.upload.onprogress = (e) => {
-              if (e.lengthComputable && e.total > 0) {
-                const pct = Math.min(99, Math.round((e.loaded / e.total) * 100));
-                progressBar.style.width = pct + '%';
-                progressPct.textContent = pct + '%';
-                stageText.textContent = `Uploading ${betaState.sourceFile.name}… (${pct}%)`;
-              }
-            };
-            xhr.onload = () => {
-              if (xhr.status >= 200 && xhr.status < 300) {
-                try { resolve(JSON.parse(xhr.responseText)); } catch (err) { reject(err); }
-              } else {
-                try {
-                  const res = JSON.parse(xhr.responseText);
-                  reject(new Error(res.error || `Upload failed (${xhr.status})`));
-                } catch { reject(new Error(`Upload failed (${xhr.status})`)); }
-              }
-            };
-            xhr.onerror = () => reject(new Error('Network error uploading video.'));
-            xhr.send(upForm);
+          const upData = await uploadVideoResilient(betaState.sourceFile, (loaded, total) => {
+            const pct = Math.min(99, Math.round((loaded / Math.max(1, total)) * 100));
+            progressBar.style.width = pct + '%';
+            progressPct.textContent = pct + '%';
+            stageText.textContent = `Uploading ${betaState.sourceFile.name}… (${pct}%)`;
           });
           if (!upData.job_id) throw new Error(upData.error || 'Failed to upload video');
           betaState.jobId = upData.job_id;

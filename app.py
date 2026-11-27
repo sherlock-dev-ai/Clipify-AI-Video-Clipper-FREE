@@ -307,7 +307,7 @@ MODES = {
 }
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024 * 1024  # 16 GB max upload
+app.config["MAX_CONTENT_LENGTH"] = None  # Unlimited local video upload size
 
 
 @app.errorhandler(400)
@@ -2828,32 +2828,15 @@ def delete_narrate_history(job_id: str):
     return jsonify({"ok": True})
 
 
-@app.post("/api/upload")
-def upload():
-    file = request.files.get("video")
-    if not file or not file.filename:
-        return jsonify({"error": "Choose a video first."}), 400
-    if not is_allowed(file.filename):
-        return jsonify({"error": "Unsupported video format."}), 400
-
-    job_id = uuid.uuid4().hex[:12]
-    safe_name = secure_filename(file.filename) or f"video_{job_id}.mp4"
-    job_dir = JOBS / job_id
-    input_dir = job_dir / "input"
-    output_dir = job_dir / "output"
-    input_dir.mkdir(parents=True, exist_ok=True)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    target = input_dir / safe_name
-    file.save(target)
+def _finalize_uploaded_job(job_id: str, safe_name: str, orig_filename: str, input_dir: Path, target: Path) -> dict:
+    """Register a completed uploaded video (single or chunked) as a ready job."""
     target = _ensure_video_has_audio(target)
-
-    # Reuse a matching cached transcription from the shared input folder when available.
     target_stem = Path(safe_name).stem
     candidate_stems = [
         target_stem,
         target_stem.replace("_", " "),
         target_stem.replace(" ", "_"),
-        Path(file.filename).stem,
+        Path(orig_filename).stem,
     ]
     for c_stem in candidate_stems:
         cached = USER_DATA_DIR / "input" / f"{c_stem}_transcription.pkl"
@@ -2876,6 +2859,70 @@ def upload():
             "events": [],
             "outputs": [],
         }
+    return {"ok": True, "job_id": job_id, "filename": safe_name}
+
+
+@app.post("/api/upload-chunk")
+def upload_chunk():
+    """Stream large local video files in chunks directly to the job input folder."""
+    orig_filename = (request.args.get("filename") or request.headers.get("X-File-Name") or "").strip()
+    if not orig_filename:
+        return jsonify({"error": "Missing filename."}), 400
+    if not is_allowed(orig_filename):
+        return jsonify({"error": "Unsupported video format."}), 400
+
+    job_id = (request.args.get("job_id") or "").strip() or uuid.uuid4().hex[:12]
+    if not re.fullmatch(r"[A-Za-z0-9_-]{4,64}", job_id):
+        return jsonify({"error": "Invalid job id."}), 400
+
+    offset = int(request.args.get("offset", "0") or 0)
+    is_last = request.args.get("is_last", "0") == "1"
+
+    safe_name = secure_filename(orig_filename) or f"video_{job_id}.mp4"
+    job_dir = JOBS / job_id
+    input_dir = job_dir / "input"
+    output_dir = job_dir / "output"
+    input_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    target = input_dir / safe_name
+
+    mode = "wb" if offset == 0 else "r+b"
+    if mode == "r+b" and not target.exists():
+        mode = "wb"
+    with open(target, mode) as fh:
+        if offset > 0:
+            fh.seek(offset)
+        while True:
+            buf = request.stream.read(1024 * 1024)
+            if not buf:
+                break
+            fh.write(buf)
+
+    if is_last:
+        res = _finalize_uploaded_job(job_id, safe_name, orig_filename, input_dir, target)
+        return jsonify(res)
+
+    return jsonify({"ok": True, "job_id": job_id, "filename": safe_name, "received_offset": offset})
+
+
+@app.post("/api/upload")
+def upload():
+    file = request.files.get("video")
+    if not file or not file.filename:
+        return jsonify({"error": "Choose a video first."}), 400
+    if not is_allowed(file.filename):
+        return jsonify({"error": "Unsupported video format."}), 400
+
+    job_id = uuid.uuid4().hex[:12]
+    safe_name = secure_filename(file.filename) or f"video_{job_id}.mp4"
+    job_dir = JOBS / job_id
+    input_dir = job_dir / "input"
+    output_dir = job_dir / "output"
+    input_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    target = input_dir / safe_name
+    file.save(target)
+    _finalize_uploaded_job(job_id, safe_name, file.filename, input_dir, target)
     emit(job_id, "log", f"Uploaded {safe_name}")
     return jsonify({"job_id": job_id, "filename": safe_name})
 

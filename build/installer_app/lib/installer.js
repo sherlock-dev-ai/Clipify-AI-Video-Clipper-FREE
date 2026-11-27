@@ -34,6 +34,7 @@ const { APP_SLUG, APP_SHORTCUT_NAME, APP_EXE, findOllama, parseOllamaList, runti
 const {
   acquireInstallLock,
   renameWithRetry,
+  retryFileOperation,
   uniqueSibling,
 } = require('./filesystem');
 

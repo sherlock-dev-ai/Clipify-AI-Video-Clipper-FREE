@@ -1288,6 +1288,70 @@
             style="background:transparent;border:1px solid transparent;color:var(--muted,#c9b9a4);padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer;">Social
             Package</button>
         </div>
+        <section id="youtubeTrialPanel" aria-labelledby="youtubeTrialHeading"
+          style="display:flex;flex-direction:column;gap:12px;padding:14px;margin-bottom:18px;border:1px solid rgba(215,187,148,0.38);border-radius:12px;background:rgba(215,187,148,0.05);">
+          <div>
+            <h3 id="youtubeTrialHeading" style="margin:0;color:var(--text,#f3eadf);font-size:1rem;">3-clip public Shorts trial</h3>
+            <p style="margin:5px 0 0;font-size:0.8rem;color:var(--muted-2,#9b8e7c);">Trial visibility: <strong style="color:#fbbf24;">Public</strong> (you selected public). This publishes immediately, so anyone can watch the clips and they may appear on your channel. Only the first 3 verified 9:16 outputs are included; other clips and existing schedules are untouched.</p>
+          </div>
+          <div id="youtubeTrialClipList" style="display:flex;flex-direction:column;gap:8px;"></div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <button type="button" class="primary" id="youtubeLaunchTrialBtn" disabled style="padding:10px 15px;">Confirm & publish 3 public trial clips</button>
+            <span id="youtubeTrialStatus" role="status" aria-live="polite" style="font-size:0.82rem;color:var(--muted,#c9b9a4);"></span>
+          </div>
+          <div id="youtubeTrialResults" style="max-height:140px;overflow:auto;font-size:0.78rem;color:var(--muted,#c9b9a4);"></div>
+        </section>
+        <section id="youtubeSchedulePanel" aria-labelledby="youtubeScheduleHeading"
+          style="display:flex;flex-direction:column;gap:12px;padding:14px;margin-bottom:18px;border:1px solid var(--line,rgba(190,176,159,0.2));border-radius:12px;background:rgba(255,255,255,0.025);">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div>
+              <h3 id="youtubeScheduleHeading" style="margin:0;color:var(--text,#f3eadf);font-size:1rem;">YouTube channel & schedule</h3>
+              <div id="youtubeConnectionStatus" role="status" aria-live="polite" style="font-size:0.82rem;color:var(--muted,#c9b9a4);margin-top:5px;">Checking connection…</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="ghost" id="youtubeConnectBtn" style="padding:8px 12px;">Connect YouTube</button>
+              <button type="button" class="ghost" id="youtubeConfirmChannelBtn" style="display:none;padding:8px 12px;">Confirm this channel</button>
+              <button type="button" class="ghost" id="youtubeDisconnectBtn" style="display:none;padding:8px 12px;">Disconnect</button>
+            </div>
+          </div>
+          <p style="margin:0;font-size:0.8rem;color:var(--muted-2,#9b8e7c);">Review generated 30–50 second clips, then confirm to upload them as private scheduled videos. Nothing is uploaded before confirmation. Default: 7 per day, evenly spaced from 9:00 AM to 9:00 PM Asia/Kolkata, starting tomorrow. You can disconnect and switch channels later; videos already scheduled stay on their original channel and are not transferred.</p>
+          <label style="display:flex;flex-direction:column;gap:4px;font-size:0.8rem;color:var(--muted,#c9b9a4);">Video format (required)
+            <select id="youtubeVideoType" style="max-width:360px;padding:8px;border-radius:7px;">
+              <option value="">Choose how these clips should be published</option>
+              <option value="shorts">YouTube Shorts — verified 9:16 vertical outputs only</option>
+              <option value="standard">Standard YouTube videos — landscape is not a Short</option>
+            </select>
+          </label>
+          <div id="youtubeAspectWarning" role="status" aria-live="polite"
+            style="padding:9px 10px;border-radius:8px;background:rgba(255,255,255,0.035);font-size:0.76rem;color:var(--muted-2,#9b8e7c);">
+            Shorts require a verified 9:16 vertical output. Landscape clips are not resized or cropped.
+          </div>
+          <div style="padding:9px 10px;border-radius:8px;background:rgba(255,255,255,0.035);font-size:0.76rem;color:var(--muted-2,#9b8e7c);">
+            <strong style="color:var(--muted,#c9b9a4);">Privacy & data:</strong> Clipify AI and this publishing backend run on this computer at a local-only address. Connecting sends OAuth/API requests to Google; confirming uploads sends the selected video bytes, title, description, tags, and schedule to Google/YouTube. OAuth tokens stay in the OS credential vault, not Git or application logs. Disconnect removes the local token; revoke Google access at
+            <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" style="color:var(--warm,#d6b388);">Google Account permissions</a>.
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:0.8rem;color:var(--muted,#c9b9a4);">Clips per day
+              <input id="youtubeClipsPerDay" type="number" min="1" max="13" value="7" style="width:100px;padding:8px;border-radius:7px;">
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:0.8rem;color:var(--muted,#c9b9a4);">Start hour (IST)
+              <input id="youtubeStartHour" type="number" min="9" max="20" value="9" style="width:100px;padding:8px;border-radius:7px;">
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:0.8rem;color:var(--muted,#c9b9a4);">End hour (IST)
+              <input id="youtubeEndHour" type="number" min="10" max="21" value="21" style="width:100px;padding:8px;border-radius:7px;">
+            </label>
+            <button type="button" class="ghost" id="youtubeLoadClipsBtn" style="padding:9px 12px;">Refresh generated clips</button>
+            <button type="button" class="ghost" id="youtubePreviewScheduleBtn" style="padding:9px 12px;">Preview schedule</button>
+          </div>
+          <p style="margin:0;font-size:0.76rem;color:var(--muted-2,#9b8e7c);">No clips are selected automatically. Review the detected dimensions and select only clips you have approved.</p>
+          <div id="youtubeClipList" style="max-height:180px;overflow:auto;display:flex;flex-direction:column;gap:6px;"></div>
+          <div id="youtubeScheduleReview" style="display:none;max-height:300px;overflow:auto;flex-direction:column;gap:8px;"></div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <button type="button" class="primary" id="youtubeApplyScheduleBtn" disabled style="padding:10px 15px;">Confirm & upload schedule</button>
+            <span id="youtubeScheduleStatus" role="status" aria-live="polite" style="font-size:0.82rem;color:var(--muted,#c9b9a4);"></span>
+          </div>
+          <div id="youtubeScheduleResults" style="max-height:160px;overflow:auto;font-size:0.78rem;color:var(--muted,#c9b9a4);"></div>
+        </section>
         <form id="publishForm" style="display:flex;flex-direction:column;gap:14px;">
           <input type="hidden" id="publishJobId">
           <input type="hidden" id="publishFilename">

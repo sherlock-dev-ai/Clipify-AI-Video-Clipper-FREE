@@ -11,9 +11,6 @@ import os
 import sys
 import json
 import mimetypes
-import urllib.request
-import urllib.error
-import urllib.parse
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -43,13 +40,6 @@ def load_credentials() -> Dict[str, Any]:
             except Exception:
                 pass
     return {
-        "youtube": {
-            "enabled": False,
-            "client_id": os.getenv("YOUTUBE_CLIENT_ID", ""),
-            "client_secret": os.getenv("YOUTUBE_CLIENT_SECRET", ""),
-            "access_token": os.getenv("YOUTUBE_ACCESS_TOKEN", ""),
-            "refresh_token": os.getenv("YOUTUBE_REFRESH_TOKEN", ""),
-        },
         "instagram": {
             "enabled": False,
             "access_token": os.getenv("INSTAGRAM_ACCESS_TOKEN", ""),
@@ -76,15 +66,29 @@ def save_credentials(creds: Dict[str, Any]) -> bool:
         return False
 
 
+def _youtube_publisher():
+    from clippedai_runtime import APP_DIR, USER_DATA_DIR
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(APP_DIR / ".env")
+        load_dotenv(USER_DATA_DIR / ".env", override=True)
+    except ImportError:
+        pass
+    from server_config import configured_port
+    from tools.youtube_publisher import YouTubePublisher
+    return YouTubePublisher(configured_port())
+
+
 def list_social_accounts() -> Dict[str, Any]:
     """Return status of all social publishing accounts."""
     creds = load_credentials()
+    youtube_status = _youtube_publisher().status()
     return {
         "youtube": {
-            "configured": bool(creds.get("youtube", {}).get("access_token") or creds.get("youtube", {}).get("client_id")),
-            "enabled": creds.get("youtube", {}).get("enabled", False),
+            **youtube_status,
+            "enabled": youtube_status.get("confirmed", False),
             "platform_name": "YouTube Shorts",
-            "required_fields": ["access_token", "client_id", "client_secret"]
+            "required_fields": ["YOUTUBE_CLIENT_ID"]
         },
         "instagram": {
             "configured": bool(creds.get("instagram", {}).get("access_token") and creds.get("instagram", {}).get("instagram_account_id")),
@@ -107,79 +111,20 @@ def publish_youtube_short(video_path: str, title: str, description: str = "",
     v_path = Path(video_path)
     if not v_path.is_file():
         return {"ok": False, "error": f"Video file not found: {video_path}"}
-
-    creds = load_credentials().get("youtube", {})
-    token = creds.get("access_token") or os.getenv("YOUTUBE_ACCESS_TOKEN")
-
-    if not token:
-        # Generate upload helper and direct YouTube studio link when direct token isn't stored
-        clean_title = urllib.parse.quote_plus(title[:100])
-        studio_url = f"https://studio.youtube.com/channel/upload?d=pt"
-        return {
-            "ok": True,
-            "status": "manual_action_ready",
-            "platform": "youtube",
-            "action": "open_studio_upload",
-            "video_path": str(v_path.resolve()),
-            "title": title,
-            "description": description,
-            "tags": tags or ["Shorts", "AI", "Clipify"],
-            "privacy": privacy,
-            "studio_url": studio_url,
-            "message": "Direct token not configured. Video package prepped for instant 1-click YouTube upload."
-        }
-
-    # If access token is configured, execute official Resumable Upload
-    metadata = {
-        "snippet": {
-            "title": title[:100],
-            "description": f"{description}\n\n#Shorts",
-            "tags": tags or ["Shorts", "ClipifyAI"],
-            "categoryId": "22"
-        },
-        "status": {
-            "privacyStatus": privacy if privacy in {"public", "unlisted", "private"} else "unlisted",
-            "selfDeclaredMadeForKids": False
-        }
-    }
-
     try:
-        init_url = "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status"
-        req = urllib.request.Request(
-            init_url,
-            data=json.dumps(metadata).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json; charset=UTF-8",
-                "X-Upload-Content-Type": "video/mp4",
-                "X-Upload-Content-Length": str(v_path.stat().st_size)
-            },
-            method="POST"
+        publisher = _youtube_publisher()
+        channel = publisher.status()
+        if not channel.get("confirmed"):
+            return {"ok": False, "error": "Connect and confirm the exact YouTube channel in Clipify AI before uploading."}
+        uploaded = publisher.upload_now(
+            v_path,
+            title=title[:100],
+            description=f"{description}\n\n#Shorts" if description else "#Shorts",
+            privacy=privacy if privacy in {"public", "unlisted", "private"} else "unlisted",
+            tags=tags,
+            expected_channel_id=channel["channel_id"],
         )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            upload_url = resp.headers.get("Location")
-
-        if not upload_url:
-            return {"ok": False, "error": "Failed to initiate YouTube resumable upload."}
-
-        # Upload binary stream
-        with open(v_path, "rb") as f:
-            upload_req = urllib.request.Request(
-                upload_url,
-                data=f,
-                headers={"Content-Type": "video/mp4", "Content-Length": str(v_path.stat().st_size)},
-                method="PUT"
-            )
-            with urllib.request.urlopen(upload_req, timeout=600) as upload_resp:
-                res_data = json.loads(upload_resp.read().decode("utf-8"))
-                video_id = res_data.get("id", "")
-                return {
-                    "ok": True,
-                    "platform": "youtube",
-                    "video_id": video_id,
-                    "url": f"https://www.youtube.com/shorts/{video_id}",
-                    "status": "published"
-                }
+        return {"ok": True, "platform": "youtube", "status": "published", **uploaded}
     except Exception as exc:
         return {"ok": False, "error": f"YouTube upload error: {exc}"}
 

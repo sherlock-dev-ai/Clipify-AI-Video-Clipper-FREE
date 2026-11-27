@@ -92,7 +92,7 @@ except Exception:
 import logging
 logger = logging.getLogger("clipify")
 
-from flask import Flask, Response, jsonify, redirect, render_template, request, send_from_directory, send_file
+from flask import Flask, Response, jsonify, render_template, request, send_from_directory, send_file
 from werkzeug.utils import secure_filename
 
 def _hidden_creationflags():
@@ -3315,17 +3315,25 @@ def metadata(job_id: str, filename: str):
 def get_publish_platforms():
     """Return configured social platforms and account status."""
     from tools.mcp_publish import list_social_accounts
-    return jsonify({"ok": True, "platforms": list_social_accounts()})
+    platforms = list_social_accounts()
+    platforms["youtube"] = {
+        **_youtube_publisher().status(),
+        "platform_name": "YouTube Shorts",
+        "required_fields": ["YOUTUBE_CLIENT_ID"],
+    }
+    return jsonify({"ok": True, "platforms": platforms})
 
 
 @app.post("/api/publish/credentials")
 def save_publish_credentials():
-    """Save API credentials for YouTube, Instagram, or TikTok."""
+    """Save API credentials for Instagram or TikTok; YouTube uses OAuth."""
     from tools.mcp_publish import load_credentials, save_credentials
     data = request.get_json(silent=True) or {}
     platform = str(data.get("platform", "")).lower()
     if platform not in {"youtube", "instagram", "tiktok"}:
         return jsonify({"ok": False, "error": "Invalid platform specified."}), 400
+    if platform == "youtube":
+        return jsonify({"ok": False, "error": "YouTube uses Google's OAuth authorization and the OS credential vault; do not submit tokens or client secrets here."}), 400
     creds = load_credentials()
     if platform not in creds:
         creds[platform] = {}
@@ -3333,6 +3341,446 @@ def save_publish_credentials():
     creds[platform]["enabled"] = True
     saved = save_credentials(creds)
     return jsonify({"ok": saved, "platform": platform, "configured": True})
+
+
+_youtube_publisher_instance = None
+_youtube_publisher_init_lock = threading.Lock()
+_youtube_schedule_jobs: dict[str, dict[str, Any]] = {}
+_youtube_schedule_lock = threading.Lock()
+_youtube_trial_jobs: dict[str, dict[str, Any]] = {}
+_youtube_trial_lock = threading.Lock()
+
+
+def _youtube_publisher():
+    global _youtube_publisher_instance
+    if _youtube_publisher_instance is None:
+        with _youtube_publisher_init_lock:
+            if _youtube_publisher_instance is None:
+                from tools.youtube_publisher import YouTubePublisher
+                _youtube_publisher_instance = YouTubePublisher(APP_PORT)
+    return _youtube_publisher_instance
+
+
+def _youtube_media_info(path: Path) -> tuple[float, int | None, int | None] | None:
+    from clipify.platform.binary_locator import get_ffprobe_path
+    ffprobe = get_ffprobe_path()
+    if not ffprobe:
+        return None
+    try:
+        result = _run_hidden(
+            [
+                ffprobe, "-v", "error", "-select_streams", "v:0",
+                "-show_entries", "format=duration:stream=width,height",
+                "-of", "json", str(path),
+            ],
+            capture_output=True, text=True, timeout=15, check=False,
+        )
+        if result.returncode != 0:
+            return None
+        probe = json.loads(result.stdout)
+        format_info = probe.get("format") or {}
+        duration = float(format_info.get("duration"))
+        streams = probe.get("streams") or []
+        video = streams[0] if streams and isinstance(streams[0], dict) else {}
+        width = int(video["width"]) if video.get("width") is not None else None
+        height = int(video["height"]) if video.get("height") is not None else None
+        return duration, width, height
+    except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError, subprocess.TimeoutExpired):
+        return None
+
+
+def _youtube_clips():
+    from tools.youtube_publisher import discover_generated_clips
+    return discover_generated_clips(JOBS, media_probe=_youtube_media_info)
+
+
+def _youtube_clip_path(clip: dict[str, Any]) -> Path | None:
+    job_id = str(clip.get("job_id", ""))
+    filename = str(clip.get("filename", ""))
+    job_dir = _safe_job_directory(job_id)
+    relative_path = Path(filename)
+    if job_dir is None or not filename or relative_path.is_absolute() or ".." in relative_path.parts:
+        return None
+    output_dir = job_dir / "output"
+    target = output_dir / relative_path
+    try:
+        target.resolve().relative_to(output_dir.resolve())
+        if output_dir.resolve().parent != job_dir.resolve():
+            return None
+    except (OSError, ValueError):
+        return None
+    if not target.is_file():
+        return None
+    import hashlib
+    digest = hashlib.sha256()
+    try:
+        with target.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError:
+        return None
+    return target if digest.hexdigest() == clip.get("clip_id") else None
+
+
+def _run_youtube_trial(trial_id: str, items: list[dict[str, Any]]) -> None:
+    publisher = _youtube_publisher()
+    with _youtube_trial_lock:
+        job = _youtube_trial_jobs.get(trial_id)
+        if job is None:
+            return
+        job["status"] = "uploading"
+    for index, item in enumerate(items):
+        channel = publisher.status()
+        if not channel.get("confirmed") or channel.get("channel_id") != job["channel_id"]:
+            error = "Trial stopped because the confirmed YouTube channel changed."
+            with _youtube_trial_lock:
+                job = _youtube_trial_jobs[trial_id]
+                for pending in items[index:]:
+                    job["results"].append({
+                        "clip_id": pending["clip_id"],
+                        "filename": pending["filename"],
+                        "status": "failed",
+                        "error": error,
+                    })
+                job["completed"] = len(job["results"])
+            break
+        with _youtube_trial_lock:
+            job = _youtube_trial_jobs[trial_id]
+            job["current"] = item["filename"]
+        video_path = _youtube_clip_path(item)
+        if video_path is None:
+            result = {
+                "status": "failed",
+                "error": f"Verified 9:16 trial clip changed or is missing: {item['filename']}",
+            }
+        else:
+            try:
+                uploaded = publisher.upload_now(
+                    video_path,
+                    title=item["title"],
+                    description=item["description"],
+                    privacy="public",
+                    tags=["Shorts", "ClipifyAI"],
+                    expected_channel_id=job["channel_id"],
+                )
+                result = {"status": "published", **uploaded}
+            except Exception as exc:
+                result = {"status": "failed", "error": str(exc)}
+                logger.exception("YouTube public trial upload failed for %s", item["filename"])
+        with _youtube_trial_lock:
+            job = _youtube_trial_jobs[trial_id]
+            job["results"].append({"clip_id": item["clip_id"], "filename": item["filename"], **result})
+            job["completed"] = len(job["results"])
+    with _youtube_trial_lock:
+        job = _youtube_trial_jobs[trial_id]
+        failures = sum(item["status"] == "failed" for item in job["results"])
+        job["status"] = "completed_with_errors" if failures else "completed"
+        job["current"] = ""
+
+
+@app.get("/api/publish/youtube/status")
+def youtube_publish_status():
+    return jsonify({"ok": True, **_youtube_publisher().status()})
+
+
+@app.post("/api/publish/youtube/connect")
+def youtube_publish_connect():
+    try:
+        return jsonify({"ok": True, "authorization_url": _youtube_publisher().start_authorization()})
+    except Exception as exc:
+        from tools.youtube_publisher import YouTubePublisherError
+        if isinstance(exc, YouTubePublisherError):
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        raise
+
+
+@app.post("/api/publish/youtube/confirm-channel")
+def youtube_publish_confirm_channel():
+    from tools.youtube_publisher import YouTubePublisherError
+    data = request.get_json(silent=True) or {}
+    try:
+        _youtube_publisher().confirm_channel(str(data.get("channel_id", "")))
+        return jsonify({"ok": True, "confirmed": True})
+    except YouTubePublisherError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+
+
+@app.post("/api/publish/youtube/disconnect")
+def youtube_publish_disconnect():
+    try:
+        _youtube_publisher().disconnect()
+        return jsonify({"ok": True, "connected": False})
+    except Exception as exc:
+        logger.exception("Could not remove saved YouTube authorization")
+        return jsonify({"ok": False, "error": f"Could not disconnect YouTube: {exc}"}), 500
+
+
+@app.get("/api/publish/youtube/clips")
+def youtube_publish_clips():
+    try:
+        clips = _youtube_clips()
+        return jsonify({"ok": True, "clips": clips, "count": len(clips)})
+    except Exception as exc:
+        logger.exception("Could not scan generated YouTube clips")
+        return jsonify({"ok": False, "error": f"Could not scan generated clips: {exc}"}), 500
+
+
+@app.post("/api/publish/youtube/trial")
+def youtube_publish_trial():
+    from tools.youtube_publisher import select_trial_clips
+    data = request.get_json(silent=True) or {}
+    if data.get("confirm") is not True or data.get("confirm_public_visibility") is not True:
+        return jsonify({"ok": False, "error": "Confirm the public visibility and trial upload in the app before uploading."}), 400
+    if data.get("visibility") != "public":
+        return jsonify({"ok": False, "error": "This trial is configured for the explicitly confirmed public visibility."}), 400
+    channel = _youtube_publisher().status()
+    if not channel.get("confirmed") or not channel.get("channel_id"):
+        return jsonify({"ok": False, "error": "Confirm the exact YouTube channel before starting the trial."}), 403
+    if data.get("channel_id") != channel["channel_id"]:
+        return jsonify({"ok": False, "error": "The confirmed channel changed. Refresh its identity and reconfirm the public trial."}), 409
+
+    proposed = data.get("clips")
+    if not isinstance(proposed, list) or len(proposed) != 3:
+        return jsonify({"ok": False, "error": "The trial must contain exactly the first three verified 9:16 clips."}), 400
+    trial_clips = select_trial_clips(_youtube_clips())
+    if len(trial_clips) != 3:
+        return jsonify({"ok": False, "error": "Three verified 9:16 vertical outputs are required before the trial can start."}), 400
+    if [entry.get("clip_id") if isinstance(entry, dict) else None for entry in proposed] != [
+        clip["clip_id"] for clip in trial_clips
+    ]:
+        return jsonify({"ok": False, "error": "The trial is limited to the first three verified 9:16 outputs. Refresh the clip list and review them again."}), 400
+
+    items: list[dict[str, Any]] = []
+    for entry, clip in zip(proposed, trial_clips):
+        title = str(entry.get("title", clip["title"])).strip()
+        description = str(entry.get("description", clip["description"])).strip()
+        if not title or len(title) > 100 or len(description) > 5000:
+            return jsonify({"ok": False, "error": "Each trial title must contain 1–100 characters and each description no more than 5,000 characters."}), 400
+        if _youtube_clip_path(clip) is None:
+            return jsonify({"ok": False, "error": "A verified trial clip changed or is missing. Refresh the clips and review again."}), 400
+        items.append({**clip, "title": title, "description": description})
+
+    trial_id = uuid.uuid4().hex
+    with _youtube_trial_lock:
+        _youtube_trial_jobs[trial_id] = {
+            "id": trial_id,
+            "channel_id": channel["channel_id"],
+            "visibility": "public",
+            "status": "queued",
+            "total": 3,
+            "completed": 0,
+            "current": "",
+            "results": [],
+        }
+    worker = threading.Thread(target=_run_youtube_trial, args=(trial_id, items), daemon=True)
+    worker.start()
+    return jsonify({"ok": True, "trial_id": trial_id, "status": "queued", "total": 3}), 202
+
+
+@app.get("/api/publish/youtube/trial/<trial_id>")
+def youtube_publish_trial_status(trial_id: str):
+    with _youtube_trial_lock:
+        job = _youtube_trial_jobs.get(trial_id)
+        if job is None:
+            return jsonify({"ok": False, "error": "Trial not found."}), 404
+        return jsonify({"ok": True, **job})
+
+
+@app.post("/api/publish/youtube/preview")
+def youtube_publish_preview():
+    from datetime import datetime
+    from tools.youtube_publisher import INDIA_TIMEZONE, build_schedule, is_short_compatible_clip
+    data = request.get_json(silent=True) or {}
+    video_type = data.get("video_type")
+    if video_type not in {"shorts", "standard"}:
+        return jsonify({"ok": False, "error": "Choose YouTube Shorts or standard YouTube video before previewing."}), 400
+    selected_ids = data.get("clip_ids")
+    if not isinstance(selected_ids, list) or not selected_ids or not all(isinstance(clip_id, str) for clip_id in selected_ids):
+        return jsonify({"ok": False, "error": "Select at least one generated clip."}), 400
+    if len(selected_ids) > 60 or len(set(selected_ids)) != len(selected_ids):
+        return jsonify({"ok": False, "error": "Select up to 60 unique clips."}), 400
+
+    clips_by_id = {clip["clip_id"]: clip for clip in _youtube_clips()}
+    if any(not isinstance(clip_id, str) or clip_id not in clips_by_id for clip_id in selected_ids):
+        return jsonify({"ok": False, "error": "A selected clip is no longer available. Refresh the clip list and try again."}), 400
+    selected_clips = [clips_by_id[clip_id] for clip_id in selected_ids]
+    if video_type == "shorts":
+        incompatible = [clip for clip in selected_clips if not is_short_compatible_clip(clip)]
+        if incompatible:
+            return jsonify({
+                "ok": False,
+                "error": (
+                    f"{len(incompatible)} selected clip(s) are not verified 9:16 vertical outputs. "
+                    "YouTube Shorts scheduling requires 9:16 clips; no clips are cropped or resized."
+                ),
+            }), 400
+    try:
+        schedule = build_schedule(
+            selected_clips,
+            now=datetime.now(INDIA_TIMEZONE),
+            clips_per_day=int(data.get("clips_per_day", 7)),
+            start_hour=int(data.get("start_hour", 9)),
+            end_hour=int(data.get("end_hour", 21)),
+        )
+    except (TypeError, ValueError) as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "timezone": "Asia/Kolkata", "schedule": schedule})
+
+
+def _run_youtube_schedule(schedule_id: str, items: list[dict[str, Any]]) -> None:
+    publisher = _youtube_publisher()
+    with _youtube_schedule_lock:
+        job = _youtube_schedule_jobs.get(schedule_id)
+        if job is None:
+            return
+        job["status"] = "uploading"
+    for index, item in enumerate(items):
+        channel = publisher.status()
+        if not channel.get("confirmed") or channel.get("channel_id") != job["channel_id"]:
+            error = "Upload batch stopped because the confirmed YouTube channel changed. Already scheduled videos remain on the original channel."
+            with _youtube_schedule_lock:
+                job = _youtube_schedule_jobs[schedule_id]
+                for pending in items[index:]:
+                    job["results"].append({
+                        "clip_id": pending["clip_id"],
+                        "filename": pending["filename"],
+                        "status": "failed",
+                        "error": error,
+                    })
+                job["completed"] = len(job["results"])
+            break
+        with _youtube_schedule_lock:
+            job = _youtube_schedule_jobs[schedule_id]
+            job["current"] = item["filename"]
+        video_path = _youtube_clip_path(item)
+        if video_path is None:
+            result = {"status": "failed", "error": f"Generated clip changed or is missing: {item['filename']}"}
+        else:
+            try:
+                uploaded = publisher.upload_scheduled(
+                    video_path,
+                    title=item["title"],
+                    description=item["description"],
+                    publish_at=item["publish_at"],
+                    expected_channel_id=job["channel_id"],
+                )
+                if item["video_type"] == "standard" and uploaded.get("video_id"):
+                    uploaded["url"] = f"https://www.youtube.com/watch?v={uploaded['video_id']}"
+                result = {"status": "scheduled", **uploaded}
+            except Exception as exc:
+                result = {"status": "failed", "error": str(exc)}
+                logger.exception("YouTube scheduled upload failed for %s", item["filename"])
+        with _youtube_schedule_lock:
+            job = _youtube_schedule_jobs[schedule_id]
+            job["results"].append({"clip_id": item["clip_id"], "filename": item["filename"], **result})
+            job["completed"] = len(job["results"])
+    with _youtube_schedule_lock:
+        job = _youtube_schedule_jobs[schedule_id]
+        failures = sum(item["status"] == "failed" for item in job["results"])
+        job["status"] = "completed_with_errors" if failures else "completed"
+        job["current"] = ""
+
+
+@app.post("/api/publish/youtube/schedule")
+def youtube_publish_schedule():
+    from datetime import datetime
+    from tools.youtube_publisher import INDIA_TIMEZONE, is_short_compatible_clip
+    data = request.get_json(silent=True) or {}
+    if data.get("confirm") is not True:
+        return jsonify({"ok": False, "error": "Confirm the schedule in the app before any clips are uploaded."}), 400
+    channel = _youtube_publisher().status()
+    if not channel.get("confirmed"):
+        return jsonify({"ok": False, "error": "Confirm the exact YouTube channel before applying this schedule."}), 403
+    proposed = data.get("schedule")
+    video_type = data.get("video_type")
+    if video_type not in {"shorts", "standard"}:
+        return jsonify({"ok": False, "error": "Choose YouTube Shorts or standard YouTube video before scheduling."}), 400
+    if not isinstance(proposed, list) or not proposed or len(proposed) > 60:
+        return jsonify({"ok": False, "error": "The schedule must contain 1–60 clips."}), 400
+    clips_by_id = {clip["clip_id"]: clip for clip in _youtube_clips()}
+    now = datetime.now(INDIA_TIMEZONE)
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    day_counts: dict[str, int] = {}
+    seen_times: set[str] = set()
+    for entry in proposed:
+        if not isinstance(entry, dict):
+            return jsonify({"ok": False, "error": "Invalid schedule entry."}), 400
+        clip_id = entry.get("clip_id")
+        clip = clips_by_id.get(clip_id) if isinstance(clip_id, str) else None
+        if not clip or clip_id in seen:
+            return jsonify({"ok": False, "error": "A selected clip is missing or duplicated. Refresh the schedule and try again."}), 400
+        if video_type == "shorts" and not is_short_compatible_clip(clip):
+            return jsonify({
+                "ok": False,
+                "error": (
+                    f"{clip['filename']} is not a verified 9:16 vertical output. "
+                    "Shorts scheduling requires 9:16 clips; no clips are cropped or resized."
+                ),
+            }), 400
+        title = str(entry.get("title", clip["title"])).strip()
+        description = str(entry.get("description", clip["description"])).strip()
+        if not title or len(title) > 100 or len(description) > 5000:
+            return jsonify({"ok": False, "error": "Each title must be 1–100 characters and each description no more than 5,000 characters."}), 400
+        try:
+            publish_at = datetime.fromisoformat(str(entry.get("publish_at", "")))
+        except ValueError:
+            return jsonify({"ok": False, "error": "A scheduled publication time is invalid."}), 400
+        if publish_at.tzinfo is None:
+            return jsonify({"ok": False, "error": "Scheduled publication times must include a timezone."}), 400
+        local_time = publish_at.astimezone(INDIA_TIMEZONE)
+        if local_time < now.replace(microsecond=0) or local_time.timestamp() < time.time() + 900:
+            return jsonify({"ok": False, "error": "Every publication must be at least 15 minutes in the future."}), 400
+        if not (9 <= local_time.hour <= 21) or (local_time.hour == 21 and local_time.minute):
+            return jsonify({"ok": False, "error": "Schedule clips between 9:00 AM and 9:00 PM Asia/Kolkata."}), 400
+        time_key = local_time.isoformat(timespec="seconds")
+        if time_key in seen_times:
+            return jsonify({"ok": False, "error": "Each clip must have a unique publication time."}), 400
+        seen_times.add(time_key)
+        day_key = local_time.date().isoformat()
+        day_counts[day_key] = day_counts.get(day_key, 0) + 1
+        if day_counts[day_key] > 13:
+            return jsonify({"ok": False, "error": "No more than 13 clips may be scheduled on one day within the 9 AM–9 PM window."}), 400
+        seen.add(clip_id)
+        items.append({
+            **clip,
+            "title": title,
+            "description": description,
+            "publish_at": time_key,
+            "video_type": video_type,
+        })
+
+    if any(_youtube_clip_path(item) is None for item in items):
+        return jsonify({"ok": False, "error": "A generated clip changed or is missing. Refresh the clip list before scheduling."}), 400
+
+    schedule_id = uuid.uuid4().hex
+    with _youtube_schedule_lock:
+        _youtube_schedule_jobs[schedule_id] = {
+            "id": schedule_id,
+            "channel_id": channel["channel_id"],
+            "status": "queued",
+            "total": len(items),
+            "completed": 0,
+            "current": "",
+            "results": [],
+        }
+    worker = threading.Thread(target=_run_youtube_schedule, args=(schedule_id, items), daemon=True)
+    worker.start()
+    return jsonify({
+        "ok": True,
+        "schedule_id": schedule_id,
+        "status": "queued",
+        "total": len(items),
+    }), 202
+
+
+@app.get("/api/publish/youtube/schedule/<schedule_id>")
+def youtube_publish_schedule_status(schedule_id: str):
+    with _youtube_schedule_lock:
+        job = _youtube_schedule_jobs.get(schedule_id)
+        if job is None:
+            return jsonify({"ok": False, "error": "Schedule not found."}), 404
+        return jsonify({"ok": True, **job})
 
 
 def _normalize_search_title(t: str) -> str:
@@ -3532,7 +3980,7 @@ def _resolve_publish_video(job_id: str, filename: str, title: str = "") -> tuple
 def publish_short():
     """Publish a generated Short to YouTube, TikTok, Instagram, or export as package."""
     from tools.mcp_publish import (
-        publish_youtube_short, publish_instagram_reel,
+        publish_instagram_reel,
         publish_tiktok_video, export_social_package
     )
     data = request.get_json(silent=True) or {}
@@ -3568,7 +4016,23 @@ def publish_short():
             pass
 
     if platform == "youtube":
-        res = publish_youtube_short(str(video_path), title or Path(filename).stem, description, tags, privacy)
+        from tools.youtube_publisher import YouTubePublisherError
+        publisher = _youtube_publisher()
+        channel = publisher.status()
+        if not channel.get("confirmed"):
+            return jsonify({"ok": False, "error": "Connect and confirm the exact YouTube channel before uploading."}), 403
+        try:
+            uploaded = publisher.upload_now(
+                video_path,
+                title=title or Path(filename).stem,
+                description=description,
+                privacy=privacy,
+                tags=[str(tag) for tag in tags if isinstance(tag, str)],
+                expected_channel_id=channel["channel_id"],
+            )
+            res = {"ok": True, "platform": "youtube", "status": "published", **uploaded}
+        except YouTubePublisherError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
     elif platform == "instagram":
         res = publish_instagram_reel(str(video_path), description or title)
     elif platform == "tiktok":

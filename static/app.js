@@ -2908,6 +2908,29 @@ function initSocialPublishing() {
   const reviewPublish = $('#reviewPublish');
   const statusMsg = $('#publishStatusMsg');
   const pubTabs = $$('.pub-tab');
+  const youtubeSchedulePanel = $('#youtubeSchedulePanel');
+  const youtubeTrialPanel = $('#youtubeTrialPanel');
+  const youtubeConnectionStatus = $('#youtubeConnectionStatus');
+  const youtubeConnectBtn = $('#youtubeConnectBtn');
+  const youtubeConfirmChannelBtn = $('#youtubeConfirmChannelBtn');
+  const youtubeDisconnectBtn = $('#youtubeDisconnectBtn');
+  const youtubeClipList = $('#youtubeClipList');
+  const youtubeScheduleReview = $('#youtubeScheduleReview');
+  const youtubeScheduleStatus = $('#youtubeScheduleStatus');
+  const youtubeScheduleResults = $('#youtubeScheduleResults');
+  const youtubeApplyScheduleBtn = $('#youtubeApplyScheduleBtn');
+  const youtubeVideoType = $('#youtubeVideoType');
+  const youtubeAspectWarning = $('#youtubeAspectWarning');
+  const youtubePreviewScheduleBtn = $('#youtubePreviewScheduleBtn');
+  const youtubeTrialClipList = $('#youtubeTrialClipList');
+  const youtubeTrialStatus = $('#youtubeTrialStatus');
+  const youtubeTrialResults = $('#youtubeTrialResults');
+  const youtubeLaunchTrialBtn = $('#youtubeLaunchTrialBtn');
+  let youtubeClips = [];
+  let youtubeSchedule = [];
+  let youtubeConnected = false;
+  let youtubeAuthorized = false;
+  let youtubeTrialActive = false;
 
   // Ensure modal is strictly hidden on initial page load
   if (modal) {
@@ -2928,6 +2951,10 @@ function initSocialPublishing() {
     $('#publishFilename').value = fName;
     $('#publishTitle').value = optionalTitle || fName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
     $('#publishDescription').value = '#Shorts #ClipifyAI #Viral';
+    if (youtubeVideoType) youtubeVideoType.value = '';
+    clearYouTubeSchedule();
+    updateYouTubeAspectStatus();
+    if (!youtubeTrialActive && youtubeTrialResults) youtubeTrialResults.replaceChildren();
     if (statusMsg) { statusMsg.style.display = 'none'; statusMsg.textContent = ''; }
 
     fetchMetadata(jId, fName).then(meta => {
@@ -2940,6 +2967,8 @@ function initSocialPublishing() {
 
     modal.style.display = 'flex';
     modal.hidden = false;
+    refreshYouTubeStatus();
+    loadYouTubeClips();
   }
 
   function closePublish() {
@@ -2977,12 +3006,483 @@ function initSocialPublishing() {
       tab.style.color = 'var(--text,#f3eadf)';
       const platform = tab.dataset.platform;
       $('#publishPlatform').value = platform;
+      if (youtubeSchedulePanel) youtubeSchedulePanel.style.display = platform === 'youtube' ? 'flex' : 'none';
+      if (youtubeTrialPanel) youtubeTrialPanel.style.display = platform === 'youtube' ? 'flex' : 'none';
+      const publishButton = $('#submitPublish');
+      if (publishButton) publishButton.disabled = platform === 'youtube' && !youtubeConnected;
       const submitBtn = $('#submitPublish span');
       if (submitBtn) {
         submitBtn.textContent = platform === 'package' ? '📦 Export Package' : `🚀 Publish to ${tab.textContent}`;
       }
     });
   });
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[char]);
+  }
+
+  function showYouTubeStatus(message, isError = false) {
+    if (!youtubeScheduleStatus) return;
+    youtubeScheduleStatus.textContent = message;
+    youtubeScheduleStatus.style.color = isError ? '#ef4444' : 'var(--muted,#c9b9a4)';
+  }
+
+  function showYouTubeTrialStatus(message, isError = false) {
+    if (!youtubeTrialStatus) return;
+    youtubeTrialStatus.textContent = message;
+    youtubeTrialStatus.style.color = isError ? '#ef4444' : 'var(--muted,#c9b9a4)';
+  }
+
+  function getYouTubeTrialClips() {
+    return youtubeClips.filter(clip => clip.short_compatible).slice(0, 3);
+  }
+
+  function updateYouTubeTrialButton() {
+    if (!youtubeLaunchTrialBtn) return;
+    youtubeLaunchTrialBtn.disabled = !youtubeConnected || getYouTubeTrialClips().length !== 3 || youtubeTrialActive;
+  }
+
+  function renderYouTubeTrial() {
+    if (!youtubeTrialClipList) return;
+    const trialClips = getYouTubeTrialClips();
+    if (trialClips.length !== 3) {
+      youtubeTrialClipList.textContent = `Found ${trialClips.length} of 3 required verified 9:16 outputs. The public trial stays disabled until all three are available.`;
+      updateYouTubeTrialButton();
+      return;
+    }
+    youtubeTrialClipList.innerHTML = trialClips.map((clip, index) => `
+      <div style="display:grid;grid-template-columns:1fr;gap:6px;padding:9px;border:1px solid var(--line,rgba(190,176,159,0.2));border-radius:8px;">
+        <strong style="font-size:0.8rem;color:var(--text,#f3eadf);">${index + 1}. ${escapeHtml(clip.filename)} · ${escapeHtml(clip.width)}×${escapeHtml(clip.height)} · ${escapeHtml(clip.duration)} sec</strong>
+        <label style="font-size:0.76rem;color:var(--muted,#c9b9a4);">Public video title
+          <input data-youtube-trial-title="${index}" maxlength="100" value="${escapeHtml(clip.title)}" style="width:100%;margin-top:4px;padding:7px;border-radius:6px;">
+        </label>
+        <label style="font-size:0.76rem;color:var(--muted,#c9b9a4);">Description
+          <textarea data-youtube-trial-description="${index}" maxlength="5000" rows="2" style="width:100%;margin-top:4px;padding:7px;border-radius:6px;resize:vertical;">${escapeHtml(clip.description)}</textarea>
+        </label>
+      </div>`).join('');
+    updateYouTubeTrialButton();
+  }
+
+  function clearYouTubeSchedule() {
+    youtubeSchedule = [];
+    if (youtubeScheduleReview) {
+      youtubeScheduleReview.style.display = 'none';
+      youtubeScheduleReview.innerHTML = '';
+    }
+    if (youtubeApplyScheduleBtn) youtubeApplyScheduleBtn.disabled = true;
+    updateYouTubeAspectStatus();
+  }
+
+  function updateYouTubeAspectStatus() {
+    if (!youtubeAspectWarning) return;
+    const format = youtubeVideoType?.value || '';
+    const selectedIds = new Set($$('.youtube-clip-choice:checked').map(input => input.value));
+    const selectedClips = youtubeClips.filter(clip => selectedIds.has(clip.clip_id));
+    const incompatible = selectedClips.filter(clip => !clip.short_compatible);
+    if (selectedClips.length > 60) {
+      youtubeAspectWarning.textContent = 'Select no more than 60 clips for one schedule.';
+      youtubeAspectWarning.style.color = '#fbbf24';
+    } else if (!format) {
+      youtubeAspectWarning.textContent = 'Choose a video format before previewing. Shorts require verified 9:16 vertical outputs; no clips are cropped or resized.';
+      youtubeAspectWarning.style.color = 'var(--muted-2,#9b8e7c)';
+    } else if (format === 'shorts' && incompatible.length) {
+      youtubeAspectWarning.textContent = `${incompatible.length} selected clip(s) are not verified 9:16 vertical outputs. Remove them or choose Standard YouTube videos. Landscape sources are never silently cropped or resized.`;
+      youtubeAspectWarning.style.color = '#fbbf24';
+    } else if (format === 'standard') {
+      const landscapeCount = selectedClips.filter(clip => clip.orientation === 'landscape').length;
+      youtubeAspectWarning.textContent = landscapeCount
+        ? `${landscapeCount} selected clip(s) are landscape. They will be scheduled as standard YouTube videos, not Shorts. No clips are cropped or resized.`
+        : 'Standard YouTube videos selected. Any non-9:16 clips will remain unchanged and will not be Shorts.';
+      youtubeAspectWarning.style.color = landscapeCount ? '#fbbf24' : 'var(--muted-2,#9b8e7c)';
+    } else {
+      youtubeAspectWarning.textContent = 'Shorts selected. Only verified 9:16 vertical outputs can be previewed; no clips are cropped or resized.';
+      youtubeAspectWarning.style.color = 'var(--muted-2,#9b8e7c)';
+    }
+    if (youtubePreviewScheduleBtn) {
+      youtubePreviewScheduleBtn.disabled = !format || !selectedClips.length || selectedClips.length > 60 || (format === 'shorts' && incompatible.length > 0);
+    }
+    if (youtubeApplyScheduleBtn) {
+      youtubeApplyScheduleBtn.disabled = !youtubeConnected || !youtubeSchedule.length || !format;
+    }
+  }
+
+  async function refreshYouTubeStatus() {
+    if (!youtubeConnectionStatus) return;
+    try {
+      const response = await fetch('/api/publish/youtube/status');
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Could not read YouTube connection status.');
+      youtubeAuthorized = Boolean(data.connected);
+      youtubeConnected = Boolean(data.confirmed);
+      const channelIdentity = data.connected
+        ? `${data.channel_title || 'YouTube channel'} · Channel ID ${data.channel_id || 'unavailable'}`
+        : '';
+      youtubeConnectionStatus.textContent = youtubeConnected
+        ? `Confirmed publishing destination: ${channelIdentity}`
+        : (youtubeAuthorized
+          ? `Google authorized this channel: ${channelIdentity}. Confirm it below before any upload.`
+          : (data.error || (data.configured ? 'Not connected. Connect your channel to review a schedule.' : 'Add a Google OAuth Desktop client ID to the local .env file to connect.')));
+      youtubeConnectionStatus.style.color = youtubeConnected ? '#4ade80' : 'var(--muted,#c9b9a4)';
+      youtubeConnectBtn.style.display = youtubeAuthorized ? 'none' : '';
+      youtubeConfirmChannelBtn.style.display = youtubeAuthorized && !youtubeConnected ? '' : 'none';
+      youtubeConfirmChannelBtn.textContent = `Confirm ${data.channel_title || 'this channel'} (${data.channel_id || 'ID unavailable'})`;
+      youtubeDisconnectBtn.style.display = youtubeAuthorized ? '' : 'none';
+      updateYouTubeTrialButton();
+      const publishSubmit = $('#submitPublish');
+      if (publishSubmit) publishSubmit.disabled = $('#publishPlatform').value === 'youtube' && !youtubeConnected;
+      if (youtubeApplyScheduleBtn) youtubeApplyScheduleBtn.disabled = !youtubeConnected || !youtubeSchedule.length;
+    } catch (error) {
+      youtubeConnected = false;
+      youtubeAuthorized = false;
+      youtubeConnectionStatus.textContent = error.message || 'Could not read YouTube connection status.';
+      youtubeConnectionStatus.style.color = '#ef4444';
+      youtubeConnectBtn.style.display = '';
+      youtubeConfirmChannelBtn.style.display = 'none';
+      youtubeDisconnectBtn.style.display = 'none';
+      updateYouTubeTrialButton();
+      const publishSubmit = $('#submitPublish');
+      if (publishSubmit) publishSubmit.disabled = $('#publishPlatform').value === 'youtube';
+      if (youtubeApplyScheduleBtn) youtubeApplyScheduleBtn.disabled = true;
+    }
+  }
+
+  function renderYouTubeClips() {
+    if (!youtubeClipList) return;
+    if (!youtubeClips.length) {
+      youtubeClipList.textContent = 'No unique generated 30–50 second MP4 clips found yet.';
+      renderYouTubeTrial();
+      return;
+    }
+    youtubeClipList.innerHTML = youtubeClips.map(clip => `
+      <label style="display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;background:rgba(255,255,255,0.035);font-size:0.8rem;">
+        <input type="checkbox" class="youtube-clip-choice" value="${escapeHtml(clip.clip_id)}">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(clip.title)} · ${escapeHtml(clip.filename)}</span>
+        <span style="white-space:nowrap;color:${clip.short_compatible ? '#4ade80' : '#fbbf24'};">${escapeHtml(clip.width && clip.height ? `${clip.width}×${clip.height}` : 'dimensions unknown')} · ${escapeHtml(clip.format_label)}</span>
+        <span style="white-space:nowrap;color:var(--muted-2,#9b8e7c);">${escapeHtml(clip.duration)} sec</span>
+      </label>`).join('');
+    updateYouTubeAspectStatus();
+    renderYouTubeTrial();
+  }
+
+  async function loadYouTubeClips() {
+    if (!youtubeClipList) return;
+    youtubeClipList.textContent = 'Scanning generated clips…';
+    clearYouTubeSchedule();
+    if (youtubeScheduleResults) youtubeScheduleResults.replaceChildren();
+    if (youtubeApplyScheduleBtn) youtubeApplyScheduleBtn.disabled = true;
+    try {
+      const response = await fetch('/api/publish/youtube/clips');
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Could not scan generated clips.');
+      youtubeClips = data.clips || [];
+      renderYouTubeClips();
+      showYouTubeStatus(`${youtubeClips.length} unique clips in the 30–50 second range; select up to 60.`);
+    } catch (error) {
+      youtubeClipList.textContent = error.message || 'Could not scan generated clips.';
+      showYouTubeStatus(error.message || 'Could not scan generated clips.', true);
+    }
+  }
+
+  function renderYouTubeSchedule() {
+    if (!youtubeScheduleReview) return;
+    youtubeScheduleReview.innerHTML = youtubeSchedule.map((item, index) => `
+      <div style="display:grid;grid-template-columns:minmax(140px,1fr) minmax(210px,1.1fr);gap:8px;padding:9px;border:1px solid var(--line,rgba(190,176,159,0.2));border-radius:8px;">
+        <label style="font-size:0.76rem;color:var(--muted,#c9b9a4);">Clip title
+          <input data-youtube-title="${index}" maxlength="100" value="${escapeHtml(item.title)}" style="width:100%;margin-top:4px;padding:7px;border-radius:6px;">
+        </label>
+        <label style="font-size:0.76rem;color:var(--muted,#c9b9a4);">Publish at (ISO 8601, Asia/Kolkata)
+          <input data-youtube-time="${index}" value="${escapeHtml(item.publish_at)}" style="width:100%;margin-top:4px;padding:7px;border-radius:6px;">
+        </label>
+        <label style="grid-column:1/-1;font-size:0.76rem;color:var(--muted,#c9b9a4);">Description
+          <textarea data-youtube-description="${index}" maxlength="5000" rows="2" style="width:100%;margin-top:4px;padding:7px;border-radius:6px;resize:vertical;">${escapeHtml(item.description)}</textarea>
+        </label>
+      </div>`).join('');
+    youtubeScheduleReview.style.display = youtubeSchedule.length ? 'flex' : 'none';
+    if (youtubeApplyScheduleBtn) youtubeApplyScheduleBtn.disabled = !youtubeConnected || !youtubeSchedule.length || !youtubeVideoType?.value;
+  }
+
+  youtubeVideoType?.addEventListener('change', () => {
+    clearYouTubeSchedule();
+    updateYouTubeAspectStatus();
+  });
+  youtubeClipList?.addEventListener('change', event => {
+    if (!event.target?.classList?.contains('youtube-clip-choice')) return;
+    if (event.target.checked && $$('.youtube-clip-choice:checked').length > 60) {
+      event.target.checked = false;
+      showYouTubeStatus('Select no more than 60 clips for one schedule.', true);
+    }
+    clearYouTubeSchedule();
+    updateYouTubeAspectStatus();
+  });
+
+  youtubeLaunchTrialBtn?.addEventListener('click', async () => {
+    if (youtubeLaunchTrialBtn.disabled || youtubeTrialActive) return;
+    const trialClips = getYouTubeTrialClips();
+    if (trialClips.length !== 3) {
+      showYouTubeTrialStatus('Exactly three verified 9:16 clips are required.', true);
+      return;
+    }
+    try {
+      const statusResponse = await fetch('/api/publish/youtube/status');
+      const currentStatus = await statusResponse.json();
+      if (!statusResponse.ok || !currentStatus.confirmed || !currentStatus.channel_id) {
+        await refreshYouTubeStatus();
+        showYouTubeTrialStatus('Connect YouTube and confirm the exact channel before the public trial.', true);
+        return;
+      }
+      const clips = trialClips.map((clip, index) => ({
+        clip_id: clip.clip_id,
+        title: $(`[data-youtube-trial-title="${index}"]`)?.value.trim() || '',
+        description: $(`[data-youtube-trial-description="${index}"]`)?.value.trim() || ''
+      }));
+      if (clips.some(clip => !clip.title || clip.title.length > 100 || clip.description.length > 5000)) {
+        showYouTubeTrialStatus('Each trial title must contain 1–100 characters and each description no more than 5,000 characters.', true);
+        return;
+      }
+      const clipNames = trialClips.map((clip, index) => `${index + 1}. ${clip.filename}`).join('\n');
+      const approval = window.confirm(
+        `Publish exactly these 3 verified 9:16 clips immediately as PUBLIC to:\n\n${currentStatus.channel_title}\nChannel ID: ${currentStatus.channel_id}\n\n${clipNames}\n\nAnyone may view these videos. No other clips or existing schedules will be changed. Continue?`
+      );
+      if (!approval) return;
+
+      youtubeTrialActive = true;
+      updateYouTubeTrialButton();
+      showYouTubeTrialStatus('Starting the confirmed public trial…');
+      const response = await fetch('/api/publish/youtube/trial', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          confirm: true,
+          confirm_public_visibility: true,
+          visibility: 'public',
+          channel_id: currentStatus.channel_id,
+          clips
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        if (response.status >= 400 && response.status < 500) {
+          youtubeTrialActive = false;
+          updateYouTubeTrialButton();
+        }
+        throw new Error(data.error || 'Could not start the public trial.');
+      }
+
+      const poll = async () => {
+        const statusResponse = await fetch(`/api/publish/youtube/trial/${encodeURIComponent(data.trial_id)}`);
+        const statusData = await statusResponse.json();
+        if (!statusResponse.ok || !statusData.ok) throw new Error(statusData.error || 'Could not read trial progress.');
+        if (statusData.status === 'completed' || statusData.status === 'completed_with_errors') {
+          const successful = (statusData.results || []).filter(item => item.status === 'published').length;
+          showYouTubeTrialStatus(`${successful} of 3 clips published publicly; ${3 - successful} failed.`, successful !== 3);
+          if (youtubeTrialResults) {
+            youtubeTrialResults.replaceChildren();
+            (statusData.results || []).forEach(item => {
+              const row = document.createElement('div');
+              row.style.padding = '4px 0';
+              if (item.status === 'published' && item.url) {
+                const link = document.createElement('a');
+                link.href = item.url;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.textContent = `${item.filename} · public on YouTube`;
+                row.appendChild(link);
+              } else {
+                row.textContent = `${item.filename}: ${item.error || 'Upload failed.'}`;
+                row.style.color = '#ef4444';
+              }
+              youtubeTrialResults.appendChild(row);
+            });
+          }
+          return;
+        }
+        showYouTubeTrialStatus(`Uploading ${statusData.completed} of 3 trial clips…`);
+        window.setTimeout(() => poll().catch(error => showYouTubeTrialStatus(error.message, true)), 1500);
+      };
+      await poll();
+    } catch (error) {
+      showYouTubeTrialStatus(error.message || 'Could not start the public trial.', true);
+      updateYouTubeTrialButton();
+    }
+  });
+
+  youtubeConnectBtn?.addEventListener('click', async () => {
+    youtubeConnectBtn.disabled = true;
+    try {
+      const response = await fetch('/api/publish/youtube/connect', { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Could not start YouTube authorization.');
+      window.location.assign(data.authorization_url);
+    } catch (error) {
+      showYouTubeStatus(error.message || 'Could not start YouTube authorization.', true);
+      youtubeConnectBtn.disabled = false;
+    }
+  });
+
+  youtubeConfirmChannelBtn?.addEventListener('click', async () => {
+    const statusResponse = await fetch('/api/publish/youtube/status');
+    const currentStatus = await statusResponse.json();
+    if (!statusResponse.ok || !currentStatus.connected || !currentStatus.channel_id) {
+      showYouTubeStatus(currentStatus.error || 'Connect your channel again before confirming it.', true);
+      return;
+    }
+    if (!window.confirm(`Confirm that all YouTube uploads and schedules in Clipify AI should go to:\n\n${currentStatus.channel_title}\nChannel ID: ${currentStatus.channel_id}`)) return;
+    youtubeConfirmChannelBtn.disabled = true;
+    try {
+      const response = await fetch('/api/publish/youtube/confirm-channel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel_id: currentStatus.channel_id })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Could not confirm this channel.');
+      await refreshYouTubeStatus();
+      showYouTubeStatus(`Confirmed: ${currentStatus.channel_title} · ${currentStatus.channel_id}. Uploading and scheduling are now enabled.`);
+    } catch (error) {
+      showYouTubeStatus(error.message || 'Could not confirm this channel.', true);
+    } finally {
+      youtubeConfirmChannelBtn.disabled = false;
+    }
+  });
+
+  youtubeDisconnectBtn?.addEventListener('click', async () => {
+    if (!window.confirm('Disconnect this YouTube channel from Clipify AI? You can connect and confirm a different channel later. Videos already scheduled remain on this channel and will not be transferred.')) return;
+    youtubeDisconnectBtn.disabled = true;
+    try {
+      const response = await fetch('/api/publish/youtube/disconnect', { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Could not disconnect YouTube.');
+      youtubeSchedule = [];
+      renderYouTubeSchedule();
+      await refreshYouTubeStatus();
+      showYouTubeStatus('YouTube channel disconnected.');
+    } catch (error) {
+      showYouTubeStatus(error.message || 'Could not disconnect YouTube.', true);
+    } finally {
+      youtubeDisconnectBtn.disabled = false;
+    }
+  });
+
+  $('#youtubeLoadClipsBtn')?.addEventListener('click', loadYouTubeClips);
+
+  youtubePreviewScheduleBtn?.addEventListener('click', async () => {
+    const clipIds = $$('.youtube-clip-choice:checked').map(input => input.value);
+    const videoType = youtubeVideoType?.value || '';
+    if (!videoType) {
+      showYouTubeStatus('Choose Shorts or standard YouTube video before previewing.', true);
+      return;
+    }
+    const selectedClips = youtubeClips.filter(clip => clipIds.includes(clip.clip_id));
+    if (videoType === 'shorts' && selectedClips.some(clip => !clip.short_compatible)) {
+      updateYouTubeAspectStatus();
+      showYouTubeStatus('Shorts require verified 9:16 vertical outputs. Landscape clips have not been cropped or resized.', true);
+      return;
+    }
+    try {
+      const response = await fetch('/api/publish/youtube/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clip_ids: clipIds,
+          video_type: videoType,
+          clips_per_day: Number($('#youtubeClipsPerDay').value),
+          start_hour: Number($('#youtubeStartHour').value),
+          end_hour: Number($('#youtubeEndHour').value)
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Could not build schedule preview.');
+      youtubeSchedule = data.schedule || [];
+      renderYouTubeSchedule();
+      showYouTubeStatus(`Review or edit ${youtubeSchedule.length} ${videoType === 'shorts' ? 'Shorts (9:16 vertical outputs)' : 'standard videos'}. All times are Asia/Kolkata.`);
+    } catch (error) {
+      showYouTubeStatus(error.message || 'Could not build schedule preview.', true);
+    }
+  });
+
+  youtubeScheduleReview?.addEventListener('input', event => {
+    const target = event.target;
+    const titleMatch = target?.dataset?.youtubeTitle;
+    const timeMatch = target?.dataset?.youtubeTime;
+    const descriptionMatch = target?.dataset?.youtubeDescription;
+    const index = Number(titleMatch ?? timeMatch ?? descriptionMatch);
+    if (!Number.isInteger(index) || !youtubeSchedule[index]) return;
+    if (titleMatch !== undefined) youtubeSchedule[index].title = target.value;
+    if (timeMatch !== undefined) youtubeSchedule[index].publish_at = target.value;
+    if (descriptionMatch !== undefined) youtubeSchedule[index].description = target.value;
+  });
+
+  youtubeApplyScheduleBtn?.addEventListener('click', async () => {
+    const videoType = youtubeVideoType?.value || '';
+    if (!youtubeConnected || !youtubeSchedule.length || !videoType) return;
+    const formatNotice = videoType === 'shorts'
+      ? 'as YouTube Shorts (verified 9:16 vertical outputs only)'
+      : 'as standard YouTube videos (landscape clips will not be Shorts)';
+    if (!window.confirm(`Upload ${youtubeSchedule.length} selected clips to your connected YouTube channel ${formatNotice}, as private scheduled videos? This cannot be undone from Clipify AI.`)) return;
+    youtubeApplyScheduleBtn.disabled = true;
+    showYouTubeStatus('Starting confirmed uploads…');
+    try {
+      const response = await fetch('/api/publish/youtube/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: true, video_type: videoType, schedule: youtubeSchedule })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Could not apply schedule.');
+      const poll = async () => {
+        const statusResponse = await fetch(`/api/publish/youtube/schedule/${encodeURIComponent(data.schedule_id)}`);
+        const statusData = await statusResponse.json();
+        if (!statusResponse.ok || !statusData.ok) throw new Error(statusData.error || 'Could not read upload progress.');
+        if (statusData.status === 'completed' || statusData.status === 'completed_with_errors') {
+          const successful = (statusData.results || []).filter(item => item.status === 'scheduled').length;
+          showYouTubeStatus(`${successful} clips scheduled; ${statusData.total - successful} failed.`, successful !== statusData.total);
+          if (youtubeScheduleResults) {
+            youtubeScheduleResults.replaceChildren();
+            (statusData.results || []).forEach(item => {
+              const row = document.createElement('div');
+              row.style.padding = '4px 0';
+              if (item.status === 'scheduled' && item.url) {
+                const link = document.createElement('a');
+                link.href = item.url;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.textContent = `${item.filename} · scheduled on YouTube`;
+                row.appendChild(link);
+              } else {
+                row.textContent = `${item.filename} · failed: ${item.error || 'Unknown error'}`;
+              }
+              youtubeScheduleResults.appendChild(row);
+            });
+          }
+          return;
+        }
+        showYouTubeStatus(`Uploading ${statusData.completed} of ${statusData.total}${statusData.current ? ` · ${statusData.current}` : ''}…`);
+        window.setTimeout(() => poll().catch(error => showYouTubeStatus(error.message, true)), 1500);
+      };
+      await poll();
+    } catch (error) {
+      showYouTubeStatus(error.message || 'Could not apply schedule.', true);
+      youtubeApplyScheduleBtn.disabled = !youtubeConnected || !youtubeSchedule.length || !youtubeVideoType?.value;
+    }
+  });
+
+  const youtubeParams = new URLSearchParams(window.location.search);
+  if (youtubeParams.has('youtube_connected') || youtubeParams.has('youtube_error')) {
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.hidden = false;
+    }
+    Promise.all([refreshYouTubeStatus(), loadYouTubeClips()]).then(() => {
+      if (youtubeParams.get('youtube_error') === 'multiple_channels') {
+        showYouTubeStatus('Google returned multiple channels, so no channel was selected. Authorize the Google account for the exact channel you intend to use.', true);
+      } else if (youtubeParams.has('youtube_error')) {
+        showYouTubeStatus('YouTube authorization was not completed. Check your Google OAuth setup and try again.', true);
+      }
+    });
+    window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+  }
 
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -2993,6 +3493,11 @@ function initSocialPublishing() {
     const description = $('#publishDescription').value.trim();
     const privacy = $('#publishPrivacy').value;
     const submitBtn = $('#submitPublish');
+
+    if (platform === 'youtube' && !youtubeConnected) {
+      showYouTubeStatus('Connect your channel and confirm the exact channel identity before uploading.', true);
+      return;
+    }
 
     if (submitBtn) { submitBtn.disabled = true; submitBtn.querySelector('span').textContent = 'Publishing…'; }
     if (statusMsg) {
@@ -3032,7 +3537,7 @@ function initSocialPublishing() {
       }
     } finally {
       if (submitBtn) {
-        submitBtn.disabled = false;
+        submitBtn.disabled = platform === 'youtube' && !youtubeConnected;
         submitBtn.querySelector('span').textContent = '🚀 Publish Now';
       }
     }

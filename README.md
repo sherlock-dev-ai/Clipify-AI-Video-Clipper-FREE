@@ -282,6 +282,8 @@ python app.py
 
 Open `http://127.0.0.1:5000` in your web browser.
 
+For Google Cloud OAuth setup, channel confirmation, and scheduled YouTube Shorts, see [YouTube publishing setup](docs/YOUTUBE_PUBLISHING_SETUP.md).
+
 ---
 
 ## 📄 License & Creator Credits

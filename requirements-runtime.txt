@@ -54,6 +54,7 @@ requests>=2.32
 PyYAML>=6.0
 tqdm>=4.66
 python-dotenv>=1.0
+keyring>=25.6
 # ClipsAI imports `magic`. The PyPI `python-magic` package is source only and
 # fails with "failed to find libmagic"; `python-magic-bin` bundles the native
 # library for Windows, which is what clipsai needs here.

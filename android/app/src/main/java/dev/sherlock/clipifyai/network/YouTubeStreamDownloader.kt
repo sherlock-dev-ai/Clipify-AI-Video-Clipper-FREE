@@ -452,10 +452,12 @@ object YouTubeStreamDownloader {
             val (cJson, _) = if (cUa == userAgent) Pair(json, cUa) else fetchPlayerJsonForClient(videoId, cName, cVer, cUa)
             val cSd = cJson?.optJSONObject("streamingData") ?: continue
             val adaptiveFormats: JSONArray? = cSd.optJSONArray("adaptiveFormats")
-            var bestAdaptiveVideoUrl: String? = null
-            var bestAdaptiveHeight = 0
-            var bestAdaptiveWidth = 0
-            var bestIsAvc = false
+            var bestAvcUrl: String? = null
+            var bestAvcH = 0
+            var bestAvcW = 0
+            var bestAnyUrl: String? = null
+            var bestAnyH = 0
+            var bestAnyW = 0
             var bestAdaptiveAudioUrl: String? = null
             var bestAudioBitrate = -1
 
@@ -465,18 +467,22 @@ object YouTubeStreamDownloader {
                     val fUrl = f.optString("url", "")
                     if (fUrl.isEmpty()) continue
                     val mime = f.optString("mimeType", "")
-                    val isSupportedMp4 = mime.contains("video/mp4") &&
-                        (mime.contains("avc1") || mime.contains("av01") || mime.contains("hvc1") || mime.contains("hev1"))
-                    if (isSupportedMp4) {
+                    val isAvc = mime.contains("video/mp4") && mime.contains("avc1")
+                    val isOtherMp4 = mime.contains("video/mp4") &&
+                        (mime.contains("av01") || mime.contains("hvc1") || mime.contains("hev1"))
+                    if (isAvc || isOtherMp4) {
                         val h = f.optInt("height", 0)
                         val w = f.optInt("width", 0)
-                        val isAvc = mime.contains("avc1")
                         if (h in 1..maxHeight) {
-                            if (h > bestAdaptiveHeight || (h == bestAdaptiveHeight && isAvc && !bestIsAvc)) {
-                                bestAdaptiveHeight = h
-                                bestAdaptiveWidth = w
-                                bestIsAvc = isAvc
-                                bestAdaptiveVideoUrl = fUrl
+                            if (isAvc && h > bestAvcH) {
+                                bestAvcH = h
+                                bestAvcW = w
+                                bestAvcUrl = fUrl
+                            }
+                            if (h > bestAnyH) {
+                                bestAnyH = h
+                                bestAnyW = w
+                                bestAnyUrl = fUrl
                             }
                         }
                     } else if (mime.contains("audio/mp4")) {
@@ -490,36 +496,46 @@ object YouTubeStreamDownloader {
             }
 
             val minAdaptiveH = if (maxHeight <= 480) 360 else 720
-            if (bestAdaptiveVideoUrl != null && bestAdaptiveAudioUrl != null && bestAdaptiveHeight >= minAdaptiveH) {
-                onProgress(15, "[YouTube HD] Downloading ${bestAdaptiveHeight}p ($cName) + AAC audio for '$videoTitle'...")
-                val tmpVid = File(destFile.parentFile, "${destFile.nameWithoutExtension}_v.mp4")
-                val tmpAud = File(destFile.parentFile, "${destFile.nameWithoutExtension}_a.m4a")
-                try {
-                    val vOk = downloadToFile(bestAdaptiveVideoUrl, tmpVid, cUa, 16, 52, "[Download ${bestAdaptiveHeight}p]", onProgress)
-                    val aOk = if (vOk) downloadToFile(bestAdaptiveAudioUrl, tmpAud, cUa, 68, 18, "[Download Audio]", onProgress) else false
-                    if (vOk && aOk) {
-                        onProgress(88, "[Muxer] Combining ${bestAdaptiveHeight}p HD video & audio...")
-                        if (muxVideoAndAudio(tmpVid, tmpAud, destFile)) {
-                            tmpVid.delete()
-                            tmpAud.delete()
-                            val mb = String.format("%.1f", destFile.length() / (1024.0 * 1024.0))
-                            Log.i(TAG, "Downloaded & muxed ${bestAdaptiveHeight}p HD MP4 via $cName ($mb MB) + ${captions.size} captions")
-                            onProgress(98, "[Download] ${bestAdaptiveHeight}p HD MP4 ready ($mb MB)!")
-                            return DownloadResult(
-                                ok = true,
-                                title = videoTitle,
-                                file = destFile,
-                                captions = captions,
-                                width = bestAdaptiveWidth,
-                                height = bestAdaptiveHeight
-                            )
+            val candidates = mutableListOf<Triple<String, Int, Int>>()
+            if (bestAnyUrl != null && bestAnyH >= minAdaptiveH && bestAnyUrl != bestAvcUrl) {
+                candidates.add(Triple(bestAnyUrl, bestAnyH, bestAnyW))
+            }
+            if (bestAvcUrl != null && bestAvcH >= minAdaptiveH) {
+                candidates.add(Triple(bestAvcUrl, bestAvcH, bestAvcW))
+            }
+
+            if (bestAdaptiveAudioUrl != null) {
+                for ((candUrl, candH, candW) in candidates) {
+                    onProgress(15, "[YouTube HD] Downloading ${candH}p ($cName) + AAC audio for '$videoTitle'...")
+                    val tmpVid = File(destFile.parentFile, "${destFile.nameWithoutExtension}_v.mp4")
+                    val tmpAud = File(destFile.parentFile, "${destFile.nameWithoutExtension}_a.m4a")
+                    try {
+                        val vOk = downloadToFile(candUrl, tmpVid, cUa, 16, 52, "[Download ${candH}p]", onProgress)
+                        val aOk = if (vOk) downloadToFile(bestAdaptiveAudioUrl, tmpAud, cUa, 68, 18, "[Download Audio]", onProgress) else false
+                        if (vOk && aOk) {
+                            onProgress(88, "[Muxer] Combining ${candH}p HD video & audio...")
+                            if (muxVideoAndAudio(tmpVid, tmpAud, destFile)) {
+                                tmpVid.delete()
+                                tmpAud.delete()
+                                val mb = String.format("%.1f", destFile.length() / (1024.0 * 1024.0))
+                                Log.i(TAG, "Downloaded & muxed ${candH}p HD MP4 via $cName ($mb MB) + ${captions.size} captions")
+                                onProgress(98, "[Download] ${candH}p HD MP4 ready ($mb MB)!")
+                                return DownloadResult(
+                                    ok = true,
+                                    title = videoTitle,
+                                    file = destFile,
+                                    captions = captions,
+                                    width = candW,
+                                    height = candH
+                                )
+                            }
                         }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "$cName adaptive ${candH}p failed: ${e.message}")
+                    } finally {
+                        tmpVid.delete()
+                        tmpAud.delete()
                     }
-                } catch (e: Exception) {
-                    Log.w(TAG, "$cName adaptive HD failed: ${e.message}")
-                } finally {
-                    tmpVid.delete()
-                    tmpAud.delete()
                 }
             }
         }

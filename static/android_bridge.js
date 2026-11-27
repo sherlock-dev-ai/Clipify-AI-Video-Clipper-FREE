@@ -384,7 +384,7 @@
           output_metadata: {}
         };
 
-        const maxHeight = parseInt(document.getElementById('mobileImportQualitySelect')?.value || '4320', 10) || 4320;
+        const maxHeight = parseInt(window._mobileSelectedImportQuality || document.querySelector('.mobile-import-quality-select')?.value || '4320', 10) || 4320;
         if (window.AndroidBridge && window.AndroidBridge.startRenderWithQuality) {
           window.AndroidBridge.startRenderWithQuality(window._lastAndroidUri, dur, layoutMode, captionsOn, count, maxHeight);
         } else if (window.AndroidBridge && window.AndroidBridge.startRenderWithCount) {
@@ -1089,8 +1089,8 @@
 
       if (currentNorm === latestNorm) {
         showMobileUpdateModal({
-          title: 'Clipify AI is Up to Date ✓',
-          bodyHtml: `<div style="padding:10px 12px;border-radius:10px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.35);color:#86efac;font-weight:600;margin-bottom:8px;">Installed successfully — v${currentNorm} is the latest version!</div>Latest release: <b>${latestTag}</b>`
+          title: `Updated to v${currentNorm} ✓`,
+          bodyHtml: `<div style="padding:10px 12px;border-radius:10px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.35);color:#86efac;font-weight:600;margin-bottom:8px;">✓ Updated to v${currentNorm} successfully!</div>You are running the latest version (<b>${latestTag}</b>).`
         });
         return;
       }
@@ -1146,24 +1146,65 @@
       window.captionPlaygroundState.styleId = 'gold_yellow';
     }
 
-    const ytInput = document.getElementById('youtubeUrl');
-    if (ytInput && !document.getElementById('mobileImportQualityWrap')) {
+    // Sync mobile version badges & show "Updated to vX" confirmation once after upgrade
+    const rawVer = (window.AndroidBridge && window.AndroidBridge.getAppVersionName)
+      ? window.AndroidBridge.getAppVersionName()
+      : '5.0.7';
+    const curVer = String(rawVer || '5.0.7').replace(/^v/i, '').split('-')[0].trim();
+    const prevSeen = localStorage.getItem('clipify_last_seen_version');
+    if (prevSeen && prevSeen !== curVer && window.AndroidBridge && window.AndroidBridge.showToast) {
+      window.AndroidBridge.showToast(`✓ Updated to v${curVer} successfully!`);
+    }
+    try { localStorage.setItem('clipify_last_seen_version', curVer); } catch (_) {}
+    const sbBadge = document.getElementById('sidebarVersionBadge');
+    const navTag = document.getElementById('navVersionTag');
+    const topVer = document.querySelector('#topBrandVersionBadge .version-num');
+    if (sbBadge) sbBadge.textContent = 'v' + curVer;
+    if (navTag) navTag.textContent = 'v' + curVer;
+    if (topVer) topVer.textContent = 'v' + curVer;
+
+    // Inject Download Quality dropdown before YouTube importing across Create, Instant, and Beta
+    window._mobileSelectedImportQuality = window._mobileSelectedImportQuality || '4320';
+    ['youtubeUrl', 'instantYoutubeUrl', 'betaYtUrl'].forEach((inputId) => {
+      const ytInput = document.getElementById(inputId);
+      if (!ytInput || ytInput.dataset.hasQualitySelect) return;
+      ytInput.dataset.hasQualitySelect = '1';
       const wrap = document.createElement('div');
-      wrap.id = 'mobileImportQualityWrap';
-      wrap.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);';
+      wrap.className = 'mobile-import-quality-wrap';
+      wrap.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);width:100%;box-sizing:border-box;';
       wrap.innerHTML = `
-        <span style="font-size:0.78rem;font-weight:700;color:rgba(255,255,255,0.85);">Import Quality</span>
-        <select id="mobileImportQualitySelect" style="background:#0e0f14;color:#fff;border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:6px 10px;font-size:0.78rem;font-weight:600;">
+        <span style="font-size:0.78rem;font-weight:700;color:rgba(255,255,255,0.85);">Video Quality</span>
+        <select class="mobile-import-quality-select" style="background:#0e0f14;color:#fff;border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:6px 10px;font-size:0.78rem;font-weight:600;max-width:62%;">
           <option value="4320" selected>Best Available (4K / 1080p)</option>
           <option value="1080">1080p Full HD</option>
           <option value="720">720p HD</option>
           <option value="480">360p / 480p Fast</option>
         </select>
       `;
-      const parentRow = ytInput.closest('.youtube-import-row, .url-row, .field-row') || ytInput.parentElement;
+      const sel = wrap.querySelector('select');
+      sel.value = window._mobileSelectedImportQuality;
+      sel.addEventListener('change', () => {
+        window._mobileSelectedImportQuality = sel.value;
+        document.querySelectorAll('.mobile-import-quality-select').forEach(s => { s.value = sel.value; });
+      });
+      const parentRow = ytInput.closest('.youtube-input-row, .youtube-import-row, .url-row, .field-row') || ytInput.parentElement;
       if (parentRow && parentRow.parentElement) {
         parentRow.parentElement.insertBefore(wrap, parentRow.nextSibling);
       }
+    });
+
+    // Fix any overflowing cards/buttons & non-B&W badges on mobile
+    if (!document.getElementById('clipify-mobile-bw-overflow-fix')) {
+      const fixSt = document.createElement('style');
+      fixSt.id = 'clipify-mobile-bw-overflow-fix';
+      fixSt.textContent = `
+        .ai-provider-card, .ollama-download-row, .provider-header-row { max-width: 100% !important; box-sizing: border-box !important; overflow: hidden !important; }
+        .btn-open-model-hub { max-width: 100% !important; width: 100% !important; height: auto !important; min-height: 38px !important; white-space: normal !important; background: rgba(255,255,255,0.08) !important; border-color: rgba(255,255,255,0.22) !important; color: #fff !important; }
+        #btnModelHubBadge { background: #ffffff !important; color: #000000 !important; }
+        .ollama-download-row > div, .provider-tabs { max-width: 100% !important; flex-wrap: wrap !important; }
+        .ollama-download-row input { min-width: 0 !important; }
+      `;
+      document.head.appendChild(fixSt);
     }
   });
 

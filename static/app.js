@@ -2930,7 +2930,7 @@ async function loadProjects() {
           : `/media/${encodeURIComponent(x.id)}/${encodeURIComponent(firstOutput)}`)
       : '';
     const thumbWithFrame = thumbUrl && !thumbUrl.includes('#') ? `${thumbUrl}#t=0.5` : thumbUrl;
-    const thumbnail = firstOutput ? `<video class="project-thumb" muted playsinline preload="metadata" src="${escapeHtml(thumbWithFrame)}"></video>` : '<div class="project-thumb project-thumb-empty">✦</div>';
+    const thumbnail = firstOutput ? `<video class="project-thumb" muted playsinline preload="none" src="${escapeHtml(thumbWithFrame)}" onmouseenter="if(this.preload==='none'){this.preload='metadata';this.load();}"></video>` : '<div class="project-thumb project-thumb-empty">✦</div>';
 
     el.innerHTML = `
       ${thumbnail}
@@ -3182,10 +3182,16 @@ function navigateTo(id) {
   }
   const knownSection = document.getElementById(target);
   const activeSectionId = (knownSection && knownSection.classList.contains('page-section')) ? target : 'create';
+  const targetSection = document.getElementById(activeSectionId);
+  if (targetSection) {
+    targetSection.style.display = 'block';
+    targetSection.classList.add('visible');
+  }
   $$('.page-section').forEach(s => {
-    const isTarget = s.id === activeSectionId;
-    s.classList.toggle('visible', isTarget);
-    s.style.display = isTarget ? 'block' : 'none';
+    if (s.id !== activeSectionId) {
+      s.classList.remove('visible');
+      s.style.display = 'none';
+    }
   });
   $$('[data-nav]').forEach(a =>
     a.classList.toggle('active', a.dataset.nav === activeSectionId)
@@ -3194,12 +3200,16 @@ function navigateTo(id) {
   if (target === 'storage') loadStorageConfig();
   if (target === 'assets') loadProjects().then(loadAssets);
   if (target === 'editor') {
-    if (typeof renderEditorShortsTray === 'function') renderEditorShortsTray();
+    if (typeof renderEditorShortsTray === 'function') {
+      requestAnimationFrame(() => renderEditorShortsTray());
+    }
   }
   if (target === 'trending') {
     if (typeof window.loadTrending === 'function') window.loadTrending();
   }
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  if (window.scrollY > 120) {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
 }
 
 window.clipTrendingVideo = function(videoUrl) {
@@ -3980,31 +3990,55 @@ function initBetaTestingSection() {
     });
   }
 
+  const betaPlatBtns = document.querySelectorAll('#betaSourcePlatformGroup .beta-platform-pill');
+  betaState.platform = betaState.platform || 'youtube';
+  const platPlaceholders = {
+    youtube: 'https://www.youtube.com/watch?v=...',
+    twitch: 'https://www.twitch.tv/videos/...',
+    kick: 'https://kick.com/video/...'
+  };
+  betaPlatBtns.forEach(pBtn => {
+    pBtn.addEventListener('click', () => {
+      const plat = pBtn.dataset.platform || 'youtube';
+      betaState.platform = plat;
+      betaPlatBtns.forEach(b => {
+        const active = b === pBtn;
+        b.classList.toggle('active', active);
+        b.style.background = active ? '#ffffff' : 'rgba(255,255,255,0.05)';
+        b.style.color = active ? '#050507' : 'rgba(255,255,255,0.82)';
+        b.style.borderColor = active ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.16)';
+      });
+      if (ytUrl && platPlaceholders[plat]) ytUrl.placeholder = platPlaceholders[plat];
+    });
+  });
+
   if (ytImportBtn && ytUrl) {
     ytImportBtn.addEventListener('click', async () => {
       const url = ytUrl.value.trim();
-      if (!url) return alert('Enter a valid YouTube URL first.');
+      const plat = betaState.platform || 'youtube';
+      const platLabel = plat.charAt(0).toUpperCase() + plat.slice(1);
+      if (!url) return alert(`Enter a valid ${platLabel} URL first.`);
       ytImportBtn.disabled = true;
       ytImportBtn.textContent = 'Fetching...';
       betaState.downloading = true;
       if (runBtn) {
         runBtn.disabled = true;
-        runBtn.textContent = '⏳ Downloading YouTube video…';
+        runBtn.textContent = `⏳ Downloading ${platLabel} video…`;
       }
       try {
         const res = await fetch('/api/import-youtube', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url })
+          body: JSON.stringify({ url, platform: plat })
         });
         const data = await res.json();
-        if (!res.ok || (!data.ok && !data.job_id)) throw new Error(data.error || 'Failed to import YouTube video');
+        if (!res.ok || (!data.ok && !data.job_id)) throw new Error(data.error || `Failed to import ${platLabel} video`);
         const jobId = data.job_id;
         betaState.jobId = jobId;
         betaState.sourceFile = null;
         dropZone.style.display = 'none';
         sourceInfo.style.display = 'flex';
-        sourceName.textContent = 'Connecting to YouTube...';
+        sourceName.textContent = `Connecting to ${platLabel}...`;
         sourceMeta.textContent = `Project ${jobId} · Downloading...`;
 
         // Poll /api/status/${jobId} until uploaded or error
@@ -5603,7 +5637,7 @@ async function renderEditorShortsTray() {
       const videoSrc = `/media/${clip.jobId}/${encodeURIComponent(clip.filename)}`;
 
       card.innerHTML = `
-        <video class="card-video-thumb" src="${videoSrc}#t=0.5" preload="metadata" muted playsinline></video>
+        <video class="card-video-thumb" src="${videoSrc}#t=0.5" preload="none" muted playsinline onmouseenter="if(this.preload==='none'){this.preload='metadata';this.load();}"></video>
         <span class="card-overlay-badge">${dur}</span>
         <div class="card-play-icon">▶</div>
         <div class="card-meta-bottom">

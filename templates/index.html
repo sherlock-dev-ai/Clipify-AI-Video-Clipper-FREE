@@ -1443,7 +1443,14 @@
               <div style="flex:1;height:1px;background:rgba(255,255,255,0.08);"></div>
             </div>
 
-            <div style="display:flex;gap:8px;margin-top:12px;">
+            <div id="betaSourcePlatformGroup" style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;">
+              <span style="font-size:0.75rem;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:0.06em;font-weight:700;margin-right:4px;">Source Platform:</span>
+              <button type="button" class="beta-platform-pill active" data-platform="youtube" style="padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,0.35);background:#ffffff;color:#050507;font-size:0.78rem;font-weight:700;cursor:pointer;">YouTube</button>
+              <button type="button" class="beta-platform-pill" data-platform="twitch" style="padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,0.16);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.82);font-size:0.78rem;font-weight:600;cursor:pointer;">Twitch</button>
+              <button type="button" class="beta-platform-pill" data-platform="kick" style="padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,0.16);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.82);font-size:0.78rem;font-weight:600;cursor:pointer;">Kick</button>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:8px;">
               <input type="url" id="betaYtUrl" name="beta_youtube_url_no_autofill"
                 placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" autocorrect="off"
                 autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true"

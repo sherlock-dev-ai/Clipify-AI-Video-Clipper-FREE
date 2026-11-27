@@ -989,43 +989,141 @@
     }
   };
 
-  // Mobile APK Update Checker (checks GitHub Releases API directly, never uses desktop update.zip or 90% loop)
-  window.openClipifyMobileUpdate = async function () {
-    const currentVer = (window.AndroidBridge && window.AndroidBridge.getAppVersionName)
-      ? window.AndroidBridge.getAppVersionName()
-      : '5.0.6';
-    if (window.AndroidBridge && window.AndroidBridge.showToast) {
-      window.AndroidBridge.showToast('Checking GitHub for latest mobile APK...');
+  // Mobile APK Update Checker & Installer Window
+  function showMobileUpdateModal(opts) {
+    let ov = document.getElementById('clipifyMobileUpdateModal');
+    if (ov) ov.remove();
+    ov = document.createElement('div');
+    ov.id = 'clipifyMobileUpdateModal';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(5,5,9,0.88);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;padding:18px;';
+    ov.innerHTML = `
+      <div style="width:100%;max-width:390px;background:#0e0f14;border:1px solid rgba(255,255,255,0.16);border-radius:18px;padding:20px;color:#fff;font-family:Inter,system-ui,sans-serif;box-shadow:0 24px 60px rgba(0,0,0,0.8);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <strong style="font-size:16px;">${opts.title || 'Clipify AI Update'}</strong>
+          <button type="button" id="mUpdCloseX" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);color:#fff;width:30px;height:30px;border-radius:8px;font-size:16px;">✕</button>
+        </div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.78);line-height:1.5;margin-bottom:14px;">${opts.bodyHtml || ''}</div>
+        <div id="mUpdProgressWrap" style="display:none;margin-bottom:14px;">
+          <div style="height:8px;background:rgba(255,255,255,0.1);border-radius:99px;overflow:hidden;">
+            <div id="mUpdProgressBar" style="height:100%;width:0%;background:#ffffff;transition:width 0.2s;"></div>
+          </div>
+          <div id="mUpdProgressText" style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:6px;">Preparing download...</div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button type="button" id="mUpdCloseBtn" style="padding:10px 14px;border-radius:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);color:#fff;font-weight:600;">Close</button>
+          ${opts.actionHtml || ''}
+        </div>
+      </div>
+    `;
+    document.body.appendChild(ov);
+    ov.querySelector('#mUpdCloseX').onclick = () => ov.remove();
+    ov.querySelector('#mUpdCloseBtn').onclick = () => ov.remove();
+    if (opts.onMount) opts.onMount(ov);
+  }
+
+  window.onMobileUpdateProgress = function (pct, msg) {
+    const wrap = document.getElementById('mUpdProgressWrap');
+    const bar = document.getElementById('mUpdProgressBar');
+    const txt = document.getElementById('mUpdProgressText');
+    if (wrap) wrap.style.display = 'block';
+    if (bar) bar.style.width = `${pct}%`;
+    if (txt) txt.textContent = msg || `Downloading (${pct}%)...`;
+  };
+
+  window.onMobileUpdateReady = function (ok, msg) {
+    const txt = document.getElementById('mUpdProgressText');
+    if (txt) txt.textContent = msg || (ok ? 'Installer opened!' : 'Could not open installer.');
+    const btn = document.getElementById('mUpdInstallBtn');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = ok ? 'Re-open Installer' : 'Install Update';
     }
+  };
+
+  window.openClipifyMobileUpdate = async function () {
+    const currentVerRaw = (window.AndroidBridge && window.AndroidBridge.getAppVersionName)
+      ? window.AndroidBridge.getAppVersionName()
+      : '5.0.7';
+    const norm = (v) => String(v || '').replace(/^v/i, '').split('-')[0].trim();
+    const currentNorm = norm(currentVerRaw);
+
+    showMobileUpdateModal({
+      title: 'Checking for Updates...',
+      bodyHtml: `Installed version: <b>v${currentNorm}</b><br>Checking GitHub Releases...`
+    });
+
     try {
       const resp = await originalFetch('https://api.github.com/repos/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/latest', {
         headers: { 'Accept': 'application/vnd.github.v3+json' }
       });
       const rel = await resp.json();
       const assets = Array.isArray(rel.assets) ? rel.assets : [];
-      const apkAsset = assets.find(a => (a.name || '').toLowerCase().includes('5.0.7') && (a.name || '').toLowerCase().endsWith('.apk'))
-        || assets.find(a => (a.name || '').toLowerCase().includes('5.0.6') && (a.name || '').toLowerCase().endsWith('.apk'))
+      const latestTag = rel.tag_name || `v${currentNorm}`;
+      const latestNorm = norm(latestTag);
+      const apkAsset = assets.find(a => (a.name || '').toLowerCase().includes(latestNorm) && (a.name || '').toLowerCase().endsWith('.apk'))
         || assets.find(a => (a.name || '').toLowerCase().endsWith('.apk'));
-      const latestTag = rel.tag_name || 'latest';
       const targetUrl = (apkAsset && apkAsset.browser_download_url)
         ? apkAsset.browser_download_url
         : (rel.html_url || 'https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases');
 
-      if (window.AndroidBridge && window.AndroidBridge.showToast) {
-        window.AndroidBridge.showToast(`Installed: v${currentVer} · Latest: ${latestTag}`);
+      if (currentNorm === latestNorm) {
+        showMobileUpdateModal({
+          title: 'Clipify AI is Up to Date ✓',
+          bodyHtml: `<div style="padding:10px 12px;border-radius:10px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.35);color:#86efac;font-weight:600;margin-bottom:8px;">Installed successfully — v${currentNorm} is the latest version!</div>Latest release: <b>${latestTag}</b>`
+        });
+        return;
       }
-      if (window.AndroidBridge && window.AndroidBridge.openBrowser) {
-        window.AndroidBridge.openBrowser(targetUrl);
-      } else {
-        window.open(targetUrl, '_blank');
-      }
+
+      showMobileUpdateModal({
+        title: `Update Available: ${latestTag}`,
+        bodyHtml: `Installed: <b>v${currentNorm}</b> &nbsp;→&nbsp; Latest: <b style="color:#4ade80;">${latestTag}</b><br><br>Tap <b>Install Update</b> to download and open the Android installer.`,
+        actionHtml: `<button type="button" id="mUpdInstallBtn" style="padding:10px 16px;border-radius:10px;background:#ffffff;color:#000000;border:none;font-weight:700;">Install Update</button>`,
+        onMount: (ov) => {
+          const btn = ov.querySelector('#mUpdInstallBtn');
+          if (!btn) return;
+          btn.onclick = () => {
+            btn.disabled = true;
+            btn.textContent = 'Downloading...';
+            window.onMobileUpdateProgress(2, `Downloading ${latestTag}...`);
+            if (window.AndroidBridge && window.AndroidBridge.downloadAndInstallApk) {
+              window.AndroidBridge.downloadAndInstallApk(targetUrl, latestTag);
+            } else if (window.AndroidBridge && window.AndroidBridge.openBrowser) {
+              window.AndroidBridge.openBrowser(targetUrl);
+            } else {
+              window.open(targetUrl, '_blank');
+            }
+          };
+        }
+      });
     } catch (e) {
-      if (window.AndroidBridge && window.AndroidBridge.openBrowser) {
-        window.AndroidBridge.openBrowser('https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases');
-      }
+      showMobileUpdateModal({
+        title: 'Update Check',
+        bodyHtml: `Installed: <b>v${currentNorm}</b><br>Could not reach GitHub right now. You can open the Releases page to check manually.`,
+        actionHtml: `<button type="button" id="mUpdOpenRel" style="padding:10px 16px;border-radius:10px;background:#ffffff;color:#000000;border:none;font-weight:700;">Open Releases</button>`,
+        onMount: (ov) => {
+          ov.querySelector('#mUpdOpenRel').onclick = () => {
+            const url = 'https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases';
+            if (window.AndroidBridge && window.AndroidBridge.openBrowser) window.AndroidBridge.openBrowser(url);
+            else window.open(url, '_blank');
+          };
+        }
+      });
     }
   };
   window.openClipifyUpdate = window.openClipifyMobileUpdate;
+
+  // Ensure default mobile caption design in Create/Beta is White & Yellow (gold_yellow)
+  document.addEventListener('DOMContentLoaded', () => {
+    ['#captionAccentSelect', '#betaCaptionAccent'].forEach(sel => {
+      const el = document.querySelector(sel);
+      if (el && !el.dataset.userChanged) {
+        el.value = 'gold_yellow';
+      }
+    });
+    if (window.captionPlaygroundState && !window.captionPlaygroundState.styleId) {
+      window.captionPlaygroundState.styleId = 'gold_yellow';
+    }
+  });
 
   // Mobile-only anti-squeeze layout & Caption Playground spacing polish
   (function injectMobileAntiSqueezeCss() {

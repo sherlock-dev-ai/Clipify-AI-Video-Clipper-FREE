@@ -120,19 +120,19 @@ class RenderForegroundService : Service() {
                                     RenderState.lastExportPath = exportFile.absolutePath
                                     updateNotification("✓ 9:16 Short saved to Gallery!", 100)
                                     RenderState.listener?.invoke(100, "Render complete! Saved to Movies/ClipifyAI.", exportFile.absolutePath)
-                                    return@Thread
+                                    return@execute
                                 }
                             }
 
                             if (errorMsg != null) {
                                 updateNotification(errorMsg, 100)
                                 RenderState.listener?.invoke(100, errorMsg, null)
-                                return@Thread
+                                return@execute
                             }
                         } else {
                             updateNotification("Could not start desktop instant job", 100)
                             RenderState.listener?.invoke(100, "Could not start desktop instant job", null)
-                            return@Thread
+                            return@execute
                         }
                     } else {
                         // Independent Mobile Mode: download YouTube or direct MP4 stream on-device, then render 9:16 Short!
@@ -150,7 +150,7 @@ class RenderForegroundService : Service() {
                             if (!res.ok || res.file == null) {
                                 updateNotification(res.error, 100)
                                 RenderState.listener?.invoke(100, "ERROR: ${res.error}", null)
-                                return@Thread
+                                return@execute
                             }
                             dlCaptions = res.captions
                             dlTitle = res.title
@@ -165,7 +165,7 @@ class RenderForegroundService : Service() {
                             val msg = "ERROR: Could not download video stream. Pick a video from Gallery or try another link."
                             updateNotification(msg, 100)
                             RenderState.listener?.invoke(100, msg, null)
-                            return@Thread
+                            return@execute
                         }
 
                         val clipsCount = intent?.getIntExtra("clipsCount", 1)?.coerceIn(1, 5) ?: 1
@@ -230,7 +230,7 @@ class RenderForegroundService : Service() {
                             updateNotification("Could not render short", 100)
                             RenderState.listener?.invoke(100, "ERROR: Could not render MP4 short.", null)
                         }
-                        return@Thread
+                        return@execute
                     }
                 } else {
                     // Local user video processing on-device
@@ -238,7 +238,7 @@ class RenderForegroundService : Service() {
                     if (sourceFile == null || !sourceFile.exists() || sourceFile.length() < 1024) {
                         updateNotification("Please choose a video from your gallery first", 100)
                         RenderState.listener?.invoke(100, "Please choose a video from your gallery first", null)
-                        return@Thread
+                        return@execute
                     }
                     val clipsCount = intent?.getIntExtra("clipsCount", 1)?.coerceIn(1, 5) ?: 1
                     RenderState.listener?.invoke(10, "Scanning local video for best highlight moments...", null)

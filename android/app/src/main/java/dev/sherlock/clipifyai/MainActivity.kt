@@ -710,6 +710,89 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
+        fun downloadAndInstallApk(apkUrl: String, versionLabel: String) {
+            Thread {
+                try {
+                    val outDir = getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS) ?: cacheDir
+                    val apkFile = File(outDir, "ClipifyAI_update.apk")
+                    val conn = (java.net.URL(apkUrl).openConnection() as java.net.HttpURLConnection).apply {
+                        instanceFollowRedirects = true
+                        connectTimeout = 15000
+                        readTimeout = 30000
+                        setRequestProperty("User-Agent", "ClipifyAI-Android")
+                    }
+                    val total = conn.contentLengthLong.coerceAtLeast(1L)
+                    var downloaded = 0L
+                    var lastPct = -1
+                    conn.inputStream.use { input ->
+                        java.io.FileOutputStream(apkFile).use { output ->
+                            val buf = ByteArray(16384)
+                            while (true) {
+                                val r = input.read(buf)
+                                if (r <= 0) break
+                                output.write(buf, 0, r)
+                                downloaded += r
+                                val pct = ((downloaded * 100L) / total).toInt().coerceIn(0, 100)
+                                if (pct != lastPct && (pct % 5 == 0 || pct == 100)) {
+                                    lastPct = pct
+                                    runOnUiThread {
+                                        binding.webView.evaluateJavascript(
+                                            "window.onMobileUpdateProgress && window.onMobileUpdateProgress($pct, 'Downloading $versionLabel ($pct%)...');",
+                                            null
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    runOnUiThread {
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
+                            !packageManager.canRequestPackageInstalls()
+                        ) {
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Allow 'Install unknown apps' for Clipify AI to finish updating",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            val permIntent = Intent(
+                                android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                Uri.parse("package:$packageName")
+                            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(permIntent)
+                            binding.webView.evaluateJavascript(
+                                "window.onMobileUpdateReady && window.onMobileUpdateReady(false, 'Enable \"Install unknown apps\" permission, then tap Install again.');",
+                                null
+                            )
+                            return@runOnUiThread
+                        }
+                        val apkUri = androidx.core.content.FileProvider.getUriForFile(
+                            this@MainActivity,
+                            "dev.sherlock.clipifyai.fileprovider",
+                            apkFile
+                        )
+                        val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(apkUri, "application/vnd.android.package-archive")
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(installIntent)
+                        binding.webView.evaluateJavascript(
+                            "window.onMobileUpdateReady && window.onMobileUpdateReady(true, 'Installer opened! Tap Install to complete update.');",
+                            null
+                        )
+                    }
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        binding.webView.evaluateJavascript(
+                            "window.onMobileUpdateReady && window.onMobileUpdateReady(false, 'Download failed. Opening release page...');",
+                            null
+                        )
+                        openExternalUrl(apkUrl)
+                    }
+                }
+            }.start()
+        }
+
+        @JavascriptInterface
         fun showToast(msg: String) {
             runOnUiThread {
                 Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()

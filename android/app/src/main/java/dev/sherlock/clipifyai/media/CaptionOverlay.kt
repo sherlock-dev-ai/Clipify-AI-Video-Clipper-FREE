@@ -7,8 +7,11 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.text.Layout
+import android.text.SpannableString
+import android.text.Spanned
 import android.text.StaticLayout
 import android.text.TextPaint
+import android.text.style.ForegroundColorSpan
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.OverlaySettings
@@ -75,11 +78,26 @@ class CaptionBitmapOverlay(
         val canvas = Canvas(cachedBitmap)
         val displayTxt = textToDraw.take(88)
         val textWidth = width - 40
+        // White & Yellow default viral caption styling: highlight key/alternating words in #FFE500
+        val yellowColor = Color.parseColor("#FFE500")
+        val styledText = SpannableString(displayTxt)
+        val wordRegex = Regex("\\S+")
+        val matches = wordRegex.findAll(displayTxt).toList()
+        matches.forEachIndexed { idx, m ->
+            if (idx % 3 == 1 || (matches.size == 1 && idx == 0)) {
+                styledText.setSpan(
+                    ForegroundColorSpan(yellowColor),
+                    m.range.first,
+                    m.range.last + 1,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+        }
         val strokeLayout = StaticLayout.Builder.obtain(displayTxt, 0, displayTxt.length, strokePaint, textWidth)
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
             .setMaxLines(3)
             .build()
-        val fillLayout = StaticLayout.Builder.obtain(displayTxt, 0, displayTxt.length, fillPaint, textWidth)
+        val fillLayout = StaticLayout.Builder.obtain(styledText, 0, styledText.length, fillPaint, textWidth)
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
             .setMaxLines(3)
             .build()

@@ -4,8 +4,11 @@ import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.PointF
-import android.media.FaceDetector
 import android.media.MediaCodec
+import com.google.android.gms.tasks.Tasks
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.FaceDetection
+import com.google.mlkit.vision.face.FaceDetectorOptions
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
@@ -417,19 +420,25 @@ class AndroidMediaProcessor(private val context: Context) {
     }
 
     /**
-     * Detects streamer webcam/face coordinates across sample frames so Split-Screen places
-     * gameplay on TOP and the detected facecam on BOTTOM.
+     * Uses offline Google ML Kit Face Detection across 6 sample frames + corner quadrants
+     * so Split-Screen reliably locks onto the streamer's webcam (even side profiles & small corner cams)
+     * and places gameplay on TOP and streamer on BOTTOM.
      */
     private fun detectFacecamRegion(sourceFile: File, startMs: Long, endMs: Long): Triple<Float, Float, Float> {
         val retriever = MediaMetadataRetriever()
+        val options = FaceDetectorOptions.Builder()
+            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+            .setMinFaceSize(0.06f)
+            .build()
+        val detector = FaceDetection.getClient(options)
         try {
             retriever.setDataSource(sourceFile.absolutePath)
-            val sampleTimesUs = listOf(
-                (startMs + 2000L).coerceAtMost(endMs) * 1000L,
-                ((startMs + endMs) / 2L) * 1000L,
-                (endMs - 2000L).coerceAtLeast(startMs) * 1000L
-            )
-            val hits = mutableListOf<Triple<Float, Float, Float>>()
+            val span = (endMs - startMs).coerceAtLeast(2000L)
+            val sampleTimesUs = (0 until 6).map { idx ->
+                (startMs + (span * (idx + 1)) / 7L) * 1000L
+            }
+            data class FaceHit(val normX: Float, val glY: Float, val zoomSpan: Float, val quadrant: String)
+            val hits = mutableListOf<FaceHit>()
 
             for (tUs in sampleTimesUs) {
                 val rawBmp = retriever.getFrameAtTime(tUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) ?: continue
@@ -440,70 +449,84 @@ class AndroidMediaProcessor(private val context: Context) {
                     continue
                 }
 
-                // Scan left-edge webcam zone, right-edge webcam zone, and full frame (upscaled 2.5x for small corner cams)
+                // Scan 4 corner webcam zones (upscaled 2x) first, then full frame
                 val regions = listOf(
-                    intArrayOf(0, 0, (fw * 0.25f).toInt().coerceAtLeast(32), fh),
-                    intArrayOf((fw * 0.75f).toInt(), 0, (fw * 0.25f).toInt().coerceAtLeast(32), fh),
-                    intArrayOf(0, 0, fw, fh)
+                    intArrayOf(0, 0, (fw * 0.34f).toInt(), (fh * 0.45f).toInt()),                 // Top-Left
+                    intArrayOf(0, (fh * 0.50f).toInt(), (fw * 0.34f).toInt(), (fh * 0.50f).toInt()), // Bottom-Left
+                    intArrayOf((fw * 0.66f).toInt(), 0, (fw * 0.34f).toInt(), (fh * 0.45f).toInt()), // Top-Right
+                    intArrayOf((fw * 0.66f).toInt(), (fh * 0.50f).toInt(), (fw * 0.34f).toInt(), (fh * 0.50f).toInt()), // Bottom-Right
+                    intArrayOf(0, 0, fw, fh) // Full Frame fallback
                 )
 
-                var foundInFrame = false
                 for ((rIdx, r) in regions.withIndex()) {
-                    val rx = r[0].coerceIn(0, fw - 2)
-                    val ry = r[1].coerceIn(0, fh - 2)
-                    val rw = r[2].coerceAtMost(fw - rx)
-                    val rh = r[3].coerceAtMost(fh - ry)
-                    val evenW = if (rw % 2 == 0) rw else rw - 1
-                    if (evenW < 16 || rh < 16) continue
+                    val rx = r[0].coerceIn(0, fw - 4)
+                    val ry = r[1].coerceIn(0, fh - 4)
+                    val rw = r[2].coerceAtMost(fw - rx).coerceAtLeast(32)
+                    val rh = r[3].coerceAtMost(fh - ry).coerceAtLeast(32)
 
-                    val crop = Bitmap.createBitmap(rawBmp, rx, ry, evenW, rh)
-                    val scale = if (rIdx < 2) 2.5f else 1.0f
-                    val scaledW = ((evenW * scale).toInt() / 2) * 2
-                    val scaledH = (rh * scale).toInt().coerceAtLeast(16)
-                    val scaled = if (scale > 1.0f) Bitmap.createScaledBitmap(crop, scaledW, scaledH, true) else crop
-                    if (scaled !== crop) crop.recycle()
-                    val rgb565 = scaled.copy(Bitmap.Config.RGB_565, false)
-                    scaled.recycle()
-                    if (rgb565 == null) continue
+                    val crop = Bitmap.createBitmap(rawBmp, rx, ry, rw, rh)
+                    val scale = if (rIdx < 4) 2.0f else 1.0f
+                    val scanBmp = if (scale > 1.0f) {
+                        Bitmap.createScaledBitmap(crop, (rw * scale).toInt(), (rh * scale).toInt(), true).also {
+                            crop.recycle()
+                        }
+                    } else crop
 
-                    val faces = arrayOfNulls<FaceDetector.Face>(3)
-                    val detector = FaceDetector(rgb565.width, rgb565.height, 3)
-                    val count = detector.findFaces(rgb565, faces)
-                    rgb565.recycle()
+                    val faces = try {
+                        Tasks.await(detector.process(InputImage.fromBitmap(scanBmp, 0)), 4, TimeUnit.SECONDS)
+                    } catch (_: Exception) {
+                        emptyList()
+                    }
+                    scanBmp.recycle()
 
-                    if (count > 0) {
-                        val f = faces[0] ?: continue
-                        val mid = PointF()
-                        f.getMidPoint(mid)
-                        val normX = ((rx + (mid.x / scale)) / fw.toFloat()).coerceIn(0.04f, 0.96f)
-                        val normBmpY = ((ry + (mid.y / scale)) / fh.toFloat()).coerceIn(0.04f, 0.96f)
-                        val glY = (1.0f - normBmpY).coerceIn(0.04f, 0.96f)
-                        val eyeDistNorm = ((f.eyesDistance() / scale) / fh.toFloat()).coerceIn(0.02f, 0.25f)
-                        val zoomSpan = (eyeDistNorm * 7.0f).coerceIn(0.24f, 0.48f)
-                        hits.add(Triple(normX, glY, zoomSpan))
-                        foundInFrame = true
+                    if (faces.isNotEmpty()) {
+                        val bestFace = faces.maxByOrNull { it.boundingBox.width() * it.boundingBox.height() } ?: continue
+                        val box = bestFace.boundingBox
+                        val centerXInFw = rx + (box.exactCenterX() / scale)
+                        // Bias center slightly upward toward eyes/head rather than chin/chest
+                        val centerYInFh = ry + ((box.exactCenterY() - box.height() * 0.08f) / scale)
+                        val normX = (centerXInFw / fw.toFloat()).coerceIn(0.05f, 0.95f)
+                        val normBmpY = (centerYInFh / fh.toFloat()).coerceIn(0.05f, 0.95f)
+                        val glY = (1.0f - normBmpY).coerceIn(0.05f, 0.95f)
+                        val boxHNorm = ((box.height() / scale) / fh.toFloat()).coerceIn(0.06f, 0.45f)
+                        val zoomSpan = (boxHNorm * 2.8f).coerceIn(0.28f, 0.55f)
+                        val quad = when {
+                            normX < 0.35f && normBmpY < 0.50f -> "TL"
+                            normX < 0.35f && normBmpY >= 0.50f -> "BL"
+                            normX > 0.65f && normBmpY < 0.50f -> "TR"
+                            normX > 0.65f && normBmpY >= 0.50f -> "BR"
+                            else -> "CENTER"
+                        }
+                        hits.add(FaceHit(normX, glY, zoomSpan, quad))
                         break
                     }
                 }
                 rawBmp.recycle()
-                if (foundInFrame && hits.size >= 2) break
             }
 
             if (hits.isNotEmpty()) {
-                val avgX = hits.map { it.first }.average().toFloat()
-                val avgY = hits.map { it.second }.average().toFloat()
-                val avgZoom = hits.map { it.third }.average().toFloat()
-                Log.i(TAG, "Facecam detected at normX=$avgX, glY=$avgY, zoom=$avgZoom (${hits.size} hits)")
+                // Prefer consistent corner webcam cluster over stray gameplay face hits
+                val grouped = hits.groupBy { it.quadrant }
+                val cornerWinner = grouped.entries.filter { it.key != "CENTER" }.maxByOrNull { it.value.size }
+                val chosenGroup = if (cornerWinner != null && cornerWinner.value.size >= 2) {
+                    cornerWinner.value
+                } else {
+                    grouped.maxByOrNull { it.value.size }?.value ?: hits
+                }
+                val avgX = chosenGroup.map { it.normX }.average().toFloat()
+                val avgY = chosenGroup.map { it.glY }.average().toFloat()
+                val avgZoom = chosenGroup.map { it.zoomSpan }.average().toFloat()
+                Log.i(TAG, "MLKit Facecam locked (${chosenGroup.first().quadrant}): normX=$avgX, glY=$avgY, zoom=$avgZoom (${chosenGroup.size}/${hits.size} hits)")
                 return Triple(avgX, avgY, avgZoom)
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Facecam detection fallback: ${e.message}")
+            Log.w(TAG, "MLKit Facecam detection fallback: ${e.message}")
         } finally {
+            try { detector.close() } catch (_: Exception) {}
             try { retriever.release() } catch (_: Exception) {}
         }
-        // Default: left-center webcam region common in gaming/reaction streams
-        Log.i(TAG, "No facecam hit; using default center-action bottom crop")
-        return Triple(0.5f, 0.5f, 0.65f)
+        Log.i(TAG, "No facecam hit; using clean wide bottom framing")
+        return Triple(0.5f, 0.48f, 0.72f)
     }
 
     @Volatile
@@ -822,7 +845,20 @@ class AndroidMediaProcessor(private val context: Context) {
                     videoEffects.add(Presentation.createForWidthAndHeight(tier.w, tier.h, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP))
                 }
                 if (tier.withOverlay && captionsEnabled && (effectiveCaptions.isNotEmpty() || videoTitle.isNotBlank())) {
-                    videoEffects.add(OverlayEffect(ImmutableList.of(CaptionBitmapOverlay(effectiveCaptions, startMs, videoTitle))))
+                    videoEffects.add(
+                        OverlayEffect(
+                            ImmutableList.of(
+                                CaptionBitmapOverlay(
+                                    captions = effectiveCaptions,
+                                    clipStartMs = startMs,
+                                    fallbackTitle = videoTitle,
+                                    outWidth = tier.w,
+                                    outHeight = tier.h,
+                                    isSplitScreen = (layout == "split")
+                                )
+                            )
+                        )
+                    )
                 }
 
                 val editedMediaItem = EditedMediaItem.Builder(mediaItem)

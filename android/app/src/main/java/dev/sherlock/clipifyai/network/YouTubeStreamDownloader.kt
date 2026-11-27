@@ -46,8 +46,8 @@ object YouTubeStreamDownloader {
     )
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(90, TimeUnit.SECONDS)
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)
         .followRedirects(true)
         .build()
 
@@ -303,7 +303,7 @@ object YouTubeStreamDownloader {
     ): Boolean {
         targetFile.parentFile?.mkdirs()
         if (targetFile.exists()) targetFile.delete()
-        val chunkSize = 4L * 1024L * 1024L
+        val chunkSize = 2L * 1024L * 1024L
         var offset = 0L
         var totalBytes = -1L
         var lastEmitMs = 0L
@@ -314,59 +314,76 @@ object YouTubeStreamDownloader {
                 val buf = ByteArray(64 * 1024)
                 while (true) {
                     val endByte = offset + chunkSize - 1L
-                    val req = Request.Builder()
-                        .url(streamUrl)
-                        .header("User-Agent", userAgent)
-                        .header("Range", "bytes=$offset-$endByte")
-                        .get()
-                        .build()
-
                     var gotBytes = 0L
                     var done = false
                     var failedChunk = false
-                    client.newCall(req).execute().use { resp ->
-                        if (!resp.isSuccessful && resp.code != 206) {
-                            lastHttpError = "HTTP ${resp.code}"
-                            Log.w(TAG, "$label Range download failed HTTP ${resp.code} at offset=$offset")
-                            failedChunk = true
-                        } else {
-                            val cr = resp.header("Content-Range")
-                            if (cr != null && cr.contains("/")) {
-                                totalBytes = cr.substringAfter("/").trim().toLongOrNull() ?: totalBytes
-                            } else if (totalBytes < 0) {
-                                val cl = resp.body?.contentLength() ?: -1L
-                                if (cl > 0) totalBytes = cl
-                            }
-                            val body = resp.body
-                            if (body == null) {
-                                failedChunk = true
-                            } else {
-                                body.byteStream().use { input ->
-                                    while (true) {
-                                        val read = input.read(buf)
-                                        if (read == -1) break
-                                        output.write(buf, 0, read)
-                                        gotBytes += read
-                                        offset += read
-                                        val now = System.currentTimeMillis()
-                                        if (now - lastEmitMs >= 450L) {
-                                            lastEmitMs = now
-                                            val mbDone = String.format("%.1f", offset / (1024.0 * 1024.0))
-                                            if (totalBytes > 0) {
-                                                val pct = pctStart + ((offset * pctSpan) / totalBytes).toInt()
-                                                val mbTotal = String.format("%.1f", totalBytes / (1024.0 * 1024.0))
-                                                onProgress(pct.coerceAtMost(pctStart + pctSpan), "$label ($mbDone / $mbTotal MB)")
-                                            } else {
-                                                onProgress(pctStart + (pctSpan / 2), "$label ($mbDone MB)")
+
+                    for (attempt in 0 until 4) {
+                        gotBytes = 0L
+                        failedChunk = false
+                        val chunkStartOffset = offset
+                        try {
+                            val req = Request.Builder()
+                                .url(streamUrl)
+                                .header("User-Agent", userAgent)
+                                .header("Range", "bytes=$chunkStartOffset-$endByte")
+                                .get()
+                                .build()
+
+                            client.newCall(req).execute().use { resp ->
+                                if (!resp.isSuccessful && resp.code != 206) {
+                                    lastHttpError = "HTTP ${resp.code}"
+                                    Log.w(TAG, "$label Range download failed HTTP ${resp.code} at offset=$chunkStartOffset (attempt ${attempt + 1})")
+                                    failedChunk = true
+                                } else {
+                                    val cr = resp.header("Content-Range")
+                                    if (cr != null && cr.contains("/")) {
+                                        totalBytes = cr.substringAfter("/").trim().toLongOrNull() ?: totalBytes
+                                    } else if (totalBytes < 0) {
+                                        val cl = resp.body?.contentLength() ?: -1L
+                                        if (cl > 0) totalBytes = cl
+                                    }
+                                    val body = resp.body
+                                    if (body == null) {
+                                        failedChunk = true
+                                    } else {
+                                        val chunkBuf = java.io.ByteArrayOutputStream()
+                                        body.byteStream().use { input ->
+                                            while (true) {
+                                                val read = input.read(buf)
+                                                if (read == -1) break
+                                                chunkBuf.write(buf, 0, read)
+                                                gotBytes += read
+                                                val now = System.currentTimeMillis()
+                                                if (now - lastEmitMs >= 450L) {
+                                                    lastEmitMs = now
+                                                    val doneBytes = chunkStartOffset + gotBytes
+                                                    val mbDone = String.format("%.1f", doneBytes / (1024.0 * 1024.0))
+                                                    if (totalBytes > 0) {
+                                                        val pct = pctStart + ((doneBytes * pctSpan) / totalBytes).toInt()
+                                                        val mbTotal = String.format("%.1f", totalBytes / (1024.0 * 1024.0))
+                                                        onProgress(pct.coerceAtMost(pctStart + pctSpan), "$label ($mbDone / $mbTotal MB)")
+                                                    } else {
+                                                        onProgress(pctStart + (pctSpan / 2), "$label ($mbDone MB)")
+                                                    }
+                                                }
                                             }
+                                        }
+                                        output.write(chunkBuf.toByteArray())
+                                        offset = chunkStartOffset + gotBytes
+                                        if (resp.code == 200 || gotBytes == 0L || (totalBytes > 0 && offset >= totalBytes)) {
+                                            done = true
                                         }
                                     }
                                 }
-                                if (resp.code == 200 || gotBytes == 0L || (totalBytes > 0 && offset >= totalBytes)) {
-                                    done = true
-                                }
                             }
+                        } catch (e: Exception) {
+                            lastHttpError = e.message ?: "Network error"
+                            Log.w(TAG, "$label chunk error at offset=$chunkStartOffset (attempt ${attempt + 1}): ${e.message}")
+                            failedChunk = true
                         }
+                        if (!failedChunk) break
+                        Thread.sleep(600L * (attempt + 1))
                     }
                     if (failedChunk) break
                     if (done) {
@@ -390,6 +407,7 @@ object YouTubeStreamDownloader {
         val vExt = MediaExtractor()
         val aExt = MediaExtractor()
         var muxer: MediaMuxer? = null
+        var muxerStarted = false
         try {
             vExt.setDataSource(videoFile.absolutePath)
             aExt.setDataSource(audioFile.absolutePath)
@@ -416,18 +434,24 @@ object YouTubeStreamDownloader {
                 }
             }
 
-            if (vTrackIdx < 0 || vFormat == null) return false
+            if (vTrackIdx < 0 || vFormat == null) {
+                Log.e(TAG, "muxVideoAndAudio: no video track found in ${videoFile.name}")
+                return false
+            }
 
             outFile.parentFile?.mkdirs()
+            if (outFile.exists()) outFile.delete()
             muxer = MediaMuxer(outFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
             val outV = muxer.addTrack(vFormat)
             val outA = if (aTrackIdx >= 0 && aFormat != null) muxer.addTrack(aFormat) else -1
             muxer.start()
+            muxerStarted = true
 
-            val buf = ByteBuffer.allocateDirect(1024 * 1024)
+            val buf = ByteBuffer.allocateDirect(2 * 1024 * 1024)
             val info = MediaCodec.BufferInfo()
 
             vExt.selectTrack(vTrackIdx)
+            var vSamples = 0
             while (true) {
                 val sz = vExt.readSampleData(buf, 0)
                 if (sz < 0) break
@@ -437,10 +461,13 @@ object YouTubeStreamDownloader {
                 info.flags = if ((vExt.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC) != 0) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0
                 muxer.writeSampleData(outV, buf, info)
                 vExt.advance()
+                vSamples++
             }
+            Log.i(TAG, "muxVideoAndAudio: wrote $vSamples video samples from ${videoFile.name}")
 
             if (outA >= 0) {
                 aExt.selectTrack(aTrackIdx)
+                var aSamples = 0
                 while (true) {
                     val sz = aExt.readSampleData(buf, 0)
                     if (sz < 0) break
@@ -450,16 +477,24 @@ object YouTubeStreamDownloader {
                     info.flags = if ((aExt.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC) != 0) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0
                     muxer.writeSampleData(outA, buf, info)
                     aExt.advance()
+                    aSamples++
                 }
+                Log.i(TAG, "muxVideoAndAudio: wrote $aSamples audio samples from ${audioFile.name}")
             }
             muxer.stop()
-            return outFile.exists() && outFile.length() > 1024
+            muxerStarted = false
+            val outSize = outFile.length()
+            Log.i(TAG, "muxVideoAndAudio: output ${outFile.name} = ${outSize / 1024} KB")
+            return outSize > 1024
         } catch (e: Exception) {
             Log.e(TAG, "HD muxing failed: ${e.message}", e)
             return false
         } finally {
             try { vExt.release() } catch (_: Exception) {}
             try { aExt.release() } catch (_: Exception) {}
+            if (muxerStarted) {
+                try { muxer?.stop() } catch (_: Exception) {}
+            }
             try { muxer?.release() } catch (_: Exception) {}
         }
     }
@@ -545,11 +580,16 @@ object YouTubeStreamDownloader {
 
             val minAdaptiveH = if (maxHeight <= 480) 360 else 720
             val candidates = mutableListOf<Triple<String, Int, Int>>()
-            if (bestAnyUrl != null && bestAnyH >= minAdaptiveH && bestAnyUrl != bestAvcUrl) {
+            // Prefer H.264 avc1 first for rock-solid Android hardware MediaMuxer & Media3 compatibility;
+            // if user selected >1080p (4K/2K), try highest resolution first with avc1 as immediate fallback.
+            if (maxHeight > 1080 && bestAnyUrl != null && bestAnyH > bestAvcH && bestAnyH >= minAdaptiveH) {
                 candidates.add(Triple(bestAnyUrl, bestAnyH, bestAnyW))
             }
             if (bestAvcUrl != null && bestAvcH >= minAdaptiveH) {
                 candidates.add(Triple(bestAvcUrl, bestAvcH, bestAvcW))
+            }
+            if (bestAnyUrl != null && bestAnyH >= minAdaptiveH && bestAnyUrl != bestAvcUrl && maxHeight <= 1080) {
+                candidates.add(Triple(bestAnyUrl, bestAnyH, bestAnyW))
             }
 
             if (bestAdaptiveAudioUrl != null) {
@@ -576,6 +616,22 @@ object YouTubeStreamDownloader {
                                     width = candW,
                                     height = candH
                                 )
+                            } else {
+                                // Muxing failed — try video-only copy as a last resort for this candidate
+                                Log.w(TAG, "$cName muxing failed for ${candH}p — trying video-only fallback")
+                                if (tmpVid.exists() && tmpVid.length() > 1024) {
+                                    try {
+                                        tmpVid.copyTo(destFile, overwrite = true)
+                                        tmpVid.delete()
+                                        tmpAud.delete()
+                                        val mb = String.format("%.1f", destFile.length() / (1024.0 * 1024.0))
+                                        Log.i(TAG, "Video-only ${candH}p fallback via $cName ($mb MB)")
+                                        onProgress(98, "[Download] ${candH}p video ready ($mb MB, no audio track)")
+                                        return DownloadResult(ok = true, title = videoTitle, file = destFile, captions = captions, width = candW, height = candH)
+                                    } catch (copyEx: Exception) {
+                                        Log.w(TAG, "Video-only copy failed: ${copyEx.message}")
+                                    }
+                                }
                             }
                         }
                     } catch (e: Exception) {

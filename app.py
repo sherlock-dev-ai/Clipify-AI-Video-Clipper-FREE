@@ -3952,17 +3952,22 @@ def _instant_worker(
                 try:
                     ollama_url = _ollama_base_url()
                     cfg_ai = _load_ai_config()
-                    m_name = cfg_ai.get("ollama_model") or "qwen2.5:3b"
+                    installed_models, _ = _discover_ollama_models()
+                    m_name = cfg_ai.get("ollama_model") or ""
+                    if installed_models and m_name not in installed_models:
+                        m_name = _get_fastest_ollama_model()[0] or installed_models[0]
+                    if not m_name:
+                        m_name = "qwen3:4b"
                     prompt_txt = (
                         f"Return JSON {{\"title\":\"...\",\"description\":\"...\"}} for a {int(clip_len)}s YouTube Short "
                         f"from '{src_clean}' (segment {int(start_sec)}s-{int(start_sec + clip_len)}s). Keep title under 7 words with 1 emoji."
                     )
                     o_req = urllib.request.Request(
                         f"{ollama_url}/api/generate",
-                        data=json.dumps({"model": m_name, "prompt": prompt_txt, "stream": False, "format": "json"}).encode("utf-8"),
+                        data=json.dumps({"model": m_name, "prompt": prompt_txt, "stream": False, "think": False, "format": "json"}).encode("utf-8"),
                         headers={"Content-Type": "application/json"},
                     )
-                    with urllib.request.urlopen(o_req, timeout=8) as o_resp:
+                    with urllib.request.urlopen(o_req, timeout=25) as o_resp:
                         o_data = json.loads(o_resp.read().decode("utf-8", errors="replace"))
                         ai_raw = o_data.get("response", "")
                         m_json = re.search(r"\{[\s\S]*\}", ai_raw)
@@ -4168,7 +4173,25 @@ def metadata(job_id: str, filename: str):
     stem = re.sub(r"_edited(?:_\d+)?$", "", stem, flags=re.I)
     meta = out_dir / f"{stem}.json"
     if not meta.exists():
-        return jsonify({"ok": False, "error": "Metadata not found."}), 404
+        vid_file = out_dir / safe
+        if not vid_file.exists():
+            return jsonify({"ok": False, "error": "Metadata not found."}), 404
+        # Auto-create metadata for older/instant clips missing a sidecar JSON
+        in_dir = job_dir / "input"
+        src_name = next((p.stem for p in in_dir.iterdir() if p.is_file()), "") if in_dir.exists() else ""
+        src_clean = re.sub(r"[_-]+", " ", src_name).strip() or re.sub(r"[_-]+", " ", stem).strip() or "Viral Moment"
+        fallback_meta = {
+            "title": f"{src_clean[:44]} 🔥",
+            "description": f"Viral highlight from {src_clean}. #Shorts #ClipifyAI",
+            "hashtags": ["#shorts", "#ClipifyAI", "#viral"],
+            "tags": ["shorts", "clipify", src_clean[:30]],
+            "source_video": src_name or safe,
+        }
+        try:
+            meta.write_text(json.dumps(fallback_meta, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+        return jsonify({"ok": True, **fallback_meta})
     try:
         return jsonify({"ok": True, **json.loads(meta.read_text(encoding="utf-8"))})
     except Exception as exc:
@@ -4597,6 +4620,12 @@ def _load_ai_config() -> dict:
                 default_cfg.update(saved)
     except Exception as exc:
         logger.warning(f"Failed to read ai_model_config: {exc}")
+    try:
+        installed, _ = _discover_ollama_models()
+        if installed and default_cfg.get("ollama_model") not in installed:
+            default_cfg["ollama_model"] = _default_model(installed)
+    except Exception:
+        pass
     return default_cfg
 
 def _save_ai_config(cfg: dict) -> None:

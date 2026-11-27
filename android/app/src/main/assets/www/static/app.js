@@ -2342,6 +2342,7 @@ function renderOutputCarousel() {
       </div>
       <h3 id="featuredTitle">${escapeHtml(title)}</h3>
       <p id="featuredMeta">1080 × 1920 · finished captions · optional branding</p>
+      <p id="featuredDescription" style="margin:6px 0 10px;font-size:0.84rem;line-height:1.45;color:rgba(255,255,255,0.72);display:none;"></p>
       <div class="featured-dots" aria-label="Select clip">
         ${state.outputs.map((_, index) => `<button class="dot ${index === state.currentOutputIndex ? 'active' : ''}" type="button" aria-label="Go to clip ${index + 1}" data-index="${index}"></button>`).join('')}
       </div>
@@ -2409,6 +2410,12 @@ function renderOutputCarousel() {
     if (state.jobId !== renderedJob || state.outputs[state.currentOutputIndex] !== reviewFile) return;
     const titleEl = $('#featuredTitle');
     if (titleEl && m?.title) titleEl.textContent = m.title;
+    const descEl = $('#featuredDescription');
+    if (descEl && (m?.description || (Array.isArray(m?.hashtags) && m.hashtags.length))) {
+      const tagsText = Array.isArray(m?.hashtags) && m.hashtags.length ? ` ${m.hashtags.join(' ')}` : '';
+      descEl.textContent = `${m.description || ''}${tagsText}`.trim();
+      descEl.style.display = 'block';
+    }
     const metaEl = $('#featuredMeta');
     const selection = m?.selection || {};
     let timePrefix = '';
@@ -2482,9 +2489,18 @@ function updateEditorClipSwitcher() {
     const active = (out === state.reviewFile || (!state.reviewFile && idx === 0));
     return `<button type="button" class="editor-short-pill ${active ? 'active' : ''}" data-file="${out}" style="background:${active ? 'rgba(215,187,148,0.28)' : 'rgba(255,255,255,0.06)'};border:1px solid ${active ? 'var(--warm,#d6b388)' : 'rgba(190,176,159,0.3)'};color:var(--text);padding:6px 12px;border-radius:8px;font-size:0.8rem;font-weight:600;cursor:pointer;">Short #${idx + 1}</button>`;
   }).join('');
-  switcher.querySelectorAll('button').forEach(btn => {
+  switcher.querySelectorAll('button').forEach((btn, idx) => {
+    const f = btn.dataset.file;
+    if (f && state.jobId) {
+      fetchMetadata(state.jobId, f).then((m) => {
+        if (m && m.title) {
+          const shortLabel = m.title.length > 34 ? m.title.slice(0, 33) + '…' : m.title;
+          btn.textContent = shortLabel;
+          btn.title = m.title;
+        }
+      });
+    }
     btn.addEventListener('click', () => {
-      const f = btn.dataset.file;
       if (f) selectReview(state.jobId, f);
     });
   });
@@ -4392,12 +4408,16 @@ function initBetaTestingSection() {
         btn.style.fontSize = '0.78rem';
         btn.textContent = `Short #${idx + 1}`;
         fetchMetadata(jobId, filename).then(m => {
-          if (m && m.duration) {
+          if (m && m.title) {
+            const shortLabel = m.title.length > 30 ? m.title.slice(0, 29) + '…' : m.title;
+            const durSuffix = m.duration ? ` (${Math.floor(Math.round(m.duration) / 60)}:${String(Math.round(m.duration) % 60).padStart(2, '0')})` : '';
+            btn.textContent = `${shortLabel}${durSuffix}`;
+            btn.title = `${m.title}${m.duration ? ` · ${m.duration}s` : ''}`;
+          } else if (m && m.duration) {
             const mSec = Math.round(m.duration);
             const mMin = Math.floor(mSec / 60);
             const sSec = String(mSec % 60).padStart(2, '0');
             btn.textContent = `Short #${idx + 1} (${mMin}:${sSec})`;
-            if (m.title) btn.title = `${m.title} · ${m.duration}s`;
           }
         });
         btn.addEventListener('click', () => {
@@ -5636,13 +5656,15 @@ async function renderEditorShortsTray() {
       const dur = clip.meta.duration ? `${Math.round(clip.meta.duration)}s` : '9:16 Short';
       const videoSrc = `/media/${clip.jobId}/${encodeURIComponent(clip.filename)}`;
 
+      const cardTitle = (clip.meta && clip.meta.title) ? clip.meta.title : clip.filename;
+      const cardSub = (clip.meta && clip.meta.description) ? clip.meta.description : clip.source;
       card.innerHTML = `
         <video class="card-video-thumb" src="${videoSrc}#t=0.5" preload="none" muted playsinline onmouseenter="if(this.preload==='none'){this.preload='metadata';this.load();}"></video>
         <span class="card-overlay-badge">${dur}</span>
         <div class="card-play-icon">▶</div>
         <div class="card-meta-bottom">
-          <span class="card-filename" title="${clip.filename}">${clip.filename}</span>
-          <span class="card-source-sub" title="${clip.source}">${clip.source}</span>
+          <span class="card-filename" title="${escapeHtml(cardTitle)}">${escapeHtml(cardTitle)}</span>
+          <span class="card-source-sub" title="${escapeHtml(cardSub)}">${escapeHtml(cardSub)}</span>
         </div>
       `;
 

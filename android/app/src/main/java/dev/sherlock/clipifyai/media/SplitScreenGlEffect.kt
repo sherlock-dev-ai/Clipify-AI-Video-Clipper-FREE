@@ -122,34 +122,34 @@ class SplitScreenGlEffect(
                 }
 
                 void main() {
-                    // Center divider bar at y = 0.5
-                    if (abs(vTexCoords.y - 0.5) < 0.004) {
-                        gl_FragColor = vec4(0.07, 0.07, 0.11, 1.0);
-                        return;
-                    }
+                    float panelAspect = 1.125; // 9:8 half-frame panel
 
-                    float panelAspect = 1.125; // 9:8 panel
-
-                    if (vTexCoords.y > 0.5) {
-                        // TOP PANEL: Gameplay wide view with subtle sharpening
+                    if (vTexCoords.y >= 0.5) {
+                        // TOP PANEL: Edge-to-edge cover-crop gameplay (zero grey letterbox gaps)
                         float localY = (vTexCoords.y - 0.5) * 2.0;
                         float localX = vTexCoords.x;
-                        float zoomX = 0.96;
-                        float sx = 0.5 + (localX - 0.5) * zoomX;
-                        float visibleAspect = uSrcAspect * zoomX;
-                        float scaleY = visibleAspect / panelAspect;
-                        float sy = 0.5 + (localY - 0.5) * scaleY;
-                        if (sy < 0.0 || sy > 1.0 || sx < 0.0 || sx > 1.0) {
-                            gl_FragColor = vec4(0.05, 0.05, 0.08, 1.0);
+                        float sx;
+                        float sy;
+                        if (uSrcAspect >= panelAspect) {
+                            float spanX = panelAspect / uSrcAspect;
+                            sx = 0.5 + (localX - 0.5) * spanX;
+                            sy = localY;
                         } else {
-                            gl_FragColor = sampleSharpened(vec2(sx, sy), 0.45);
+                            float spanY = uSrcAspect / panelAspect;
+                            sx = localX;
+                            sy = 0.5 + (localY - 0.5) * spanY;
                         }
+                        gl_FragColor = sampleSharpened(vec2(sx, sy), 0.55);
                     } else {
-                        // BOTTOM PANEL: Facecam / reaction focus with strong unsharp-mask clarity
+                        // BOTTOM PANEL: Edge-to-edge facecam / reaction focus
                         float localY = vTexCoords.y * 2.0;
                         float localX = vTexCoords.x;
-                        float spanY = uCamZoom;
+                        float spanY = min(uCamZoom, 1.0);
                         float spanX = spanY * (panelAspect / uSrcAspect);
+                        if (spanX > 1.0) {
+                            spanX = 1.0;
+                            spanY = min(1.0, uSrcAspect / panelAspect);
+                        }
                         float cx = clamp(uCamX, spanX * 0.5, 1.0 - spanX * 0.5);
                         float cy = clamp(uCamY, spanY * 0.5, 1.0 - spanY * 0.5);
                         float sx = cx + (localX - 0.5) * spanX;

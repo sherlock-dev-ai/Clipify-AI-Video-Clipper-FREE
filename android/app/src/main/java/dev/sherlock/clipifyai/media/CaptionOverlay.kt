@@ -28,27 +28,25 @@ class CaptionBitmapOverlay(
     private val fallbackTitle: String = ""
 ) : BitmapOverlay() {
 
-    private val width = 660
-    private val height = 180
+    private val width = 680
+    private val height = 230
     private var lastText: String? = null
     private var cachedBitmap: Bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
 
-    private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(185, 12, 12, 18)
-        style = Paint.Style.FILL
-    }
+    private val boldTypeface = Typeface.create("sans-serif-black", Typeface.BOLD)
     private val strokePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.BLACK
-        textSize = 40f
-        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        textSize = 54f
+        typeface = boldTypeface
         style = Paint.Style.STROKE
-        strokeWidth = 9f
+        strokeWidth = 14f
         strokeJoin = Paint.Join.ROUND
+        setShadowLayer(8f, 0f, 4f, Color.BLACK)
     }
     private val fillPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
-        textSize = 40f
-        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        textSize = 54f
+        typeface = boldTypeface
         style = Paint.Style.FILL
     }
 
@@ -76,7 +74,7 @@ class CaptionBitmapOverlay(
         }
 
         val canvas = Canvas(cachedBitmap)
-        val displayTxt = textToDraw.take(88)
+        val displayTxt = textToDraw.take(88).uppercase()
         val textWidth = width - 40
         // White & Yellow default viral caption styling: highlight key/alternating words in #FFE500
         val yellowColor = Color.parseColor("#FFE500")
@@ -102,12 +100,11 @@ class CaptionBitmapOverlay(
             .setMaxLines(3)
             .build()
 
-        val boxH = (fillLayout.height + 28f).coerceAtMost(height.toFloat() - 8f)
+        val boxH = (fillLayout.height + 16f).coerceAtMost(height.toFloat() - 8f)
         val topY = (height - boxH) / 2f
-        canvas.drawRoundRect(RectF(12f, topY, width - 12f, topY + boxH), 22f, 22f, bgPaint)
 
         canvas.save()
-        canvas.translate(20f, topY + 14f)
+        canvas.translate(20f, topY + 8f)
         strokeLayout.draw(canvas)
         fillLayout.draw(canvas)
         canvas.restore()

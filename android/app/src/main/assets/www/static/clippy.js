@@ -61,7 +61,7 @@
     welcomeDiv.innerHTML = `
       <div class="clippy-msg-bubble clippy-welcome-bubble">
         <p class="clippy-welcome-title"><strong>Hey! I'm your Clipify AI assistant.</strong></p>
-        <p class="clippy-welcome-desc">Ask me anything about Clipify AI v6.0.11 — Instant 9:16 Clipping, Storage Manager, reusing existing subtitles, GPU switching, Live Studio, or Narration Studio.</p>
+        <p class="clippy-welcome-desc">Ask me anything about Clipify AI v6.0.12 — Instant 9:16 Clipping, Storage Manager, reusing existing subtitles, GPU switching, Live Studio, or Narration Studio.</p>
         <div class="clippy-chips">
           <button class="clippy-chip" data-prompt="What's new in the latest version?">✨ What's New</button>
           <button class="clippy-chip" data-prompt="How do I change storage folders?">💾 Storage Manager</button>

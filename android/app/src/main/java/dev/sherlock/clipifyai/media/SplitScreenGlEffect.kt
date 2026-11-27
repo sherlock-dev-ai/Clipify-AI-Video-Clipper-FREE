@@ -25,7 +25,7 @@ class SplitScreenGlEffect(
 ) : GlEffect {
 
     override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram {
-        return SplitScreenShaderProgram(useHdr, camCenterX, camCenterY, camZoom.coerceIn(0.30f, 0.65f), outWidth, outHeight)
+        return SplitScreenShaderProgram(useHdr, camCenterX, camCenterY, camZoom.coerceIn(0.25f, 0.75f), outWidth, outHeight)
     }
 
     private class SplitScreenShaderProgram(
@@ -125,14 +125,21 @@ class SplitScreenGlEffect(
                     float panelAspect = 1.125; // 9:8 half-frame panel
 
                     if (vTexCoords.y >= 0.5) {
-                        // TOP PANEL: Edge-to-edge cover-crop gameplay (zero grey letterbox gaps)
+                        // TOP PANEL: Edge-to-edge cover-crop gameplay (avoid duplicating corner webcam)
                         float localY = (vTexCoords.y - 0.5) * 2.0;
                         float localX = vTexCoords.x;
                         float sx;
                         float sy;
                         if (uSrcAspect >= panelAspect) {
                             float spanX = panelAspect / uSrcAspect;
-                            sx = 0.5 + (localX - 0.5) * spanX;
+                            float gameCenterX = 0.5;
+                            if (uCamX < 0.28) {
+                                gameCenterX = 0.56;
+                            } else if (uCamX > 0.72) {
+                                gameCenterX = 0.44;
+                            }
+                            gameCenterX = clamp(gameCenterX, spanX * 0.5, 1.0 - spanX * 0.5);
+                            sx = gameCenterX + (localX - 0.5) * spanX;
                             sy = localY;
                         } else {
                             float spanY = uSrcAspect / panelAspect;

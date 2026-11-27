@@ -95,6 +95,23 @@ class MobileLiveManager(private val context: Context) {
                     hlsUrl = info.hlsManifestUrl
                     resolvedDirectUrl = info.directStreamUrl
                     addLog("info", "Resolved: $streamTitle (live=${info.isLive})")
+                    if (!info.isLive) {
+                        val bufFile = File(liveDir, "live_vod_hd.mp4")
+                        addLog("info", "Downloading 1080p HD stream buffer for Live Studio...")
+                        val dlRes = YouTubeStreamDownloader.downloadYouTubeMp4(sourceUrl, bufFile, 1080) { pct, msg ->
+                            bufferChunks = (pct / 5).coerceAtLeast(1)
+                            bufferDurationSec = (pct * 0.9)
+                            if (pct % 20 == 0) addLog("info", msg)
+                        }
+                        if (dlRes.ok && dlRes.file != null && dlRes.file.exists()) {
+                            activeBufferFile = dlRes.file
+                            previewPath = "file://${dlRes.file.absolutePath}"
+                            status = "live"
+                            statusDetail = "HD Live VOD ready (${dlRes.height}p)"
+                            addLog("system", "HD Live buffer ready (${dlRes.height}p)! Preview & Instant Clip enabled.")
+                            return@execute
+                        }
+                    }
                 } else {
                     resolvedDirectUrl = sourceUrl
                 }
@@ -128,14 +145,17 @@ class MobileLiveManager(private val context: Context) {
                                     if (chunksNow != bufferChunks) {
                                         bufferChunks = chunksNow
                                         bufferDurationSec = (chunksNow * 4.0).coerceAtMost(90.0)
-                                        if (status != "live" && total > 1024 * 1024) {
-                                            activeBufferFile = bufFile
-                                            previewPath = "file://${bufFile.absolutePath}"
-                                            status = "live"
-                                            statusDetail = "Live ingestion active (${String.format("%.1f", total / (1024.0 * 1024.0))} MB buffered)"
-                                            addLog("system", "Live buffer ready! Preview & Instant Clip enabled.")
+                                        if (status != "live" && total > 5 * 1024 * 1024) {
+                                            val durMs = probeVideoDurationMs(bufFile)
+                                            if (durMs >= 10_000L) {
+                                                activeBufferFile = bufFile
+                                                previewPath = "file://${bufFile.absolutePath}"
+                                                status = "live"
+                                                statusDetail = "Live ingestion active (${durMs / 1000}s / ${String.format("%.1f", total / (1024.0 * 1024.0))} MB buffered)"
+                                                addLog("system", "Live buffer ready (${durMs / 1000}s)! Preview & Instant Clip enabled.")
+                                            }
                                         }
-                                        if (autoClipEnabled.get() && total > 4 * 1024 * 1024 &&
+                                        if (autoClipEnabled.get() && status == "live" && total > 8 * 1024 * 1024 &&
                                             System.currentTimeMillis() - lastAutoClipTimeMs > 30_000L
                                         ) {
                                             lastAutoClipTimeMs = System.currentTimeMillis()
@@ -237,23 +257,53 @@ class MobileLiveManager(private val context: Context) {
         }
     }
 
+    private fun probeVideoDurationMs(file: File): Long {
+        if (!file.exists() || file.length() < 1024) return 0L
+        val ret = android.media.MediaMetadataRetriever()
+        return try {
+            ret.setDataSource(file.absolutePath)
+            ret.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+        } catch (_: Exception) {
+            0L
+        } finally {
+            try { ret.release() } catch (_: Exception) {}
+        }
+    }
+
     private fun triggerClipInternal(durationSec: Int, layout: String, captions: Boolean): File? {
         val src = activeBufferFile ?: return null
+        val snapFile = File(context.cacheDir, "live_snap_${System.currentTimeMillis()}.mp4")
+        try {
+            src.inputStream().use { inp -> snapFile.outputStream().use { out -> inp.copyTo(out) } }
+        } catch (e: Exception) {
+            Log.w(TAG, "Live snapshot copy failed: ${e.message}")
+            return null
+        }
+        val snapDurMs = probeVideoDurationMs(snapFile)
+        if (snapDurMs < 8000L) {
+            snapFile.delete()
+            addLog("info", "Live buffer has ${snapDurMs / 1000}s so far; waiting for at least 8s before clipping.")
+            return null
+        }
         val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         val exportDir = File(
             android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_MOVIES),
             "ClipifyAI"
         ).apply { mkdirs() }
         val exportFile = File(exportDir, "Clipify_Live_$ts.mp4")
-        val ok = processor.processAndRenderShort(
-            sourceFile = src,
-            exportFile = exportFile,
-            targetDurationSec = durationSec.coerceIn(5, 180),
-            layout = layout,
-            captionsEnabled = captions,
-            videoTitle = streamTitle
-        ) { pct, msg ->
-            if (pct == 22 || pct == 100) addLog("info", msg)
+        val ok = try {
+            processor.processAndRenderShort(
+                sourceFile = snapFile,
+                exportFile = exportFile,
+                targetDurationSec = durationSec.coerceIn(10, 180),
+                layout = layout,
+                captionsEnabled = captions,
+                videoTitle = streamTitle
+            ) { pct, msg ->
+                if (pct == 22 || pct == 100) addLog("info", msg)
+            }
+        } finally {
+            snapFile.delete()
         }
         if (ok && exportFile.exists() && exportFile.length() > 1024) {
             liveClips.add(0, JSONObject().apply {

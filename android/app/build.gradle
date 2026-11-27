@@ -11,8 +11,8 @@ android {
         applicationId "dev.sherlock.clipifyai"
         minSdk 26
         targetSdk 34
-        versionCode 6011
-        versionName "6.0.11"
+        versionCode 6012
+        versionName "6.0.12"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -79,6 +79,9 @@ dependencies {
 
     // Real On-Device Offline Voice-to-Text (Vosk Speech Recognition)
     implementation 'com.alphacephei:vosk-android:0.3.47'
+
+    // Offline ML Kit Face Detection for accurate multi-angle streamer webcam framing
+    implementation 'com.google.mlkit:face-detection:16.1.7'
 
     // Tests
     testImplementation 'junit:junit:4.13.2'

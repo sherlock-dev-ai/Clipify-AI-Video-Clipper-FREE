@@ -2889,20 +2889,29 @@ def upload_chunk():
     mode = "wb" if offset == 0 else "r+b"
     if mode == "r+b" and not target.exists():
         mode = "wb"
-    with open(target, mode) as fh:
-        if offset > 0:
-            fh.seek(offset)
-        while True:
-            buf = request.stream.read(1024 * 1024)
-            if not buf:
-                break
-            fh.write(buf)
+    try:
+        with open(target, mode) as fh:
+            if offset > 0:
+                fh.seek(offset)
+            while True:
+                buf = request.stream.read(1024 * 1024)
+                if not buf:
+                    break
+                fh.write(buf)
+    except OSError as exc:
+        resp = jsonify({"error": f"Disk write error during upload: {exc}"})
+        resp.headers["Connection"] = "close"
+        return resp, 507
 
     if is_last:
         res = _finalize_uploaded_job(job_id, safe_name, orig_filename, input_dir, target)
-        return jsonify(res)
+        resp = jsonify(res)
+        resp.headers["Connection"] = "close"
+        return resp
 
-    return jsonify({"ok": True, "job_id": job_id, "filename": safe_name, "received_offset": offset})
+    resp = jsonify({"ok": True, "job_id": job_id, "filename": safe_name, "received_offset": offset})
+    resp.headers["Connection"] = "close"
+    return resp
 
 
 @app.post("/api/upload")
@@ -6945,6 +6954,11 @@ if __name__ == "__main__":
     if os.environ.get("CLIPPEDAI_NO_BROWSER", "").strip() not in {"1", "true", "yes"}:
         _open_app_window(_connect_host, _port)
     try:
+        try:
+            from werkzeug.serving import ThreadedWSGIServer
+            ThreadedWSGIServer.request_queue_size = 128
+        except Exception:
+            pass
         app.run(host=_host, port=_port, debug=False, threaded=True)
         with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
             _lf.write(f"[{datetime.now()}] app.run returned cleanly\n")

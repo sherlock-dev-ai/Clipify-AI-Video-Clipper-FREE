@@ -1635,8 +1635,8 @@ function selectedBranding() {
 }
 
 async function uploadVideoResilient(file, onProgress) {
-  const CHUNK_SIZE = 16 * 1024 * 1024; // 16 MB chunks (supports 20GB+ files with zero temp spooling)
-  if (!file || file.size <= 32 * 1024 * 1024) {
+  const CHUNK_SIZE = 8 * 1024 * 1024; // 8 MB ArrayBuffer chunks (avoids Chromium >4GB Blob handle & keep-alive issues)
+  if (!file || file.size <= 24 * 1024 * 1024) {
     const uploadForm = new FormData();
     uploadForm.append('video', file);
     return new Promise((resolve, reject) => {
@@ -1668,8 +1668,9 @@ async function uploadVideoResilient(file, onProgress) {
     const slice = file.slice(offset, end);
     const isLast = end >= total ? '1' : '0';
     let lastErr = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 10; attempt++) {
       try {
+        const bodyBuf = await slice.arrayBuffer();
         const qs = new URLSearchParams({
           filename: file.name || 'video.mp4',
           offset: String(offset),
@@ -1678,8 +1679,9 @@ async function uploadVideoResilient(file, onProgress) {
         if (jobId) qs.set('job_id', jobId);
         const resp = await fetch(`/api/upload-chunk?${qs.toString()}`, {
           method: 'POST',
+          cache: 'no-store',
           headers: { 'Content-Type': 'application/octet-stream' },
-          body: slice
+          body: bodyBuf
         });
         const data = await resp.json().catch(() => ({}));
         if (!resp.ok || data.error) {
@@ -1693,7 +1695,7 @@ async function uploadVideoResilient(file, onProgress) {
         break;
       } catch (err) {
         lastErr = err;
-        await new Promise(r => setTimeout(r, 600 * (attempt + 1)));
+        await new Promise(r => setTimeout(r, Math.min(4000, 500 * (attempt + 1))));
       }
     }
     if (lastErr) throw lastErr;

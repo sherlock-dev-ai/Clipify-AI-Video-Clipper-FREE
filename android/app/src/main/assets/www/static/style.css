@@ -359,28 +359,39 @@ select {
   }
 }
 
-.sidebar-github {
+.sidebar-social-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0 2px 14px;
+}
+
+.sidebar-github,
+.sidebar-discord {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   overflow: hidden;
-  margin: 0 2px 14px;
+  margin: 0;
   min-height: 36px;
+  padding: 0 8px;
   border: 1px solid #27272a;
   border-radius: 10px;
   background: #121215;
   color: #fafafa;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-decoration: none;
   text-transform: uppercase;
+  white-space: nowrap;
   transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.sidebar-github:hover {
+.sidebar-github:hover,
+.sidebar-discord:hover {
   background: #18181b;
   border-color: #ffffff;
   color: #ffffff;
@@ -1180,15 +1191,16 @@ nav a.active {
   margin-bottom: 20px;
 }
 
-.github-watermark {
+.github-watermark,
+.discord-watermark {
   position: relative;
   isolation: isolate;
   overflow: hidden;
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   min-height: 46px;
-  padding: 0 17px;
+  padding: 0 16px;
   border: 1px solid rgba(255, 255, 255, 0.62);
   border-radius: 10px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.34));
@@ -1204,7 +1216,8 @@ nav a.active {
   transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
 
-.github-watermark::after {
+.github-watermark::after,
+.discord-watermark::after {
   content: "";
   position: absolute;
   z-index: -1;
@@ -1223,7 +1236,8 @@ nav a.active {
   animation: github-watermark-pulse 2.8s ease-in-out infinite;
 }
 
-.github-watermark:hover {
+.github-watermark:hover,
+.discord-watermark:hover {
   transform: translateY(-3px);
   border-color: var(--accent);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.46));
@@ -1381,8 +1395,9 @@ nav a.active {
     margin-top: 0;
   }
 
-  .github-watermark {
-    flex: 1 1 100%;
+  .github-watermark,
+  .discord-watermark {
+    flex: 1 1 calc(50% - 6px);
     justify-content: center;
   }
 }
@@ -3251,7 +3266,13 @@ footer {
     width: 90px;
   }
 
-  .sidebar-github {
+  .sidebar-social-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .sidebar-github,
+  .sidebar-discord {
     margin-left: 0;
     margin-right: 0;
     padding: 0;
@@ -3298,7 +3319,9 @@ footer {
   .sidebar,
   .sidebar-creature-card,
   #clippyFloatingCard,
+  .sidebar-social-row,
   .sidebar-github,
+  .sidebar-discord,
   .aurora,
   .noise {
     display: none !important;

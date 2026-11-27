@@ -975,6 +975,14 @@
             <span class="drawer-icon">✨</span>
             <span class="drawer-copy"><b>App Guide</b><small>Interactive Studio walkthrough</small></span>
           </button>
+          <a class="mobile-drawer-item" href="https://discord.gg/5ZBsasgryX" target="_blank" rel="noopener noreferrer" style="text-decoration:none;color:inherit;">
+            <span class="drawer-icon">💬</span>
+            <span class="drawer-copy"><b>Discord Server</b><small>Community, help &amp; updates</small></span>
+          </a>
+          <a class="mobile-drawer-item" href="https://github.com/sherlock-dev-ai" target="_blank" rel="noopener noreferrer" style="text-decoration:none;color:inherit;">
+            <span class="drawer-icon">↗</span>
+            <span class="drawer-copy"><b>GitHub</b><small>Releases &amp; source code</small></span>
+          </a>
         </div>`;
       document.body.appendChild(backdrop);
       document.body.appendChild(sheet);

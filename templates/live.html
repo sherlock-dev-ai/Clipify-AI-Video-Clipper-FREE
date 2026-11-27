@@ -23,9 +23,9 @@
         <div class="brand-title-wrap">
           <b>Clipify AI</b>
           <span class="cool-version-badge" id="topBrandVersionBadge"
-            title="Clipify AI v5.0.1 · Click for updates & release info">
+            title="Clipify AI v5.0.7 · Click for updates & release info">
             <span class="version-dot"></span>
-            <span class="version-num">v5.0.1</span>
+            <span class="version-num">v5.0.7</span>
             <span class="version-shimmer-sweep"></span>
           </span>
         </div>
@@ -34,6 +34,24 @@
     </div>
     <a class="sidebar-github" href="https://github.com/sherlock-dev-ai" target="_blank"
       rel="noopener noreferrer"><span>↗</span> GitHub</a>
+    <div class="sidebar-gpu-wrapper gpu-dropdown-wrapper" id="sidebarGpuWrapper">
+      <button type="button" class="gpu-dropdown-btn sidebar-gpu-btn" title="Switch active GPU / Hardware Accelerator">
+        <span class="gpu-indicator-dot nvidia"></span>
+        <span class="gpu-current-label">GPU: Detecting…</span>
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" class="gpu-chevron">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      <div class="gpu-dropdown-menu sidebar-gpu-menu">
+        <div class="gpu-menu-header">
+          <span>Hardware Accelerator</span>
+          <span class="gpu-menu-subtitle">Active Engine GPU</span>
+        </div>
+        <div class="gpu-menu-list">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
     <nav>
       <a href="/" data-nav="create" id="navCreateLink">
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -110,7 +128,7 @@
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
         </svg>
-        <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v5.0.1</span>
+        <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v5.0.7</span>
       </a>
       <a href="#cache" id="navClearCacheLink" title="Clear transcription cache & imported YouTube videos">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -408,6 +426,12 @@
             placeholder="https://www.youtube.com/watch?v=... or https://www.youtube.com/live/..." autocomplete="off"
             autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true"
             data-form-type="other">
+          <select id="streamQualitySelect" title="Stream Capture Quality" style="width:auto;min-width:128px;height:42px;padding:0 10px;border-radius:10px;background:#111318;border:1px solid rgba(255,255,255,0.16);color:#fff;font-size:0.84rem;font-weight:600;">
+            <option value="1080p" selected>1080p HD</option>
+            <option value="best">Best / 4K</option>
+            <option value="720p">720p HD</option>
+            <option value="480p">480p SD</option>
+          </select>
           <button type="button" class="primary" id="btnConnectStream">Connect & Start Clipping</button>
           <button type="button" class="ghost" id="btnDisconnectStream" style="display:none;">Disconnect</button>
         </div>
@@ -636,11 +660,38 @@
                 </select>
               </div>
               <div>
-                <label for="liveModelSelect">AI Model</label>
+                <label for="liveAiProviderSelect">AI Engine Provider</label>
+                <select id="liveAiProviderSelect">
+                  <option value="ollama" selected>🖥 Local Ollama</option>
+                  <option value="huggingface">☁ Free Hugging Face API</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="pref-grid-two" id="liveOllamaModelRow">
+              <div>
+                <label for="liveModelSelect">Ollama AI Model</label>
                 <select id="liveModelSelect">
                   <option value="qwen2.5:3b" selected>Qwen 2.5 (Local)</option>
                   <option value="heuristic">Built-in Fast AI</option>
                 </select>
+              </div>
+              <div></div>
+            </div>
+
+            <div class="pref-grid-two" id="liveHfConfigRow" style="display:none;">
+              <div>
+                <label for="liveHfModelSelect">Hugging Face Model</label>
+                <select id="liveHfModelSelect">
+                  <option value="Qwen/Qwen2.5-7B-Instruct" selected>Qwen 2.5 7B Instruct (Free)</option>
+                  <option value="meta-llama/Llama-3.2-3B-Instruct">Meta Llama 3.2 3B Instruct</option>
+                  <option value="mistralai/Mistral-7B-Instruct-v0.3">Mistral 7B Instruct v0.3</option>
+                  <option value="google/gemma-2-9b-it">Google Gemma 2 9B IT</option>
+                </select>
+              </div>
+              <div>
+                <label for="liveHfTokenInput">Hugging Face Token</label>
+                <input type="password" id="liveHfTokenInput" placeholder="hf_... (optional if already saved)" autocomplete="off" style="width:100%;height:38px;padding:0 10px;border-radius:8px;background:#111318;border:1px solid rgba(255,255,255,0.14);color:#fff;font-size:0.82rem;">
               </div>
             </div>
 
@@ -716,7 +767,9 @@
                   <option value="de">German (Deutsch)</option>
                   <option value="ja">Japanese (日本語)</option>
                   <option value="pt">Portuguese (Português)</option>
-                  <option value="hi">Hindi (हिन्दी)</option>
+                  <option value="hi">Hindi (Written in English / Hinglish)</option>
+                  <option value="ko">Korean (한국어)</option>
+                  <option value="ar">Arabic (العربية)</option>
                   <option value="auto">Auto-Detect Language</option>
                 </select>
               </div>
@@ -1156,6 +1209,7 @@
       </div>
     </div>
 
+    <script src="{{ url_for('static', filename='android_bridge.js') }}"></script>
     <script src="{{ url_for('static', filename='forest_game.js', v='4.0.6') }}"></script>
     <script src="{{ url_for('static', filename='updater.js', v='4.0.6') }}"></script>
     <script src="{{ url_for('static', filename='live.js', v='4.0.6') }}"></script>

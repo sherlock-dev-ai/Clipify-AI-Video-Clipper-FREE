@@ -61,12 +61,12 @@
     welcomeDiv.innerHTML = `
       <div class="clippy-msg-bubble clippy-welcome-bubble">
         <p class="clippy-welcome-title"><strong>Hey! I'm your Clipify AI assistant.</strong></p>
-        <p class="clippy-welcome-desc">Ask me anything about Instant 9:16 Clipping, NVIDIA CUDA 12 GPU acceleration, Live Studio streams, Narration Studio, or customizing your shorts.</p>
+        <p class="clippy-welcome-desc">Ask me anything about Clipify AI v5.0.7 — Instant 9:16 Clipping, Storage Manager, reusing existing subtitles, GPU switching, Live Studio, or Narration Studio.</p>
         <div class="clippy-chips">
+          <button class="clippy-chip" data-prompt="What's new in the latest version?">✨ What's New</button>
+          <button class="clippy-chip" data-prompt="How do I change storage folders?">💾 Storage Manager</button>
           <button class="clippy-chip" data-prompt="How does Instant Clipping work?">⚡ Instant 9:16 Shorts</button>
-          <button class="clippy-chip" data-prompt="How does GPU acceleration work?">🚀 GPU & CUDA</button>
           <button class="clippy-chip" data-prompt="How do I clip a live stream?">🔴 Live Studio</button>
-          <button class="clippy-chip" data-prompt="How do I create an AI narration video?">🎙️ Narration Studio</button>
         </div>
       </div>
       <span class="clippy-msg-time">Just now</span>

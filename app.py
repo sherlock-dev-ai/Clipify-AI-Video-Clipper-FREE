@@ -6273,11 +6273,11 @@ def _get_fastest_ollama_model() -> tuple[str, str | None]:
     return sorted_models[0], None
 
 
-_CLIPPY_SYSTEM_PROMPT = """You are the official in-app AI assistant for Clipify AI (Version 5.0.0).
+_CLIPPY_SYSTEM_PROMPT = f"""You are the official in-app AI assistant for Clipify AI (Version {APP_VERSION}).
 You talk naturally, concisely, warmly, and helpfully like a creative video editing expert.
 Never dump overwhelming bulleted lists for simple greetings (like "hi", "hello") or casual comments. Reply normally and ask what they'd like to create!
 
-Key In-App Features & Knowledge:
+Key In-App Features & Knowledge ({APP_VERSION}):
 1. Instant Clipping ([NAVIGATE:instant] or #instant):
    - Ultra-fast isolated pipeline that cuts high-impact 9:16 vertical shorts in seconds.
    - Completely skips heavy LLM transcription and multi-stage candidate scoring for instant results.
@@ -6304,11 +6304,19 @@ Key In-App Features & Knowledge:
    - Create faceless AI voiceover videos.
    - Pairs neural voice models (like Kokoro TTS) with satisfying gameplay and aesthetic background loops.
 
-5. Beta Lab ([NAVIGATE:beta] or #beta):
-   - Custom draggable and timed text overlays burned onto the 9:16 vertical frame with exact start and end timestamps.
+5. Beta Lab & Caption Playground ([NAVIGATE:beta] or #beta):
+   - YouTube / Twitch / Kick platform selector when importing from link.
+   - 7 caption design presets, interactive mouse drag/resize Caption Playground, 18 audio languages, Disable Captions toggle, and custom draggable timed text overlays.
 
-6. Create Shorts ([NAVIGATE:create] or #create):
-   - Full AI highlight generation engine with WhisperX transcription, multi-speaker diarization, smart podcast split, and face tracking.
+6. Create Shorts & Reuse Existing Subtitles ([NAVIGATE:create] or #create):
+   - Full AI highlight generation engine with WhisperX transcription, multi-speaker diarization, smart podcast split, face tracking, and automatic AI viral title + description + hashtag generation.
+   - Reuse Existing Subtitles Toggle: Automatically detects and reuses .srt, .vtt, .ass, .json, or embedded video subtitle tracks (ffprobe) to skip WhisperX transcription and save time!
+
+7. Storage Manager ([NAVIGATE:storage] or #storage):
+   - Dedicated Storage section in the sidebar to view disk usage and customize folder paths for Workspace & Output, Ollama Models (OLLAMA_MODELS), and AI Caches & Models (HF_HOME, WhisperX, Narrate thumbnails), plus Move Current Data.
+
+8. Trending Streams & Gameplay ([NAVIGATE:trending] or #trending):
+   - Discover live broadcasts and trending gameplay across YouTube, Twitch, and Kick with hover-to-play previews and 1-click Clip This / Clip This Stream.
 
 7. Editor & Projects ([NAVIGATE:editor] or #editor):
    - Interactive timeline, trim adjustments, watermark & logo branding, and social publishing.
@@ -6349,15 +6357,18 @@ Key In-App Features & Knowledge:
 
 Navigation Action Tags:
 When recommending or directing a user to a specific feature, always include the matching navigation tag on its own line:
+- [NAVIGATE:storage] -> For Storage Manager, changing output/Ollama folders, moving data
 - [NAVIGATE:campaigns] -> For Clipper Campaigns & Bounties Directory
+- [NAVIGATE:trending] -> For Trending Streams & Gameplay (YouTube, Twitch, Kick)
 - [NAVIGATE:instant] -> For Instant Clipping, fast 9:16 shorts, split screen, generate another clip
 - [NAVIGATE:live] -> For Live Studio, OBS, RTMP stream clipping
 - [NAVIGATE:narrate] -> For Narration Studio, AI voiceovers, Kokoro
-- [NAVIGATE:beta] -> For Beta Lab, draggable text overlays
-- [NAVIGATE:create] -> For Create Shorts, YouTube import, full AI highlight detection
+- [NAVIGATE:beta] -> For Beta Lab, YouTube/Twitch/Kick link selector, caption playground, draggable text
+- [NAVIGATE:create] -> For Create Shorts, YouTube import, reuse existing subtitles toggle, full AI highlight detection
 - [NAVIGATE:editor] -> For Editor, video trimming, watermarks, branding
+- [NAVIGATE:projects] -> For Projects library
 - [NAVIGATE:models] -> For Models & Engine Hub, Ollama, Whisper
-- [NAVIGATE:update] -> For Update Manager, v5.0.1, checking updates
+- [NAVIGATE:update] -> For Update Manager, checking updates
 - [NAVIGATE:promoters] -> For Promoters Spotlight
 - [NAVIGATE:support] -> For Support Us, GitHub star, Instagram
 """
@@ -6497,22 +6508,40 @@ def _clippy_builtin_fallback(user_query: str) -> str:
             "or connects you directly with the community on Instagram!"
         )
 
-    # Updates and Version Info (v5.0.1)
+    # Storage Manager
+    if any(k in q for k in ("storage", "folder", "move data", "change path", "output path", "ollama path", "disk location")):
+        return (
+            "[NAVIGATE:storage]\n"
+            "I've opened **Storage Manager** for you! 💾\n\n"
+            "Here you can view live disk usage and change the folder locations for:\n"
+            "- 📁 **Workspace & Output**: Imported videos, transcription caches, and rendered Shorts.\n"
+            "- 🤖 **Ollama Models**: Your local LLM weights (`OLLAMA_MODELS`).\n"
+            "- 🧠 **AI Caches & Models**: WhisperX, Hugging Face (`HF_HOME`), and Narrate thumbnails.\n\n"
+            "You can pick a new folder and click **Move Current Data** to migrate your existing files safely!"
+        )
+
+    # Reuse Existing Subtitles / Transcription
+    if any(k in q for k in ("existing transcript", "existing subtitle", "reuse subtitle", "reuse transcript", ".srt", ".vtt", "skip transcri")):
+        return (
+            "[NAVIGATE:create]\n"
+            "I've opened **Create Shorts** for you! 📝\n\n"
+            "Turn on the **Reuse Existing Subtitles / Transcription** toggle to automatically use matching `.srt`, `.vtt`, `.ass`, `.json`, or embedded video subtitle tracks (`ffprobe`) — skipping heavy WhisperX transcription and saving a ton of time!"
+        )
+
+    # Updates and Version Info
     if any(k in q for k in ("update", "version", "what's new", "whats new", "latest", "upgrade", "changelog", "patch", "v5")):
         return (
             "[NAVIGATE:update]\n"
-            "You are currently running **Clipify AI v5.0.1**! 🚀\n\n"
-            "**What's new in v5.0.1:**\n"
-            "- 📐 **1:1 Video-Ratio Preview Scaling**: Text overlays in Preview, Editor, and Beta Lab scale mathematically proportional to the video frame aspect ratio, matching FFmpeg exports exactly.\n"
-            "- 🎛️ **In-Preview Resize & Controls**: Direct on-overlay quick controls pill (`−`, live `%` badge, `+`, move handle) plus a corner drag-handle (`⤡`) and mouse wheel scrolling to resize text on the fly.\n"
-            "- ⚡ **Instant Clipping (#instant)**: Isolated video ingestion, Split Screen presets, Kinetic Captions, multi-clip limits, and 'Generate Another Clip' diversification.\n"
-            "- 🚀 **CUDA 12 GPU Acceleration**: Auto NVIDIA GPU detection with CTranslate2 float16 & NVENC encoding; zero CPU transcription delays.\n"
-            "- 👾 **Dynamic ASCII Matrix Updater**: Themed Update Modal with animated 'CLIPIFY' 5x7 block typography, mascot constellation, and cyber particle waves.\n"
-            "- 🌟 **Promoters Spotlight (#promoters)**: Creator showcase modal for top community supporters.\n"
-            "- 🖤 **Obsidian Monochrome Theme**: Unified black & white design system across Create, Live Studio, and Narration Studio.\n"
-            "- 🤖 **Intelligent Clippy AI**: Deep-link in-app navigation (`[NAVIGATE:...]`) and full feature knowledge.\n"
-            "- 📦 **1-Click Update Manager**: Seamless in-place updates verified against GitHub releases.\n\n"
-            "Click the **Update** button on the left sidebar anytime to check for fresh releases!"
+            f"You are currently running **Clipify AI {APP_VERSION}**! 🚀\n\n"
+            f"**What's new in {APP_VERSION}:**\n"
+            "- 💾 **Storage Manager (`#storage`)**: Change paths & move existing data for Output, Ollama Models, and AI Caches.\n"
+            "- 📝 **Existing Subtitles Reuse**: Toggle in Create Shorts to reuse `.srt`/`.vtt`/embedded subtitles and skip transcription.\n"
+            "- ⚡ **Instant & Main AI Titles + Descriptions**: Automatic viral titles, descriptions, hashtags & tags powered by your installed Ollama model (`qwen3:4b`, etc.).\n"
+            "- 🎮 **Beta Platform Selector**: Pick **YouTube**, **Twitch**, or **Kick** when importing links in Beta Lab, plus 7 caption styles and mouse Caption Playground.\n"
+            "- 🚀 **Top-Header GPU Cockpit**: Instant switching across NVIDIA CUDA, Intel QSV, and CPU with cached detection.\n"
+            "- 🔔 **Highlighted Update Button & 1-Click Updater**: Automatic update highlight when a new release is available on GitHub.\n"
+            "- 📱 **Android Companion v5.0.7**: 4K/8K high-quality split-screen rendering.\n\n"
+            "Click **Update** in the left sidebar anytime to install the latest release in one click!"
         )
 
     # Casual greetings
@@ -6577,13 +6606,14 @@ def _clippy_builtin_fallback(user_query: str) -> str:
         return "You're very welcome! Let me know if you need any other help creating your clips."
 
     return (
-        "I'm here to help you get the most out of Clipify AI v5.0.2! 🚀\n\n"
+        f"I'm here to help you get the most out of Clipify AI {APP_VERSION}! 🚀\n\n"
         "Here are a few quick things I can help you with:\n"
-        "- 🔴 **Trending Streams**: Discover live streams on YouTube, Twitch & Kick and clip in 1 click (`#trending`)\n"
-        "- 🎨 **Caption Studio**: Try 7 animated styles and resize/drag captions with your mouse (`#beta`)\n"
-        "- 💰 **Campaigns & Bounties**: Explore platforms paying clippers per view (`#campaigns`)\n"
-        "- ⚡ **Instant Clipping**: Create fast 9:16 vertical shorts from any YouTube link (`#instant`)\n"
-        "- 🌐 **Captions & Languages**: Disable captions or select from 18 audio languages (`#beta`)\n\n"
+        "- 💾 **Storage Manager**: Change Output, Ollama & AI Cache folders (`#storage`)\n"
+        "- 📝 **Reuse Existing Subtitles**: Skip transcription when subtitles exist (`#create`)\n"
+        "- 🔴 **Trending Streams**: Discover & clip YouTube, Twitch & Kick streams (`#trending`)\n"
+        "- 🎨 **Caption Studio & Platform Import**: 7 styles, mouse playground & YT/Twitch/Kick (`#beta`)\n"
+        "- 💰 **Campaigns & Bounties**: Find platforms paying clippers per view (`#campaigns`)\n"
+        "- ⚡ **Instant Clipping**: Fast 9:16 vertical shorts with AI titles & descriptions (`#instant`)\n\n"
         "Just ask me what you'd like to do!"
     )
 

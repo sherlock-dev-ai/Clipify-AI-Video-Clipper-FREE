@@ -51,8 +51,8 @@
         updateState = {
           checked: true,
           updateAvailable: !!data.update_available,
-          latestVersion: data.latest_version || 'v5.0.3',
-          currentVersion: data.current_version || 'v5.0.3',
+          latestVersion: data.latest_version || 'v6.0.12',
+          currentVersion: data.current_version || 'v6.0.12',
           releaseUrl: data.release_url || updateState.releaseUrl,
           releaseName: data.release_name || '',
           notes: data.body || '',
@@ -60,11 +60,12 @@
           gitBehind: !!data.git_behind
         };
 
-        if (badge) badge.textContent = data.current_version || 'v5.0.7';
-        if (navVersionTag) navVersionTag.textContent = data.current_version || 'v5.0.7';
+        const currVerLabel = data.current_version || 'v6.0.12';
+        if (badge) badge.textContent = currVerLabel;
+        if (navVersionTag) navVersionTag.textContent = currVerLabel;
         const topBadgeEl = document.getElementById('topBrandVersionBadge');
         const topBadgeNum = document.querySelector('#topBrandVersionBadge .version-num');
-        if (topBadgeNum) topBadgeNum.textContent = data.current_version || 'v5.0.7';
+        if (topBadgeNum) topBadgeNum.textContent = currVerLabel;
         const mobileUpdBtn = document.getElementById('mobileHeaderUpdateBtn');
 
         if (!document.getElementById('clipify-update-highlight-css')) {
@@ -119,17 +120,20 @@
           if (card) card.classList.remove('has-update');
           if (navUpdateLink) navUpdateLink.classList.remove('clipify-update-highlight');
           if (topBadgeEl) topBadgeEl.classList.remove('clipify-update-highlight');
-          if (mobileUpdBtn) mobileUpdBtn.classList.remove('clipify-update-highlight');
-          if (navVersionTag) {
-            navVersionTag.textContent = data.current_version || 'v5.0.7';
-            navVersionTag.style.background = '';
-            navVersionTag.style.color = '';
-            navVersionTag.style.fontWeight = '';
+          if (mobileUpdBtn) {
+            mobileUpdBtn.classList.remove('clipify-update-highlight');
+            mobileUpdBtn.textContent = `✓ Latest · ${currVerLabel}`;
           }
-          if (badge) badge.textContent = data.current_version || 'v5.0.7';
-          if (statusMsg) statusMsg.textContent = 'Up to date ✓';
+          if (navVersionTag) {
+            navVersionTag.textContent = `Latest · ${currVerLabel}`;
+            navVersionTag.style.background = 'rgba(34,197,94,0.16)';
+            navVersionTag.style.color = '#4ade80';
+            navVersionTag.style.fontWeight = '700';
+          }
+          if (badge) badge.textContent = `Latest (${currVerLabel})`;
+          if (statusMsg) statusMsg.textContent = `Latest (${currVerLabel}) ✓`;
           if (btn) {
-            btn.innerHTML = '<span class="btn-update-icon">↻</span> Update';
+            btn.innerHTML = '<span class="btn-update-icon">✓</span> Latest';
             btn.disabled = false;
           }
           if (!silent) {
@@ -244,7 +248,7 @@
           actionRow.style.display = 'flex';
           actionRow.style.gap = '10px';
           actionRow.innerHTML = `
-            <a href="https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/tag/v5.0.5" target="_blank" class="btn-restart-retry" style="text-align:center;text-decoration:none;background:#22c55e;color:#000;font-weight:700;">Download v5.0.5 Installer →</a>
+            <a href="https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/latest" target="_blank" class="btn-restart-retry" style="text-align:center;text-decoration:none;background:#22c55e;color:#000;font-weight:700;">Download Latest Installer →</a>
             <button type="button" class="btn-restart-retry" id="btnRestartForceReload">Retry / Reload</button>
           `;
           document.getElementById('btnRestartForceReload')?.addEventListener('click', () => window.location.reload());

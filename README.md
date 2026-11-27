@@ -30,8 +30,23 @@
 </div>
 
 <p align="center">
-  <img src="docs/screenshots/dashboard.png" alt="Clipify AI v6.0.0 Create Studio Dashboard" width="100%">
+  <img src="docs/screenshots/dashboard.png" alt="Clipify AI v6.0.12 Create Studio Dashboard" width="100%">
 </p>
+
+<details>
+<summary><b>📸 View v6.0.12 Desktop &amp; Mobile Screenshots (Click to Expand)</b></summary>
+<br>
+<table>
+  <tr>
+    <td align="center" width="50%"><b>Live Studio (YouTube / Twitch / Kick / OBS)</b><br><img src="docs/screenshots/live_studio.png" width="100%"></td>
+    <td align="center" width="50%"><b>Android Mobile Companion (1080p60 HLS)</b><br><img src="docs/screenshots/mobile_studio.png" width="48%"> <img src="docs/screenshots/mobile_discord.png" width="48%"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>ML Kit Gaming Split-Screen (Mobile)</b><br><img src="docs/screenshots/mobile_splitscreen.png" width="42%"></td>
+    <td align="center"><b>4K UHD 60fps Live Clip + Viral Captions</b><br><img src="docs/screenshots/mobile_live_4k.png" width="42%"></td>
+  </tr>
+</table>
+</details>
 
 ---
 
@@ -78,7 +93,7 @@
 
 #### Verify Installer SHA-256 Integrity:
 ```powershell
-Get-FileHash ".\Clipify.AI.Setup.4.0.11.exe" -Algorithm SHA256
+Get-FileHash ".\Clipify.AI.Setup.6.0.12.exe" -Algorithm SHA256
 ```
 
 ---

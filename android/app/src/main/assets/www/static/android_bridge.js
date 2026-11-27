@@ -288,7 +288,10 @@
           logs: ['[YouTube] Connecting to YouTube stream...']
         };
 
-        if (window.AndroidBridge && window.AndroidBridge.startYouTubeImport) {
+        const maxHeight = parseInt(window._mobileSelectedImportQuality || document.querySelector('.mobile-import-quality-select')?.value || '4320', 10) || 4320;
+        if (window.AndroidBridge && window.AndroidBridge.startYouTubeImportWithQuality) {
+          window.AndroidBridge.startYouTubeImportWithQuality(reqUrl, maxHeight);
+        } else if (window.AndroidBridge && window.AndroidBridge.startYouTubeImport) {
           window.AndroidBridge.startYouTubeImport(reqUrl);
         }
 
@@ -1181,8 +1184,8 @@
       wrap.className = 'mobile-import-quality-wrap';
       wrap.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);width:100%;box-sizing:border-box;';
       wrap.innerHTML = `
-        <span style="font-size:0.78rem;font-weight:700;color:rgba(255,255,255,0.85);">Video Quality</span>
-        <select class="mobile-import-quality-select" style="background:#0e0f14;color:#fff;border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:6px 10px;font-size:0.78rem;font-weight:600;max-width:62%;">
+        <span style="font-size:0.78rem;font-weight:700;color:rgba(255,255,255,0.85);white-space:nowrap;">Quality</span>
+        <select class="mobile-import-quality-select" style="flex:1;min-width:0;background:#0e0f14;color:#fff;border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:6px 10px;font-size:0.78rem;font-weight:600;">
           <option value="4320" selected>Best Available (4K / 1080p)</option>
           <option value="1080">1080p Full HD</option>
           <option value="720">720p HD</option>

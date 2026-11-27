@@ -860,9 +860,15 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun startYouTubeImport(url: String) {
+            startYouTubeImportWithQuality(url, 4320)
+        }
+
+        @JavascriptInterface
+        fun startYouTubeImportWithQuality(url: String, maxHeight: Int) {
             apiExecutor.execute {
                 val destFile = File(filesDir, "user_selected_video.mp4")
-                val res = YouTubeStreamDownloader.downloadYouTubeMp4(url, destFile) { pct, msg ->
+                val qHeight = if (maxHeight in 360..4320) maxHeight else 4320
+                val res = YouTubeStreamDownloader.downloadYouTubeMp4(url, destFile, qHeight) { pct, msg ->
                     val msgQ = JSONObject.quote(msg)
                     runOnUiThread {
                         binding.webView.evaluateJavascript(

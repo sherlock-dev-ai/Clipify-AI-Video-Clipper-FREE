@@ -231,6 +231,64 @@ object YouTubeStreamDownloader {
         return result
     }
 
+    private var lastHttpError: String = ""
+
+    private fun downloadPlainGet(
+        streamUrl: String,
+        targetFile: File,
+        userAgent: String,
+        pctStart: Int,
+        pctSpan: Int,
+        label: String,
+        onProgress: (Int, String) -> Unit
+    ): Boolean {
+        return try {
+            if (targetFile.exists()) targetFile.delete()
+            targetFile.parentFile?.mkdirs()
+            val req = Request.Builder()
+                .url(streamUrl)
+                .header("User-Agent", userAgent)
+                .get()
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    lastHttpError = "HTTP ${resp.code}"
+                    Log.w(TAG, "$label plain GET failed HTTP ${resp.code}")
+                    return false
+                }
+                val cl = resp.body?.contentLength() ?: -1L
+                val body = resp.body ?: return false
+                var offset = 0L
+                var lastPct = pctStart
+                FileOutputStream(targetFile).use { output ->
+                    val buf = ByteArray(64 * 1024)
+                    body.byteStream().use { input ->
+                        while (true) {
+                            val read = input.read(buf)
+                            if (read == -1) break
+                            output.write(buf, 0, read)
+                            offset += read
+                            if (cl > 0) {
+                                val pct = pctStart + ((offset * pctSpan) / cl).toInt()
+                                if (pct >= lastPct + 6) {
+                                    lastPct = pct
+                                    val mbDone = String.format("%.1f", offset / (1024.0 * 1024.0))
+                                    val mbTotal = String.format("%.1f", cl / (1024.0 * 1024.0))
+                                    onProgress(pct.coerceAtMost(pctStart + pctSpan), "$label $pct% ($mbDone / $mbTotal MB)")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            targetFile.exists() && targetFile.length() > 1024
+        } catch (e: Exception) {
+            lastHttpError = e.message ?: "Network error"
+            Log.w(TAG, "$label plain GET error: ${e.message}")
+            false
+        }
+    }
+
     private fun downloadToFile(
         streamUrl: String,
         targetFile: File,
@@ -241,11 +299,13 @@ object YouTubeStreamDownloader {
         onProgress: (Int, String) -> Unit
     ): Boolean {
         targetFile.parentFile?.mkdirs()
-        // Try chunked Range requests first for adaptive/googlevideo streams (prevents HTTP 403)
-        val chunkSize = 4L * 1024L * 1024L
+        if (targetFile.exists()) targetFile.delete()
+        // Try 2MB chunked Range requests first for adaptive/googlevideo streams
+        val chunkSize = 2L * 1024L * 1024L
         var offset = 0L
         var totalBytes = -1L
         var lastPct = pctStart
+        var chunkedOk = false
 
         try {
             FileOutputStream(targetFile).use { output ->
@@ -261,42 +321,13 @@ object YouTubeStreamDownloader {
 
                     var gotBytes = 0L
                     var done = false
+                    var failedChunk = false
                     client.newCall(req).execute().use { resp ->
-                        if (resp.code == 403 && offset == 0L) {
-                            Log.w(TAG, "$label Range download failed HTTP 403; retrying plain GET...")
-                            val plainReq = Request.Builder()
-                                .url(streamUrl)
-                                .header("User-Agent", userAgent)
-                                .get()
-                                .build()
-                            client.newCall(plainReq).execute().use { plainResp ->
-                                if (!plainResp.isSuccessful) {
-                                    Log.w(TAG, "$label plain GET failed HTTP ${plainResp.code}")
-                                    return false
-                                }
-                                val cl = plainResp.body?.contentLength() ?: -1L
-                                val pBody = plainResp.body ?: return false
-                                pBody.byteStream().use { input ->
-                                    while (true) {
-                                        val read = input.read(buf)
-                                        if (read == -1) break
-                                        output.write(buf, 0, read)
-                                        offset += read
-                                        if (cl > 0) {
-                                            val pct = pctStart + ((offset * pctSpan) / cl).toInt()
-                                            if (pct >= lastPct + 6) {
-                                                lastPct = pct
-                                                onProgress(pct.coerceAtMost(pctStart + pctSpan), "$label $pct%")
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            return targetFile.exists() && targetFile.length() > 1024
-                        }
                         if (!resp.isSuccessful && resp.code != 206) {
-                            Log.w(TAG, "$label download failed HTTP ${resp.code}")
-                            return false
+                            lastHttpError = "HTTP ${resp.code}"
+                            Log.w(TAG, "$label Range download failed HTTP ${resp.code} at offset=$offset")
+                            failedChunk = true
+                            return@use
                         }
                         val cr = resp.header("Content-Range")
                         if (cr != null && cr.contains("/")) {
@@ -305,7 +336,11 @@ object YouTubeStreamDownloader {
                             val cl = resp.body?.contentLength() ?: -1L
                             if (cl > 0) totalBytes = cl
                         }
-                        val body = resp.body ?: return false
+                        val body = resp.body
+                        if (body == null) {
+                            failedChunk = true
+                            return@use
+                        }
                         body.byteStream().use { input ->
                             while (true) {
                                 val read = input.read(buf)
@@ -328,14 +363,23 @@ object YouTubeStreamDownloader {
                             done = true
                         }
                     }
-                    if (done) break
+                    if (failedChunk) break
+                    if (done) {
+                        chunkedOk = true
+                        break
+                    }
                 }
             }
-            return targetFile.exists() && targetFile.length() > 1024
         } catch (e: Exception) {
+            lastHttpError = e.message ?: "Network error"
             Log.w(TAG, "$label chunked download error: ${e.message}")
-            return false
         }
+
+        if (chunkedOk && targetFile.exists() && targetFile.length() > 1024) {
+            return true
+        }
+        // Fallback: full plain GET (handles streams that reject Range headers)
+        return downloadPlainGet(streamUrl, targetFile, userAgent, pctStart, pctSpan, label, onProgress)
     }
 
     private fun muxVideoAndAudio(videoFile: File, audioFile: File, outFile: File): Boolean {
@@ -579,6 +623,7 @@ object YouTubeStreamDownloader {
                 height = bestHeight
             )
         }
-        return DownloadResult(ok = false, error = "Downloaded file was empty or interrupted.")
+        val errDetail = if (lastHttpError.isNotEmpty()) " ($lastHttpError)" else ""
+        return DownloadResult(ok = false, error = "Downloaded file was empty or interrupted$errDetail.")
     }
 }

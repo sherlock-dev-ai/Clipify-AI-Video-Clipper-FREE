@@ -13,7 +13,7 @@ import queue
 import subprocess
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -63,6 +63,12 @@ def _ensure_cuda_dlls():
 
 
 def _detect_default_device() -> str:
+    try:
+        from clipify.platform.gpu_manager import get_whisper_device_and_type
+        dev, _ = get_whisper_device_and_type()
+        return dev
+    except Exception:
+        pass
     _ensure_cuda_dlls()
     try:
         import ctranslate2
@@ -86,6 +92,7 @@ class LiveTranscriptSegment:
     text: str
     speaker: str = "Host"
     confidence: float = 1.0
+    words: list = field(default_factory=list)
 
 
 class LiveTranscriber:
@@ -95,14 +102,16 @@ class LiveTranscriber:
         self,
         python_bin: str,
         ffmpeg_bin: str,
-        model_name: str = "tiny",
+        model_name: str = "base",
         device: Optional[str] = None,
+        language: str = "en",
         on_segment: Optional[Callable[[LiveTranscriptSegment], None]] = None,
     ):
         self.python_bin = python_bin
         self.ffmpeg_bin = ffmpeg_bin
-        self.model_name = model_name or "tiny"
+        self.model_name = model_name or "base"
         self.device = device or _detect_default_device()
+        self.language = (language or "en").strip().lower()
         self.on_segment = on_segment
 
         self.audio_queue: queue.Queue[tuple[Path, float, float]] = queue.Queue(maxsize=150)
@@ -112,6 +121,9 @@ class LiveTranscriber:
         self._worker_thread: Optional[threading.Thread] = None
         self._model_instance: Any = None
         self._model_loaded: bool = False
+
+    def set_language(self, language: str) -> None:
+        self.language = (language or "en").strip().lower()
 
     def start(self) -> None:
         """Start the background transcription processor."""
@@ -220,25 +232,56 @@ class LiveTranscriber:
         # In-memory execution (sub-100ms)
         if model is not None:
             try:
-                segs, _ = model.transcribe(
-                    str(wav_path),
-                    beam_size=1,
-                    best_of=1,
-                    temperature=0.0,
-                    condition_on_previous_text=False,
-                )
+                lang_raw = (self.language or "en").strip().lower()
+                lang_arg = None if lang_raw in ("auto", "", "none") else ("hi" if lang_raw in ("hinglish", "hi-en") else lang_raw)
+                t_kwargs: dict[str, Any] = {
+                    "beam_size": 1,
+                    "best_of": 1,
+                    "temperature": 0.0,
+                    "condition_on_previous_text": False,
+                    "vad_filter": True,
+                    "vad_parameters": {"min_silence_duration_ms": 500},
+                    "no_speech_threshold": 0.6,
+                    "log_prob_threshold": -1.0,
+                    "compression_ratio_threshold": 2.4,
+                    "word_timestamps": True,
+                }
+                if lang_arg:
+                    t_kwargs["language"] = lang_arg
+                segs, _ = model.transcribe(str(wav_path), **t_kwargs)
+                try:
+                    from hindi_transliterator import has_devanagari, transliterate_devanagari_to_hinglish
+                except Exception:
+                    has_devanagari = lambda s: False
+                    transliterate_devanagari_to_hinglish = lambda s: s
                 for s in segs:
                     txt = s.text.strip()
-                    if txt:
-                        seg_start = chunk_start + float(s.start)
-                        seg_end = chunk_start + float(s.end)
-                        segments.append(
-                            LiveTranscriptSegment(
-                                start_sec=round(seg_start, 2),
-                                end_sec=round(max(seg_end, seg_start + 0.6), 2),
-                                text=txt,
-                            )
+                    if not txt:
+                        continue
+                    if has_devanagari(txt):
+                        txt = transliterate_devanagari_to_hinglish(txt)
+                    seg_words = []
+                    if hasattr(s, "words") and s.words:
+                        for w in s.words:
+                            wt = w.word.strip()
+                            if wt and has_devanagari(wt):
+                                wt = transliterate_devanagari_to_hinglish(wt)
+                            if wt:
+                                seg_words.append({
+                                    "word": wt,
+                                    "start": round(chunk_start + float(w.start), 2),
+                                    "end": round(chunk_start + float(w.end), 2),
+                                })
+                    seg_start = chunk_start + float(s.start)
+                    seg_end = chunk_start + float(s.end)
+                    segments.append(
+                        LiveTranscriptSegment(
+                            start_sec=round(seg_start, 2),
+                            end_sec=round(max(seg_end, seg_start + 0.6), 2),
+                            text=txt,
+                            words=seg_words,
                         )
+                    )
                 return segments
             except Exception as e:
                 logger.debug("In-memory faster-whisper transcribe failed (%s), trying fallback", e)

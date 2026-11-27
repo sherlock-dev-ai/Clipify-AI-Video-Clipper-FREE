@@ -323,6 +323,30 @@
   }
 }
 
+@media (max-width: 900px), (pointer: coarse) {
+  .live-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 16px !important;
+  }
+  .live-left, .live-right {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .input-row {
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 10px !important;
+  }
+  .input-row input,
+  .input-row button,
+  #btnConnectStream {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
 .live-left, .live-right {
   display: flex;
   flex-direction: column;

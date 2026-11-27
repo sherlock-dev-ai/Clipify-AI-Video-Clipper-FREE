@@ -26,6 +26,32 @@ body {
   overflow-x: hidden;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+button, a, .btn, .tab, .pill, [role="button"] {
+  touch-action: manipulation;
+  transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.14s ease, background-color 0.18s ease, border-color 0.18s ease;
+}
+
+button:active, .btn:active, .mobile-primary-btn:active, .mobile-action-btn:active {
+  transform: scale(0.97);
+}
+
+@keyframes mobileFadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-section.visible {
+  animation: mobileFadeSlideUp 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* Hide desktop-specific clutter inside mobile app */
@@ -38,6 +64,8 @@ body {
 .noise,
 .sidebar-creature-card,
 #clippyFloatingCard,
+#clippyToggleBtn,
+.clippy-toggle-btn,
 .desktop-only {
   display: none !important;
 }
@@ -47,7 +75,7 @@ body {
   margin-left: 0 !important;
   width: 100% !important;
   max-width: 100% !important;
-  padding: 12px 14px 80px 14px !important;
+  padding: 12px 14px 110px 14px !important;
   box-sizing: border-box !important;
   background-color: var(--mobile-bg) !important;
 }
@@ -667,3 +695,240 @@ body {
 .drawer-pill.red { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
 .drawer-pill.purple { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
 .drawer-pill.green { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+
+/* ============================================================
+   Mobile Live Studio Clean Layout (Prevent Collisions)
+   ============================================================ */
+.live-main {
+  margin-left: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 12px 14px 95px !important;
+  box-sizing: border-box !important;
+}
+
+.live-grid {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  gap: 16px !important;
+}
+
+.live-left,
+.live-right {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  gap: 16px !important;
+}
+
+.source-card,
+.monitor-card,
+.clipping-prefs-details,
+.transcript-card,
+.live-clips-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  border-radius: 14px !important;
+  position: relative !important;
+}
+
+.source-tabs {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+
+.source-tab {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 10px 8px !important;
+  font-size: 13px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.input-row {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  gap: 10px !important;
+}
+
+.input-row input {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 14px 16px !important;
+  font-size: 14px !important;
+}
+
+.input-row button,
+#btnConnectStream,
+#btnDisconnectStream {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 14px 16px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  border-radius: 10px !important;
+}
+
+.clipping-prefs-details {
+  margin-top: 6px !important;
+}
+
+.monitor-screen {
+  min-height: 220px !important;
+  max-height: 300px !important;
+}
+
+.live-sidebar,
+.sidebar {
+  display: none !important;
+}
+
+/* Crisp Play Store Monochrome Layout Polish & Zero Overflow */
+.page-section,
+.card,
+.trending-grid,
+.trending-card,
+.instant-grid,
+.editor-grid {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 680px) {
+  .trending-grid,
+  .instant-grid,
+  .editor-grid,
+  .grid-2,
+  .grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.trending-card {
+  background: #09090b !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+}
+
+.trending-card .btn,
+.trending-card button {
+  min-height: 40px !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+}
+
+/* Fix stretched default Android WebView video icon when Editor preview has no source */
+.editor-preview-frame {
+  background: #09090b !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  min-height: 280px !important;
+}
+
+.editor-preview-frame video:not([src]),
+.editor-preview-frame video[src=""],
+.editor-preview-frame video[src="#"] {
+  background: #09090b !important;
+  opacity: 0.02 !important;
+}
+
+/* Mobile Narrate Studio Clean Responsive Layout */
+.narrate-top {
+  padding: 12px 14px !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+}
+
+.narrate-main,
+.narrate-layout,
+.narrate-grid {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 720px) {
+  .narrate-layout,
+  .narrate-grid,
+  #voiceGrid,
+  #clipGrid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.mh-search-input,
+#mhSearchInput {
+  padding-left: 38px !important;
+}
+
+/* Fix Projects Grid & Editor Player Centering on Mobile (Zero Horizontal Overflow) */
+#projectList,
+.projects-grid,
+.editor-layout {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  gap: 14px !important;
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
+}
+
+.project-card {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 14px !important;
+  gap: 12px !important;
+}
+
+.project-thumb {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 180px !important;
+  border-radius: 10px !important;
+  background: #09090b !important;
+  object-fit: cover !important;
+}
+
+.project-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+
+.editor-preview-frame {
+  width: 100% !important;
+  max-width: 340px !important;
+  margin: 0 auto !important;
+  box-sizing: border-box !important;
+}
+
+.editor-preview-frame video,
+#reviewVideo {
+  width: 100% !important;
+  height: auto !important;
+  max-height: 520px !important;
+  display: block !important;
+  margin: 0 auto !important;
+  border-radius: 14px !important;
+}
+

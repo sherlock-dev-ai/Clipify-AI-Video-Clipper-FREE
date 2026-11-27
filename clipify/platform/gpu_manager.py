@@ -193,6 +193,71 @@ def apply_gpu_selection(gpu_id: str) -> Dict[str, Any]:
     return chosen
 
 
+def get_ffmpeg_video_encoder_flags(bitrate: str = "12M", preset: str = "fast", crf: int = 18) -> List[str]:
+    """Return the optimal FFmpeg encoding flags according to user's selected GPU."""
+    active_id = get_active_gpu_id()
+    all_gpus = detect_all_gpus()
+    active_gpu = next((g for g in all_gpus if g["id"] == active_id), None)
+    vendor = active_gpu.get("vendor", "cpu") if active_gpu else "cpu"
+
+    if vendor == "nvidia":
+        # Hardware NVENC on discrete NVIDIA GPU
+        return [
+            "-c:v", "h264_nvenc",
+            "-preset", "p4",
+            "-cq", str(max(14, crf)),
+            "-b:v", bitrate,
+            "-maxrate", "20M",
+            "-bufsize", "30M",
+            "-pix_fmt", "yuv420p"
+        ]
+    elif vendor == "intel":
+        # Hardware Quick Sync Video on Intel Integrated GPU
+        return [
+            "-c:v", "h264_qsv",
+            "-preset", "fast",
+            "-global_quality", str(max(18, crf + 2)),
+            "-b:v", bitrate,
+            "-maxrate", "18M",
+            "-bufsize", "24M",
+            "-pix_fmt", "nv12"
+        ]
+    else:
+        # Software encoding via libx264
+        return [
+            "-c:v", "libx264",
+            "-preset", preset or "veryfast",
+            "-crf", str(crf),
+            "-b:v", bitrate,
+            "-maxrate", "16M",
+            "-bufsize", "20M",
+            "-pix_fmt", "yuv420p"
+        ]
+
+
+def get_whisper_device_and_type() -> tuple[str, str]:
+    """Return (device, compute_type) for Faster-Whisper / CTranslate2."""
+    active_id = get_active_gpu_id()
+    all_gpus = detect_all_gpus()
+    active_gpu = next((g for g in all_gpus if g["id"] == active_id), None)
+    vendor = active_gpu.get("vendor", "cpu") if active_gpu else "cpu"
+
+    if vendor == "nvidia":
+        try:
+            import ctranslate2
+            if ctranslate2.get_cuda_device_count() > 0:
+                return ("cuda", "float16")
+        except Exception:
+            pass
+        try:
+            import torch
+            if torch.cuda.is_available():
+                return ("cuda", "float16")
+        except Exception:
+            pass
+    return ("cpu", "int8")
+
+
 def get_gpu_status() -> Dict[str, Any]:
     """Return JSON status of all GPUs and current selection."""
     all_gpus = detect_all_gpus()
@@ -206,3 +271,5 @@ def get_gpu_status() -> Dict[str, Any]:
         "active": active_obj,
         "gpus": all_gpus,
     }
+
+

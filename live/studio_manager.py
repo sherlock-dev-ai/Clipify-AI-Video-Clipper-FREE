@@ -151,10 +151,17 @@ class LiveStudioManager:
                     self.editing_prefs[k] = bool(prefs[k])
             for k in (
                 "caption_style", "caption_font", "caption_language", "background_style", "background_color",
-                "custom_text", "custom_text_pos", "custom_text_color",
+                "custom_text", "custom_text_pos", "custom_text_color", "ai_provider", "hf_model",
             ):
                 if k in prefs:
                     self.editing_prefs[k] = str(prefs[k])
+            if self.detector:
+                if "ai_provider" in prefs:
+                    self.detector.ai_provider = str(prefs["ai_provider"]).strip().lower()
+                if "hf_model" in prefs:
+                    self.detector.hf_model = str(prefs["hf_model"]).strip()
+            if "caption_language" in prefs and self.transcriber:
+                self.transcriber.set_language(str(prefs["caption_language"]))
             if "auto_clip_interval" in prefs:
                 try:
                     self.auto_clip_interval = max(1, min(60, int(prefs["auto_clip_interval"])))
@@ -177,6 +184,7 @@ class LiveStudioManager:
         sensitivity: int = 5,
         buffer_minutes: int = 10,
         model_name: str = "qwen2.5:3b",
+        stream_quality: str = "1080p",
         editing_prefs: Optional[dict[str, Any]] = None,
     ) -> tuple[bool, str]:
         """Initialize and start a live studio monitoring session."""
@@ -217,11 +225,14 @@ class LiveStudioManager:
             self.detector = HighlightDetector(
                 model_name=model_name,
                 sensitivity=self.sensitivity,
+                ai_provider=str(self.editing_prefs.get("ai_provider", "ollama")),
+                hf_model=str(self.editing_prefs.get("hf_model", "Qwen/Qwen2.5-7B-Instruct")),
             )
 
             self.transcriber = LiveTranscriber(
                 python_bin=self.python_bin,
                 ffmpeg_bin=self.ffmpeg_bin,
+                language=self.editing_prefs.get("caption_language", "en"),
                 on_segment=self._on_transcript_segment,
             )
             self.transcriber.start()
@@ -232,6 +243,7 @@ class LiveStudioManager:
                 buffer_dir=self.buffer_dir,
                 ffmpeg_bin=self.ffmpeg_bin,
                 python_bin=self.python_bin,
+                stream_quality=stream_quality,
                 on_segment_ready=self._on_segment_ready,
                 on_status_change=self._on_status_change,
                 on_error=self._on_connector_error,
@@ -322,6 +334,18 @@ class LiveStudioManager:
         chunk = self.buffer.add_chunk(chunk_path, index, stream_elapsed)
         self.log_activity(f"Buffer chunk #{index} captured ({chunk.duration:.1f}s, total buffer: {self.buffer.get_window_duration():.0f}s)", "debug")
 
+        # Update live preview JPEG frame asynchronously for snapshot / fallback mode
+        try:
+            from live.stream_connector import extract_preview_frame
+            preview_out = self.buffer_dir / "preview_current.jpg"
+            threading.Thread(
+                target=extract_preview_frame,
+                args=(chunk_path, preview_out, self.ffmpeg_bin),
+                daemon=True,
+            ).start()
+        except Exception:
+            pass
+
         # Extract WAV audio for transcription
         wav_path = chunk_path.with_suffix(".wav")
         if self.buffer.extract_audio_wav(chunk_path, wav_path):
@@ -334,6 +358,7 @@ class LiveStudioManager:
             "end": round(segment.end_sec, 2),
             "text": segment.text,
             "speaker": segment.speaker,
+            "words": getattr(segment, "words", []),
         }
         self.recent_transcripts.append(seg_dict)
         if len(self.recent_transcripts) > 100:
@@ -486,7 +511,9 @@ class LiveStudioManager:
     def instant_clip(self, duration_sec: int = 30) -> Optional[dict[str, Any]]:
         """User manual trigger: capture the last N seconds into a Short."""
         with self._lock:
+            self.last_instant_clip_error = ""
             if not self.session_active or not self.buffer or not self.generator:
+                self.last_instant_clip_error = "No active live recording session. Connect to a live stream first."
                 self.log_activity("Clip Highlight failed: no active live recording session.", "error")
                 return None
 
@@ -500,13 +527,11 @@ class LiveStudioManager:
                     self._auto_clip_thread.start()
                 self.log_activity("Clip Highlight triggered: auto-clipping enabled automatically.", "success")
 
-            duration_sec = max(10, min(90, duration_sec))
+            duration_sec = max(5, min(90, duration_sec))
             buf_duration = self.buffer.get_window_duration()
-            if buf_duration < min(float(duration_sec), 20.0):
-                self.log_activity(
-                    f"Buffer is still accumulating ({buf_duration:.0f}s / {duration_sec}s). Please wait for sufficient buffer to generate a full {duration_sec}s Short.",
-                    "warn",
-                )
+            if buf_duration < 4.0:
+                self.last_instant_clip_error = f"Buffering stream ({buf_duration:.0f}s recorded)... Wait a few seconds and try again."
+                self.log_activity(self.last_instant_clip_error, "warn")
                 return None
 
             # Base times on recorded buffer chunks to guarantee exact length and audio sync
@@ -561,8 +586,8 @@ class LiveStudioManager:
 
     def batch_clip(self, count: int = 4, duration_sec: int = 30) -> list[dict[str, Any]]:
         """Generate N professionally edited Shorts from the rolling buffer."""
-        count = max(1, min(10, int(count)))
-        duration_sec = max(10, min(90, int(duration_sec)))
+        count = max(1, min(10, count))
+        duration_sec = max(10, min(90, duration_sec))
 
         with self._lock:
             if not self.session_active or not self.buffer or not self.generator:

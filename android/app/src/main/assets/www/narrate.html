@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Clipify AI · Narrate</title><link rel="icon" type="image/png" href="static/icon.png">
 <link rel="stylesheet" href="static/style.css">
 <link rel="stylesheet" href="static/narrate.css">
@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="static/brand.css">
 <link rel="stylesheet" href="static/tour.css">
 <link rel="stylesheet" href="static/cache_manager.css">
+  <link rel="stylesheet" href="static/mobile.css">
 </head>
 <body>
 <aside class="sidebar">
@@ -17,9 +18,9 @@
   <div class="brand-copy">
     <div class="brand-title-wrap">
       <b>Clipify AI</b>
-      <span class="cool-version-badge" id="topBrandVersionBadge" title="Clipify AI v5.0.1 · Click for updates & release info">
+      <span class="cool-version-badge" id="topBrandVersionBadge" title="Clipify AI v5.0.7 · Click for updates & release info">
         <span class="version-dot"></span>
-        <span class="version-num">v5.0.1</span>
+        <span class="version-num">v5.0.7</span>
         <span class="version-shimmer-sweep"></span>
       </span>
     </div>
@@ -28,34 +29,34 @@
 </div>
 <a class="sidebar-github" href="https://github.com/sherlock-dev-ai" target="_blank" rel="noopener noreferrer"><span>↗</span> GitHub</a>
 <nav>
-  <a href="/" data-nav="create" id="navCreateLink">
+  <a href="index.html" data-nav="create" id="navCreateLink">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.75 18.25 12 12 20.25 5.75 12 12 3.75Zm0 3.5L8.25 12 12 15.75 15.75 12 12 7.25Z"/></svg>
     <span>Create</span>
   </a>
-  <a class="active narrate-nav" href="/narrate" data-nav="narrate" id="navNarrateLink">
+  <a class="active narrate-nav" href="narrate.html" data-nav="narrate" id="navNarrateLink">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a5 5 0 0 0-5 5v4a5 5 0 0 0 10 0V8a5 5 0 0 0-5-5Zm-2.5 5a2.5 2.5 0 0 1 5 0v4a2.5 2.5 0 0 1-5 0V8ZM4 11h2a6 6 0 0 0 12 0h2a8 8 0 0 1-7 7.94V21h-2v-2.06A8 8 0 0 1 4 11Z"/></svg>
     <span>Narrate</span>
   </a>
-  <a href="/live" class="live-nav" data-nav="live" id="navLiveLink">
+  <a href="live.html" class="live-nav" data-nav="live" id="navLiveLink">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 0-14.14 0M16.24 7.76a6 6 0 0 0-8.48 0M4.93 19.07a10 10 0 0 0 14.14 0M7.76 16.24a6 6 0 0 0 8.48 0"/></svg>
     <span>Live Studio</span>
   </a>
-  <a href="/#projects" data-nav="projects" id="navProjectsLink">
+  <a href="index.html#projects" data-nav="projects" id="navProjectsLink">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-9Zm2.5-.5a.5.5 0 0 0-.5.5v9c0 .28.22.5.5.5h11a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-11Zm2 2.5h7v2h-7v-2Zm0 4h7v2h-7v-2Z"/></svg>
     <span>Projects</span>
   </a>
-  <a href="/#editor" data-nav="editor" id="navEditorLink">
+  <a href="index.html#editor" data-nav="editor" id="navEditorLink">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5 14.5 8l2.5 2.5L8.5 19H6v-2.5Zm9.7-10.8 2.1 2.1a1 1 0 0 1 0 1.4l-1.1 1.1-3.5-3.5 1.1-1.1a1 1 0 0 1 1.4 0Z"/></svg>
     <span>Editor</span>
   </a>
-  <a href="/#instant" data-nav="instant" id="navInstantLink">
+  <a href="index.html#instant" data-nav="instant" id="navInstantLink">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round">
       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
     </svg>
     <span>Instant Clipping</span> <span class="nav-beta-tag">BETA</span>
   </a>
-  <a href="/#trending" data-nav="trending" id="navTrendingLink" title="Discover live broadcasts & trending gameplay across YouTube, Twitch & Kick">
+  <a href="index.html#trending" data-nav="trending" id="navTrendingLink" title="Discover live broadcasts & trending gameplay across YouTube, Twitch & Kick">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round">
       <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
@@ -66,18 +67,18 @@
 
   <div class="sidebar-nav-divider"></div>
 
-  <a href="/#beta" data-nav="beta" id="navBetaLink">
+  <a href="index.html#beta" data-nav="beta" id="navBetaLink">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
     <span>Beta Features</span> <span class="nav-beta-tag">BETA</span>
   </a>
-  <a href="/#models" id="navModelsLink" data-nav="models" class="models-nav-link" title="Open AI Models & Engine Hub">
+  <a href="index.html#models" id="navModelsLink" data-nav="models" class="models-nav-link" title="Open AI Models & Engine Hub">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13A2.5 2.5 0 0 0 5 15.5 2.5 2.5 0 0 0 7.5 18a2.5 2.5 0 0 0 2.5-2.5A2.5 2.5 0 0 0 7.5 13m9 0a2.5 2.5 0 0 0-2.5 2.5 2.5 2.5 0 0 0 2.5 2.5 2.5 2.5 0 0 0 2.5-2.5 2.5 2.5 0 0 0-2.5-2.5Z"/></svg>
     <span>Models</span> <span class="nav-count-tag" id="navModelCount"
       style="margin-left:auto;background:rgba(56,189,248,0.18);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;font-size:0.68rem;padding:1px 6px;border-radius:10px;font-weight:700;">5</span>
   </a>
-  <a href="/#update" id="navUpdateLink" title="Check GitHub for software updates">
+  <a href="index.html#update" id="navUpdateLink" title="Check GitHub for software updates">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-    <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v5.0.1</span>
+    <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v5.0.7</span>
   </a>
   <a href="#cache" id="navClearCacheLink" title="Clear transcription cache & imported YouTube videos">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -282,7 +283,7 @@
 </div>
 </aside>
 <div class="narrate-shell">
-<header class="narrate-top"><a class="back-link" href="/">← Clipify AI</a><div><span class="eyebrow">CLIPIFY AI / NARRATE</span><h1>Script to Short.</h1></div><span class="local-badge">● LOCAL VOICE ENGINE</span></header>
+<header class="narrate-top"><a class="back-link" href="index.html">← Clipify AI</a><div><span class="eyebrow">CLIPIFY AI / NARRATE</span><h1>Script to Short.</h1></div><span class="local-badge">● LOCAL VOICE ENGINE</span></header>
 <main class="narrate-grid">
 <section class="narrate-main">
 <div class="length-control"><label for="targetDuration">Target video length <output id="targetDurationValue">30 seconds minimum</output></label><input id="targetDuration" type="range" min="30" max="60" step="1" value="30"></div>
@@ -407,6 +408,7 @@
 </div>
 
 <script src="static/forest_game.js"></script>
+<script src="static/android_bridge.js"></script>
 <script src="static/updater.js"></script>
 <script src="static/tour.js"></script>
 <script src="static/narrate.js"></script>

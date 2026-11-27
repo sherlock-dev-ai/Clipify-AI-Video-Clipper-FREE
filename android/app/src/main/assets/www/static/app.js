@@ -16,6 +16,17 @@ async function safeJson(response, fallbackMsg = 'Server response error') {
 }
 const editorDownloads = () => ['#reviewDownload', '#reviewDownloadMain'].map($).filter(Boolean);
 const editorApplyButtons = () => ['#applyEditorBranding', '#applyEditorBrandingMain'].map($).filter(Boolean);
+window.resolveClipMediaUrl = function resolveClipMediaUrl(jobId, file) {
+  const f = String(file || '');
+  if (f.startsWith('file://') || f.startsWith('http://') || f.startsWith('https://')) return f;
+  if (f.startsWith('/storage/') || f.startsWith('/sdcard/')) return 'file://' + f;
+  const rel = `/media/${jobId}/${encodeURIComponent(f)}`;
+  if (window.AndroidBridge || window.location.protocol === 'file:') {
+    return (window.CLIPPY_DESKTOP_HOST || 'http://127.0.0.1:5000') + rel;
+  }
+  return rel;
+};
+
 const reviewPlayer = window.ClipifyReviewPlayer?.attach($('#reviewVideo'), $('#reviewVideoStatus'), $('#reviewVideoSpinner'), $('#reviewVideoStatusText'));
 const input = $('#videoInput'), drop = $('#dropzone'), create = $('#createBtn'), chip = $('#fileChip'), nameEl = $('#fileName'), sizeEl = $('#fileSize'), progressPanel = $('#progressPanel'), results = $('#results'), grid = $('#resultGrid'), log = $('#log'), modelSelect = $('#modelSelect'), refreshModelsBtn = $('#refreshModelsBtn'), scanModelsBtn = $('#scanModelsBtn'), fontSelect = $('#fontSelect'), minDuration = $('#minDuration'), maxDuration = $('#maxDuration'), youtubeUrl = $('#youtubeUrl'), youtubeImport = $('#youtubeImport'), youtubeStatus = $('#youtubeStatus');
 const positions = ['top-left', 'top-center', 'top-right', 'center-left', 'center', 'center-right', 'bottom-left', 'bottom-center', 'bottom-right', 'custom'];
@@ -1817,6 +1828,11 @@ async function start() {
   );
 
   form.append(
+    'use_existing_transcription',
+    $('#useExistingTranscriptToggle')?.checked ? '1' : '0'
+  );
+
+  form.append(
     'premium_captions',
     $('#premiumCaptionsToggle')?.checked ? '1' : '0'
   );
@@ -1840,6 +1856,10 @@ async function start() {
     'upscale_quality',
     $('#upscaleQuality')?.value || 'high'
   );
+
+  const selectedCreateLang = $('#createLanguageSelect')?.value || 'auto';
+  form.append('language', selectedCreateLang);
+  form.append('caption_language', selectedCreateLang);
 
   form.append(
     'branding',
@@ -2026,7 +2046,7 @@ async function watchJob(jobId) {
         });
       }
 
-      if (d && (d.status === 'done' || d.status === 'complete' || d.progress >= 100)) {
+      if (d && (d.status === 'done' || d.status === 'complete')) {
         terminal = true;
         clearInterval(pollInterval);
         if (state.es) {
@@ -2298,7 +2318,7 @@ function renderOutputCarousel() {
 
   const total = state.outputs.length;
   const currentFile = state.outputs[state.currentOutputIndex] || state.outputs[0];
-  const src = `/media/${state.jobId}/${encodeURIComponent(currentFile)}`;
+  const src = resolveClipMediaUrl(state.jobId, currentFile);
   const title = currentFile.replace(/\.mp4$/i, '');
 
   featured.hidden = false;
@@ -2494,8 +2514,9 @@ async function selectReview(job, file) {
   state.jobId = job;
   state.reviewFile = file;
 
-  const src =
-    `/media/${job}/${encodeURIComponent(file)}`;
+  const src = typeof resolveClipMediaUrl === 'function'
+    ? resolveClipMediaUrl(job, file)
+    : `/media/${job}/${encodeURIComponent(file)}`;
 
   $('#reviewTitle').textContent = file;
 
@@ -2903,7 +2924,13 @@ async function loadProjects() {
       const metadata = x.output_metadata?.[output] || {};
       return `<button class="project-output" type="button" data-output="${escapeHtml(output)}">${escapeHtml(metadata.title || `Short ${index + 1}`)}</button>`;
     }).join('');
-    const thumbnail = firstOutput ? `<video class="project-thumb" muted playsinline preload="metadata" src="/media/${encodeURIComponent(x.id)}/${encodeURIComponent(firstOutput)}"></video>` : '<div class="project-thumb project-thumb-empty">✦</div>';
+    const thumbUrl = firstOutput
+      ? (typeof resolveClipMediaUrl === 'function'
+          ? resolveClipMediaUrl(x.id, firstOutput)
+          : `/media/${encodeURIComponent(x.id)}/${encodeURIComponent(firstOutput)}`)
+      : '';
+    const thumbWithFrame = thumbUrl && !thumbUrl.includes('#') ? `${thumbUrl}#t=0.5` : thumbUrl;
+    const thumbnail = firstOutput ? `<video class="project-thumb" muted playsinline preload="none" src="${escapeHtml(thumbWithFrame)}" onmouseenter="if(this.preload==='none'){this.preload='metadata';this.load();}"></video>` : '<div class="project-thumb project-thumb-empty">✦</div>';
 
     el.innerHTML = `
       ${thumbnail}
@@ -3122,15 +3149,16 @@ if (create) {
 
 function navigateTo(id) {
   const target = id || 'create';
+  const isMobileWebView = Boolean(window.AndroidBridge || window.location.protocol === 'file:');
   if (target === 'live') {
-    if (!window.location.pathname.includes('/live')) {
-      window.location.href = '/live';
+    if (!window.location.pathname.includes('live')) {
+      window.location.href = isMobileWebView ? 'live.html' : '/live';
     }
     return;
   }
   if (target === 'narrate') {
-    if (!window.location.pathname.includes('/narrate')) {
-      window.location.href = '/narrate';
+    if (!window.location.pathname.includes('narrate')) {
+      window.location.href = isMobileWebView ? 'narrate.html' : '/narrate';
     }
     return;
   }
@@ -3154,23 +3182,34 @@ function navigateTo(id) {
   }
   const knownSection = document.getElementById(target);
   const activeSectionId = (knownSection && knownSection.classList.contains('page-section')) ? target : 'create';
+  const targetSection = document.getElementById(activeSectionId);
+  if (targetSection) {
+    targetSection.style.display = 'block';
+    targetSection.classList.add('visible');
+  }
   $$('.page-section').forEach(s => {
-    const isTarget = s.id === activeSectionId;
-    s.classList.toggle('visible', isTarget);
-    s.style.display = isTarget ? 'block' : 'none';
+    if (s.id !== activeSectionId) {
+      s.classList.remove('visible');
+      s.style.display = 'none';
+    }
   });
   $$('[data-nav]').forEach(a =>
     a.classList.toggle('active', a.dataset.nav === activeSectionId)
   );
   if (target === 'projects') loadProjects();
+  if (target === 'storage') loadStorageConfig();
   if (target === 'assets') loadProjects().then(loadAssets);
   if (target === 'editor') {
-    if (typeof renderEditorShortsTray === 'function') renderEditorShortsTray();
+    if (typeof renderEditorShortsTray === 'function') {
+      requestAnimationFrame(() => renderEditorShortsTray());
+    }
   }
   if (target === 'trending') {
     if (typeof window.loadTrending === 'function') window.loadTrending();
   }
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  if (window.scrollY > 120) {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
 }
 
 window.clipTrendingVideo = function(videoUrl) {
@@ -3951,31 +3990,55 @@ function initBetaTestingSection() {
     });
   }
 
+  const betaPlatBtns = document.querySelectorAll('#betaSourcePlatformGroup .beta-platform-pill');
+  betaState.platform = betaState.platform || 'youtube';
+  const platPlaceholders = {
+    youtube: 'https://www.youtube.com/watch?v=...',
+    twitch: 'https://www.twitch.tv/videos/...',
+    kick: 'https://kick.com/video/...'
+  };
+  betaPlatBtns.forEach(pBtn => {
+    pBtn.addEventListener('click', () => {
+      const plat = pBtn.dataset.platform || 'youtube';
+      betaState.platform = plat;
+      betaPlatBtns.forEach(b => {
+        const active = b === pBtn;
+        b.classList.toggle('active', active);
+        b.style.background = active ? '#ffffff' : 'rgba(255,255,255,0.05)';
+        b.style.color = active ? '#050507' : 'rgba(255,255,255,0.82)';
+        b.style.borderColor = active ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.16)';
+      });
+      if (ytUrl && platPlaceholders[plat]) ytUrl.placeholder = platPlaceholders[plat];
+    });
+  });
+
   if (ytImportBtn && ytUrl) {
     ytImportBtn.addEventListener('click', async () => {
       const url = ytUrl.value.trim();
-      if (!url) return alert('Enter a valid YouTube URL first.');
+      const plat = betaState.platform || 'youtube';
+      const platLabel = plat.charAt(0).toUpperCase() + plat.slice(1);
+      if (!url) return alert(`Enter a valid ${platLabel} URL first.`);
       ytImportBtn.disabled = true;
       ytImportBtn.textContent = 'Fetching...';
       betaState.downloading = true;
       if (runBtn) {
         runBtn.disabled = true;
-        runBtn.textContent = '⏳ Downloading YouTube video…';
+        runBtn.textContent = `⏳ Downloading ${platLabel} video…`;
       }
       try {
         const res = await fetch('/api/import-youtube', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url })
+          body: JSON.stringify({ url, platform: plat })
         });
         const data = await res.json();
-        if (!res.ok || (!data.ok && !data.job_id)) throw new Error(data.error || 'Failed to import YouTube video');
+        if (!res.ok || (!data.ok && !data.job_id)) throw new Error(data.error || `Failed to import ${platLabel} video`);
         const jobId = data.job_id;
         betaState.jobId = jobId;
         betaState.sourceFile = null;
         dropZone.style.display = 'none';
         sourceInfo.style.display = 'flex';
-        sourceName.textContent = 'Connecting to YouTube...';
+        sourceName.textContent = `Connecting to ${platLabel}...`;
         sourceMeta.textContent = `Project ${jobId} · Downloading...`;
 
         // Poll /api/status/${jobId} until uploaded or error
@@ -5255,7 +5318,9 @@ function initInstantClippingSection() {
             function selectClip(idx) {
               instantState.activeClipIndex = idx;
               const filename = outputs[idx];
-              const clipUrl = `/media/${activeJobId}/${filename}`;
+              const clipUrl = typeof resolveClipMediaUrl === 'function'
+                ? resolveClipMediaUrl(activeJobId, filename)
+                : `/media/${activeJobId}/${filename}`;
               instantState.outputUrl = clipUrl;
               instantState.outputFile = filename;
 
@@ -5572,7 +5637,7 @@ async function renderEditorShortsTray() {
       const videoSrc = `/media/${clip.jobId}/${encodeURIComponent(clip.filename)}`;
 
       card.innerHTML = `
-        <video class="card-video-thumb" src="${videoSrc}#t=0.5" preload="metadata" muted playsinline></video>
+        <video class="card-video-thumb" src="${videoSrc}#t=0.5" preload="none" muted playsinline onmouseenter="if(this.preload==='none'){this.preload='metadata';this.load();}"></video>
         <span class="card-overlay-badge">${dur}</span>
         <div class="card-play-icon">▶</div>
         <div class="card-meta-bottom">
@@ -5744,4 +5809,134 @@ if (document.readyState === 'loading') {
   initEditorCaptionStudio();
   renderEditorShortsTray();
   initGpuSelector();
+}
+
+
+/* ==========================================================================
+   Storage & Data Locations (Black & White UI)
+   ========================================================================== */
+async function loadStorageConfig() {
+  const grid = document.getElementById('storageCardsGrid');
+  if (!grid) return;
+  const refreshBtn = document.getElementById('btnRefreshStorage');
+  if (refreshBtn && !refreshBtn.dataset.bound) {
+    refreshBtn.dataset.bound = '1';
+    refreshBtn.addEventListener('click', () => loadStorageConfig());
+  }
+  try {
+    const r = await fetch('/api/storage/config', { cache: 'no-store' });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || 'Failed to load storage config');
+    const items = d.locations || [];
+    grid.innerHTML = items.map(item => `
+      <div class="storage-card" data-key="${escapeHtml(item.key)}" style="background:#09090b;border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:18px 20px;display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div>
+            <h3 style="margin:0 0 4px;font-size:1.05rem;font-weight:700;color:#ffffff;">${escapeHtml(item.title)}</h3>
+            <p style="margin:0;font-size:0.84rem;color:rgba(255,255,255,0.58);">${escapeHtml(item.description)}</p>
+          </div>
+          <div style="text-align:right;font-size:0.82rem;color:rgba(255,255,255,0.78);background:#121216;border:1px solid rgba(255,255,255,0.1);padding:6px 12px;border-radius:10px;">
+            <strong style="color:#fff;">${escapeHtml(item.used_human)}</strong> used · ${item.file_count} files<br>
+            <span style="color:rgba(255,255,255,0.5);font-size:0.76rem;">${escapeHtml(item.free_human)} free on drive</span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input type="text" class="storage-path-input" data-key="${escapeHtml(item.key)}" value="${escapeHtml(item.path)}"
+            style="flex:1;min-width:240px;height:40px;padding:0 12px;border-radius:10px;background:#050507;border:1px solid rgba(255,255,255,0.18);color:#ffffff;font-family:monospace;font-size:0.84rem;">
+          <button type="button" class="btn-storage-browse" data-key="${escapeHtml(item.key)}"
+            style="height:40px;padding:0 14px;border-radius:10px;background:#16161b;border:1px solid rgba(255,255,255,0.2);color:#ffffff;font-weight:600;cursor:pointer;">Browse…</button>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:4px;">
+          <label style="display:inline-flex;align-items:center;gap:8px;font-size:0.84rem;color:rgba(255,255,255,0.78);cursor:pointer;">
+            <input type="checkbox" class="storage-move-chk" data-key="${escapeHtml(item.key)}" checked style="accent-color:#ffffff;width:16px;height:16px;">
+            <span>Move existing data to new folder</span>
+          </label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button type="button" class="btn-storage-reset" data-key="${escapeHtml(item.key)}"
+              style="height:36px;padding:0 12px;border-radius:9px;background:transparent;border:1px solid rgba(255,255,255,0.16);color:rgba(255,255,255,0.72);font-size:0.82rem;font-weight:600;cursor:pointer;">Reset Default</button>
+            <button type="button" class="btn-storage-save" data-key="${escapeHtml(item.key)}"
+              style="height:36px;padding:0 16px;border-radius:9px;background:#ffffff;border:1px solid #ffffff;color:#050507;font-size:0.84rem;font-weight:700;cursor:pointer;">Apply &amp; Save</button>
+          </div>
+        </div>
+        <div class="storage-status-msg" data-key="${escapeHtml(item.key)}" style="font-size:0.8rem;color:rgba(255,255,255,0.65);display:none;"></div>
+      </div>
+    `).join('');
+
+    grid.querySelectorAll('.btn-storage-browse').forEach(btn => {
+      btn.addEventListener('click', () => browseStorageFolder(btn.dataset.key));
+    });
+    grid.querySelectorAll('.btn-storage-save').forEach(btn => {
+      btn.addEventListener('click', () => saveStorageLocation(btn.dataset.key, false));
+    });
+    grid.querySelectorAll('.btn-storage-reset').forEach(btn => {
+      btn.addEventListener('click', () => saveStorageLocation(btn.dataset.key, true));
+    });
+  } catch (err) {
+    grid.innerHTML = `<div style="padding:20px;border:1px solid rgba(255,255,255,0.12);border-radius:12px;background:#09090b;color:#f87171;">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function browseStorageFolder(key) {
+  const input = document.querySelector(`.storage-path-input[data-key="${key}"]`);
+  const current = input ? input.value.trim() : '';
+  try {
+    const r = await fetch('/api/storage/browse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current_path: current })
+    });
+    const d = await r.json();
+    if (d.ok && d.path && input) {
+      input.value = d.path;
+    }
+  } catch (_) {}
+}
+
+async function saveStorageLocation(key, resetDefault) {
+  const input = document.querySelector(`.storage-path-input[data-key="${key}"]`);
+  const moveChk = document.querySelector(`.storage-move-chk[data-key="${key}"]`);
+  const statusEl = document.querySelector(`.storage-status-msg[data-key="${key}"]`);
+  const saveBtn = document.querySelector(`.btn-storage-save[data-key="${key}"]`);
+  if (!input) return;
+
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = moveChk?.checked ? 'Moving…' : 'Saving…';
+  }
+  if (statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.style.color = 'rgba(255,255,255,0.75)';
+    statusEl.textContent = moveChk?.checked ? 'Moving existing files and updating configuration…' : 'Updating storage path…';
+  }
+  try {
+    const r = await fetch('/api/storage/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        key,
+        new_path: input.value.trim(),
+        move_data: Boolean(moveChk?.checked),
+        reset_default: Boolean(resetDefault)
+      })
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || 'Failed to update storage location');
+    if (statusEl) {
+      statusEl.style.color = '#ffffff';
+      statusEl.textContent = '✓ ' + (d.message || 'Saved!');
+    }
+    setTimeout(() => loadStorageConfig(), 700);
+  } catch (err) {
+    if (statusEl) {
+      statusEl.style.color = '#f87171';
+      statusEl.textContent = 'Error: ' + err.message;
+    }
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Apply & Save';
+    }
+  }
 }

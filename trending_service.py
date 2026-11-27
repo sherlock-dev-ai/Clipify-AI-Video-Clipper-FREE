@@ -213,10 +213,10 @@ def format_count(n) -> str:
     except Exception:
         return str(n)
 
-def get_youtube_trending(query: str = "") -> Dict[str, Any]:
+def get_youtube_trending(query: str = "", force_refresh: bool = False) -> Dict[str, Any]:
     cache_key = f"yt_{query.strip().lower()}"
     now = time.time()
-    if cache_key in _CACHE and (now - _CACHE[cache_key]["ts"]) < CACHE_TTL:
+    if not force_refresh and cache_key in _CACHE and (now - _CACHE[cache_key]["ts"]) < CACHE_TTL:
         return _CACHE[cache_key]["data"]
 
     live_streams = []
@@ -238,10 +238,17 @@ def get_youtube_trending(query: str = "") -> Dict[str, Any]:
             results = []
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    live_search = f"ytsearch6:{query.strip() + ' ' if query.strip() else ''}live gaming stream"
+                    live_search = f"ytsearch12:{query.strip() + ' ' if query.strip() else ''}live gaming stream"
                     res = ydl.extract_info(live_search, download=False)
                     for e in res.get('entries', []):
-                        if not e: continue
+                        if not e:
+                            continue
+                        live_status = str(e.get('live_status') or '').lower()
+                        # Filter out ended streams, upcoming premieres, and regular VODs with a fixed duration
+                        if live_status in ('was_live', 'is_upcoming', 'not_live', 'post_live'):
+                            continue
+                        if e.get('duration') is not None and live_status != 'is_live':
+                            continue
                         vid_id = str(e.get('id') or '')
                         title = str(e.get('title') or 'Live Gaming Stream')
                         channel = str(e.get('uploader') or e.get('channel') or 'Gaming Creator')
@@ -258,6 +265,8 @@ def get_youtube_trending(query: str = "") -> Dict[str, Any]:
                             "is_live": True,
                             "game": "Live Stream"
                         })
+                        if len(results) >= 6:
+                            break
             except Exception as e:
                 logger.debug("Live fetch error: %s", e)
             return results
@@ -316,10 +325,10 @@ def get_youtube_trending(query: str = "") -> Dict[str, Any]:
     _CACHE[cache_key] = {"data": result, "ts": now}
     return result
 
-def get_twitch_trending(query: str = "") -> Dict[str, Any]:
+def get_twitch_trending(query: str = "", force_refresh: bool = False) -> Dict[str, Any]:
     cache_key = f"twitch_{query.strip().lower()}"
     now = time.time()
-    if cache_key in _CACHE and (now - _CACHE[cache_key]["ts"]) < CACHE_TTL:
+    if not force_refresh and cache_key in _CACHE and (now - _CACHE[cache_key]["ts"]) < CACHE_TTL:
         return _CACHE[cache_key]["data"]
 
     live_streams = []
@@ -404,10 +413,10 @@ def get_twitch_trending(query: str = "") -> Dict[str, Any]:
     _CACHE[cache_key] = {"data": result, "ts": now}
     return result
 
-def get_kick_trending(query: str = "") -> Dict[str, Any]:
+def get_kick_trending(query: str = "", force_refresh: bool = False) -> Dict[str, Any]:
     cache_key = f"kick_{query.strip().lower()}"
     now = time.time()
-    if cache_key in _CACHE and (now - _CACHE[cache_key]["ts"]) < CACHE_TTL:
+    if not force_refresh and cache_key in _CACHE and (now - _CACHE[cache_key]["ts"]) < CACHE_TTL:
         return _CACHE[cache_key]["data"]
 
     live_streams = []

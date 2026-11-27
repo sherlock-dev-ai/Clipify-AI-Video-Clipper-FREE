@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="static/cache_manager.css">
   <link rel="stylesheet" href="static/trending.css">
   <link rel="stylesheet" href="static/caption_playground.css">
+  <link rel="stylesheet" href="static/mobile.css">
 </head>
 
 <body>
@@ -27,9 +28,10 @@
       <div class="brand-copy">
         <div class="brand-title-wrap">
           <b>Clipify AI</b>
-          <span class="cool-version-badge" id="topBrandVersionBadge" title="Clipify AI v5.0.4 · Click for updates & release info">
+          <span class="cool-version-badge" id="topBrandVersionBadge"
+            title="Clipify AI v5.0.7 · Click for updates & release info">
             <span class="version-dot"></span>
-            <span class="version-num">v5.0.4</span>
+            <span class="version-num">v5.0.7</span>
             <span class="version-shimmer-sweep"></span>
           </span>
         </div>
@@ -38,6 +40,25 @@
     </div>
     <a class="sidebar-github" href="https://github.com/sherlock-dev-ai" target="_blank"
       rel="noopener noreferrer"><span>↗</span> GitHub</a>
+    <div class="sidebar-gpu-wrapper gpu-dropdown-wrapper" id="sidebarGpuWrapper">
+      <button type="button" class="gpu-dropdown-btn sidebar-gpu-btn" title="Switch active GPU / Hardware Accelerator">
+        <span class="gpu-indicator-dot nvidia"></span>
+        <span class="gpu-current-label">GPU: Detecting…</span>
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"
+          class="gpu-chevron">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      <div class="gpu-dropdown-menu sidebar-gpu-menu">
+        <div class="gpu-menu-header">
+          <span>Hardware Accelerator</span>
+          <span class="gpu-menu-subtitle">Active Engine GPU</span>
+        </div>
+        <div class="gpu-menu-list">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
     <nav>
       <a class="active" href="#create" data-nav="create" id="navCreateLink">
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -45,14 +66,14 @@
         </svg>
         <span>Create</span>
       </a>
-      <a href="/narrate" class="narrate-nav" data-nav="narrate" id="navNarrateLink">
+      <a href="narrate.html" class="narrate-nav" data-nav="narrate" id="navNarrateLink">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path
             d="M12 3a5 5 0 0 0-5 5v4a5 5 0 0 0 10 0V8a5 5 0 0 0-5-5Zm-2.5 5a2.5 2.5 0 0 1 5 0v4a2.5 2.5 0 0 1-5 0V8ZM4 11h2a6 6 0 0 0 12 0h2a8 8 0 0 1-7 7.94V21h-2v-2.06A8 8 0 0 1 4 11Z" />
         </svg>
         <span>Narrate</span>
       </a>
-      <a href="/live" class="live-nav" data-nav="live" id="navLiveLink">
+      <a href="live.html" class="live-nav" data-nav="live" id="navLiveLink">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="12" r="3" />
           <path
@@ -81,13 +102,15 @@
         </svg>
         <span>Instant Clipping</span> <span class="nav-beta-tag">BETA</span>
       </a>
-      <a href="#trending" data-nav="trending" id="navTrendingLink" title="Discover live broadcasts & trending gameplay across YouTube, Twitch & Kick">
+      <a href="#trending" data-nav="trending" id="navTrendingLink"
+        title="Discover live broadcasts & trending gameplay across YouTube, Twitch & Kick">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
           <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
           <polyline points="17 6 23 6 23 12"></polyline>
         </svg>
-        <span>Trending</span> <span class="nav-trending-pill" style="margin-left:auto;background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:0.68rem;padding:1px 6px;border-radius:10px;font-weight:700;">LIVE</span>
+        <span>Trending</span> <span class="nav-trending-pill"
+          style="margin-left:auto;background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:0.68rem;padding:1px 6px;border-radius:10px;font-weight:700;">LIVE</span>
       </a>
 
       <div class="sidebar-nav-divider"></div>
@@ -108,11 +131,19 @@
         <span>Models</span> <span class="nav-count-tag" id="navModelCount"
           style="margin-left:auto;background:rgba(56,189,248,0.18);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;font-size:0.68rem;padding:1px 6px;border-radius:10px;font-weight:700;">5</span>
       </a>
+      <a href="#storage" id="navStorageLink" data-nav="storage" title="Manage Output, Ollama & Cache Storage Locations">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+          <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+          <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+        </svg>
+        <span>Storage</span>
+      </a>
       <a href="#update" id="navUpdateLink" title="Check GitHub for software updates">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
         </svg>
-        <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v5.0.3</span>
+        <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v5.0.7</span>
       </a>
       <a href="#cache" id="navClearCacheLink" title="Clear transcription cache & imported YouTube videos">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -346,18 +377,24 @@
         </div>
         <div class="top-actions">
           <div class="gpu-dropdown-wrapper" id="gpuDropdownWrapper">
-            <button type="button" class="gpu-dropdown-btn" id="gpuDropdownBtn" title="Switch active GPU / Hardware Accelerator">
+            <button type="button" class="gpu-dropdown-btn" id="gpuDropdownBtn"
+              title="Switch active GPU / Hardware Accelerator">
               <span class="gpu-indicator-dot nvidia"></span>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="4" y="4" width="16" height="16" rx="2" />
                 <rect x="9" y="9" width="6" height="6" />
-                <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
-                <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
-                <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="15" x2="23" y2="15" />
-                <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="15" x2="4" y2="15" />
+                <line x1="9" y1="1" x2="9" y2="4" />
+                <line x1="15" y1="1" x2="15" y2="4" />
+                <line x1="9" y1="20" x2="9" y2="23" />
+                <line x1="15" y1="20" x2="15" y2="23" />
+                <line x1="20" y1="9" x2="23" y2="9" />
+                <line x1="20" y1="15" x2="23" y2="15" />
+                <line x1="1" y1="9" x2="4" y2="9" />
+                <line x1="1" y1="15" x2="4" y2="15" />
               </svg>
               <span class="gpu-current-label" id="gpuCurrentLabel">GPU: Detecting…</span>
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" class="gpu-chevron">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"
+                class="gpu-chevron">
                 <polyline points="6 9 12 15 18 9" />
               </svg>
             </button>
@@ -417,10 +454,28 @@
             <h2>Choose the way your Short should feel</h2>
           </div><span class="mode-strip-note">AI adapts the edit to your content</span>
         </div>
-        <div class="mode-grid top-mode-grid">{% for key, mode in modes.items() %}<button
-            class="mode-card {% if key == 'viral' %}selected{% endif %}" data-mode="{{ key }}"><span
-              class="mode-icon">{{ mode.icon }}</span><span class="mode-name">{{ mode.name }}</span><span
-              class="mode-desc">{{ mode.description }}</span></button>{% endfor %}</div>
+        <div class="mode-grid top-mode-grid"><button
+            class="mode-card " data-mode="gaming"><span
+              class="mode-icon">🎮</span><span class="mode-name">Gaming</span><span
+              class="mode-desc">Gameplay + facecam reactions with stable smart framing</span></button><button
+            class="mode-card selected" data-mode="viral"><span
+              class="mode-icon">✦</span><span class="mode-name">Viral</span><span
+              class="mode-desc">Hooks, curiosity, surprise &amp; payoff</span></button><button
+            class="mode-card " data-mode="funny"><span
+              class="mode-icon">😂</span><span class="mode-name">Funny</span><span
+              class="mode-desc">Punchlines, reactions &amp; comedic timing</span></button><button
+            class="mode-card " data-mode="dramatic"><span
+              class="mode-icon">⚡</span><span class="mode-name">Dramatic</span><span
+              class="mode-desc">Tension, reveals &amp; emotional moments</span></button><button
+            class="mode-card " data-mode="educational"><span
+              class="mode-icon">◈</span><span class="mode-name">Educational</span><span
+              class="mode-desc">Facts, explanations &amp; takeaways</span></button><button
+            class="mode-card " data-mode="story"><span
+              class="mode-icon">◉</span><span class="mode-name">Story</span><span
+              class="mode-desc">Setup → escalation → payoff</span></button><button
+            class="mode-card " data-mode="meme"><span
+              class="mode-icon">💀</span><span class="mode-name">Meme</span><span
+              class="mode-desc">Chaotic, absurd &amp; reaction-heavy</span></button></div>
       </div>
       <div class="workspace-grid">
         <div class="left-column">
@@ -629,6 +684,12 @@
               <small>Accelerates transcription up to 10× with 16 threads. Turn off for High Accuracy / Deep
                 Scan.</small>
             </div>
+            <div class="split-toggle-row" style="margin-top: 10px;">
+              <label class="toggle-row"><input type="checkbox" id="useExistingTranscriptToggle" checked><span
+                  class="switch"></span><b>Look for Existing Transcription File in Video</b></label>
+              <small>Automatically reuses embedded subtitle tracks (MKV/MP4) or sidecar .srt/.vtt files instead of
+                running WhisperX (saves minutes).</small>
+            </div>
             <div class="split-toggle-row" id="upscaleQualityRow" style="margin-top: 10px;">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
                 <label for="upscaleQuality"
@@ -665,10 +726,16 @@
                     class="ghost" type="button" id="clearLogo">Remove</button></div>
                 <label>Logo image / folder<input id="logoPath" value=""
                     placeholder="Uploaded logo or local folder path"></label>
-                <div class="two"><label>Position<select id="logoPosition">{% for p in
-                      ['top-left','top-center','top-right','center-left','center','center-right','bottom-left','bottom-center','bottom-right']
-                      %}<option value="{{p}}" {% if p=='top-right' %}selected{% endif %}>{{p|replace('-',' ')|title}}
-                      </option>{% endfor %}<option value="custom">
+                <div class="two"><label>Position<select id="logoPosition"><option value="top-left" >Top Left
+                      </option><option value="top-center" >Top Center
+                      </option><option value="top-right" selected>Top Right
+                      </option><option value="center-left" >Center Left
+                      </option><option value="center" >Center
+                      </option><option value="center-right" >Center Right
+                      </option><option value="bottom-left" >Bottom Left
+                      </option><option value="bottom-center" >Bottom Center
+                      </option><option value="bottom-right" >Bottom Right
+                      </option><option value="custom">
                         Custom / Drag in Preview</option></select></label><label>Margin<input id="logoMargin"
                       type="number" min="0" max="250" value="40"></label></div>
                 <div class="slider-row"><label>Logo size <output id="logoSizeOut">8%</output></label><input
@@ -744,9 +811,7 @@
                 Overlay</b></label>
             <div class="text-grid">
               <label>Text<textarea id="overlayText" maxlength="100" placeholder="e.g. THAT'S CRAZY!"></textarea></label>
-              <div class="text-controls"><label>Position<select id="textPosition">{% for p in
-                    ['top-left','top-center','top-right','center-left','center','center-right','bottom-left','bottom-center','bottom-right']
-                    %}<option value="{{p}}">{{p|replace('-',' ')|title}}</option>{% endfor %}<option value="custom">
+              <div class="text-controls"><label>Position<select id="textPosition"><option value="top-left">Top Left</option><option value="top-center">Top Center</option><option value="top-right">Top Right</option><option value="center-left">Center Left</option><option value="center">Center</option><option value="center-right">Center Right</option><option value="bottom-left">Bottom Left</option><option value="bottom-center">Bottom Center</option><option value="bottom-right">Bottom Right</option><option value="custom">
                       Custom / Drag in Preview</option></select></label><label>Size<input id="textSize" type="number"
                     min="2" max="25" value="6"> %</label><label>Margin<input id="textMargin" type="number" min="20"
                     max="500" value="110"> px</label></div>
@@ -759,6 +824,29 @@
                   id="textBgOpacity" type="range" min="0" max="100" value="65"></div>
             </div>
           </section>
+          <div class="panel" style="padding:14px 18px;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+              <div>
+                <span class="kicker">CAPTION LANGUAGE</span>
+                <div style="font-size:0.86rem;font-weight:700;color:#fff;">Speech &amp; Caption Language</div>
+                <small style="color:rgba(255,255,255,0.6);">Hindi speech is automatically written in English (Hinglish)
+                  captions.</small>
+              </div>
+              <select id="createLanguageSelect"
+                style="min-width:230px;height:38px;padding:0 12px;border-radius:8px;background:#0d1117;border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:0.84rem;">
+                <option value="auto" selected>Auto-Detect Speech</option>
+                <option value="en">English</option>
+                <option value="hinglish">Hindi (Written in English / Hinglish)</option>
+                <option value="es">Spanish</option>
+                <option value="pt">Portuguese</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+                <option value="ja">Japanese</option>
+                <option value="ko">Korean</option>
+                <option value="ar">Arabic</option>
+              </select>
+            </div>
+          </div>
           <button class="primary big" id="createBtn" disabled><span>Generate Shorts</span><b>→</b></button>
         </div>
         <aside class="preview-column">
@@ -779,12 +867,15 @@
               <div class="preview-text draggable-overlay" id="previewText" data-x="50" data-y="75">
                 <span class="editor-text-content" id="previewTextContent">Your text</span>
                 <div class="overlay-quick-controls" id="previewTextControls">
-                  <button type="button" class="ctrl-btn-size" id="previewTextSizeDec" title="Decrease font size (−)">−</button>
+                  <button type="button" class="ctrl-btn-size" id="previewTextSizeDec"
+                    title="Decrease font size (−)">−</button>
                   <span class="ctrl-size-badge" id="previewTextSizeBadge">6%</span>
-                  <button type="button" class="ctrl-btn-size" id="previewTextSizeInc" title="Increase font size (+)">+</button>
+                  <button type="button" class="ctrl-btn-size" id="previewTextSizeInc"
+                    title="Increase font size (+)">+</button>
                   <span class="ctrl-drag-icon" title="Drag to move">✥</span>
                 </div>
-                <div class="overlay-resize-handle" id="previewTextResizeHandle" title="Drag corner to resize text">⤡</div>
+                <div class="overlay-resize-handle" id="previewTextResizeHandle" title="Drag corner to resize text">⤡
+                </div>
               </div>
               <div class="preview-watermark-overlay" id="previewWatermark"
                 style="display:none;position:absolute;pointer-events:none;z-index:4;font-family:inherit;font-weight:900;text-shadow:0 2px 8px rgba(0,0,0,0.6);white-space:nowrap;">
@@ -898,9 +989,11 @@
             <div id="editorText" class="editor-overlay editor-text" data-x="50" data-y="75">
               <span class="editor-text-content" id="editorTextContent">Your text</span>
               <div class="overlay-quick-controls" id="editorTextControls">
-                <button type="button" class="ctrl-btn-size" id="editorTextSizeDec" title="Decrease font size (−)">−</button>
+                <button type="button" class="ctrl-btn-size" id="editorTextSizeDec"
+                  title="Decrease font size (−)">−</button>
                 <span class="ctrl-size-badge" id="editorTextSizeBadge">6%</span>
-                <button type="button" class="ctrl-btn-size" id="editorTextSizeInc" title="Increase font size (+)">+</button>
+                <button type="button" class="ctrl-btn-size" id="editorTextSizeInc"
+                  title="Increase font size (+)">+</button>
                 <span class="ctrl-drag-icon" title="Drag to move">✥</span>
               </div>
               <div class="overlay-resize-handle" id="editorTextResizeHandle" title="Drag corner to resize text">⤡</div>
@@ -949,12 +1042,34 @@
             <div class="two">
               <label>Position
                 <select id="editorLogoPosition">
-                  {% for p in
-                  ['top-left','top-center','top-right','center-left','center','center-right','bottom-left','bottom-center','bottom-right']
-                  %}
-                  <option value="{{ p }}" {% if p=='top-right' %}selected{% endif %}>{{ p|replace('-', ' ')|title }}
+                  
+                  <option value="top-left" >Top Left
                   </option>
-                  {% endfor %}
+                  
+                  <option value="top-center" >Top Center
+                  </option>
+                  
+                  <option value="top-right" selected>Top Right
+                  </option>
+                  
+                  <option value="center-left" >Center Left
+                  </option>
+                  
+                  <option value="center" >Center
+                  </option>
+                  
+                  <option value="center-right" >Center Right
+                  </option>
+                  
+                  <option value="bottom-left" >Bottom Left
+                  </option>
+                  
+                  <option value="bottom-center" >Bottom Center
+                  </option>
+                  
+                  <option value="bottom-right" >Bottom Right
+                  </option>
+                  
                   <option value="custom">Custom / Drag in Preview</option>
                 </select>
               </label>
@@ -995,31 +1110,38 @@
                 <!-- Visual Preset Cards (7 Presets) -->
                 <div class="editor-cap-presets-label">Style Presets:</div>
                 <div class="editor-cap-presets-grid" id="editorCapPresetsGrid">
-                  <button type="button" class="editor-cap-pill active" data-preset="gold_yellow" data-color="#FFE500" data-bg="#000000" data-opacity="75" data-font="Montserrat Black" title="Viral Yellow Punch">
+                  <button type="button" class="editor-cap-pill active" data-preset="gold_yellow" data-color="#FFE500"
+                    data-bg="#000000" data-opacity="75" data-font="Montserrat Black" title="Viral Yellow Punch">
                     <span class="pill-dot" style="background:#FFE500;"></span>
                     <span>Viral Yellow</span>
                   </button>
-                  <button type="button" class="editor-cap-pill" data-preset="lime_green" data-color="#39FF14" data-bg="#000000" data-opacity="75" data-font="Impact" title="Cyber Lime Green">
+                  <button type="button" class="editor-cap-pill" data-preset="lime_green" data-color="#39FF14"
+                    data-bg="#000000" data-opacity="75" data-font="Impact" title="Cyber Lime Green">
                     <span class="pill-dot" style="background:#39FF14;"></span>
                     <span>Cyber Lime</span>
                   </button>
-                  <button type="button" class="editor-cap-pill" data-preset="hormozi" data-color="#FFFFFF" data-bg="#000000" data-opacity="85" data-font="Arial Black" title="Hormozi Bold White">
+                  <button type="button" class="editor-cap-pill" data-preset="hormozi" data-color="#FFFFFF"
+                    data-bg="#000000" data-opacity="85" data-font="Arial Black" title="Hormozi Bold White">
                     <span class="pill-dot" style="background:#FFFFFF;"></span>
                     <span>Hormozi</span>
                   </button>
-                  <button type="button" class="editor-cap-pill" data-preset="cyan_sky" data-color="#00F2FE" data-bg="#05101a" data-opacity="75" data-font="Segoe UI Black" title="TikTok Cyan Pop">
+                  <button type="button" class="editor-cap-pill" data-preset="cyan_sky" data-color="#00F2FE"
+                    data-bg="#05101a" data-opacity="75" data-font="Segoe UI Black" title="TikTok Cyan Pop">
                     <span class="pill-dot" style="background:#00F2FE;"></span>
                     <span>TikTok Cyan</span>
                   </button>
-                  <button type="button" class="editor-cap-pill" data-preset="coral_red" data-color="#FF3344" data-bg="#1a0507" data-opacity="75" data-font="Arial Black" title="Crimson Fire">
+                  <button type="button" class="editor-cap-pill" data-preset="coral_red" data-color="#FF3344"
+                    data-bg="#1a0507" data-opacity="75" data-font="Arial Black" title="Crimson Fire">
                     <span class="pill-dot" style="background:#FF3344;"></span>
                     <span>Crimson Fire</span>
                   </button>
-                  <button type="button" class="editor-cap-pill" data-preset="retro" data-color="#00FF66" data-bg="#0a0a0a" data-opacity="90" data-font="Courier Prime Mono" title="Typewriter Retro">
+                  <button type="button" class="editor-cap-pill" data-preset="retro" data-color="#00FF66"
+                    data-bg="#0a0a0a" data-opacity="90" data-font="Courier Prime Mono" title="Typewriter Retro">
                     <span class="pill-dot" style="background:#00FF66;"></span>
                     <span>Typewriter</span>
                   </button>
-                  <button type="button" class="editor-cap-pill" data-preset="pink_lavender" data-color="#E879F9" data-bg="#15051a" data-opacity="75" data-font="Poppins Bold" title="Neon Lavender">
+                  <button type="button" class="editor-cap-pill" data-preset="pink_lavender" data-color="#E879F9"
+                    data-bg="#15051a" data-opacity="75" data-font="Poppins Bold" title="Neon Lavender">
                     <span class="pill-dot" style="background:#E879F9;"></span>
                     <span>Lavender</span>
                   </button>
@@ -1029,9 +1151,12 @@
                 <div class="editor-cap-arrange-row">
                   <span class="arrange-label">Arrangement:</span>
                   <div class="arrange-btn-group">
-                    <button type="button" class="btn-arrange-pos" data-y="25" title="Top Safe Margin (25%)">Top Safe (25%)</button>
-                    <button type="button" class="btn-arrange-pos" data-y="50" title="Center Seam (50%)">Center (50%)</button>
-                    <button type="button" class="btn-arrange-pos active" data-y="75" title="Lower Safe Margin (75%)">Lower Safe (75%)</button>
+                    <button type="button" class="btn-arrange-pos" data-y="25" title="Top Safe Margin (25%)">Top Safe
+                      (25%)</button>
+                    <button type="button" class="btn-arrange-pos" data-y="50" title="Center Seam (50%)">Center
+                      (50%)</button>
+                    <button type="button" class="btn-arrange-pos active" data-y="75"
+                      title="Lower Safe Margin (75%)">Lower Safe (75%)</button>
                   </div>
                 </div>
 
@@ -1039,9 +1164,11 @@
                 <div class="editor-cap-size-row">
                   <span class="arrange-label">Size:</span>
                   <div class="cap-size-stepper-wrap">
-                    <button type="button" class="btn-cap-size-step" id="editorCapSizeMinus" title="Decrease Size (−)">−</button>
+                    <button type="button" class="btn-cap-size-step" id="editorCapSizeMinus"
+                      title="Decrease Size (−)">−</button>
                     <span class="cap-size-val-badge" id="editorCapSizeValBadge">6%</span>
-                    <button type="button" class="btn-cap-size-step" id="editorCapSizePlus" title="Increase Size (+)">+</button>
+                    <button type="button" class="btn-cap-size-step" id="editorCapSizePlus"
+                      title="Increase Size (+)">+</button>
                   </div>
                   <div class="cap-size-pills">
                     <button type="button" class="btn-size-pill" data-size="4">S</button>
@@ -1049,12 +1176,15 @@
                     <button type="button" class="btn-size-pill" data-size="8">L</button>
                     <button type="button" class="btn-size-pill" data-size="11">XL</button>
                   </div>
-                  <span class="cap-mouse-hint" title="You can also drag corner handles or scroll mouse on preview">🖱️ Mouse Drag</span>
+                  <span class="cap-mouse-hint" title="You can also drag corner handles or scroll mouse on preview">🖱️
+                    Mouse Drag</span>
                 </div>
 
                 <div class="editor-text-controls-sub">
-                  <label class="toggle-row compact" style="margin-top:6px;"><input type="checkbox" id="editorTextEnabled" checked><span class="switch"></span><b>Text Overlay Enabled</b></label>
-                  <textarea id="editorTextValue" maxlength="100" placeholder="Text overlay or subtitle text..."></textarea>
+                  <label class="toggle-row compact" style="margin-top:6px;"><input type="checkbox"
+                      id="editorTextEnabled" checked><span class="switch"></span><b>Text Overlay Enabled</b></label>
+                  <textarea id="editorTextValue" maxlength="100"
+                    placeholder="Text overlay or subtitle text..."></textarea>
                   <div class="two">
                     <label>Font Size %<input id="editorTextSize" type="number" min="2" max="25" value="6"></label>
                     <label>Text Color<input id="editorTextColor" type="color" value="#FFE500"></label>
@@ -1071,11 +1201,14 @@
                         <option value="Trebuchet MS">Trebuchet MS</option>
                       </select>
                     </label>
-                    <label class="toggle-row compact" style="align-self:flex-end;margin-bottom:6px;"><input type="checkbox" id="editorTextBg"><span class="switch"></span><b>Background Box</b></label>
+                    <label class="toggle-row compact" style="align-self:flex-end;margin-bottom:6px;"><input
+                        type="checkbox" id="editorTextBg"><span class="switch"></span><b>Background Box</b></label>
                   </div>
                   <div class="two">
                     <label>BG Color<input id="editorTextBgColor" type="color" value="#000000"></label>
-                    <div class="slider-row"><label>BG Opacity <output id="editorTextBgOpacityOut">75%</output></label><input id="editorTextBgOpacity" type="range" min="0" max="100" value="75"></div>
+                    <div class="slider-row"><label>BG Opacity <output
+                          id="editorTextBgOpacityOut">75%</output></label><input id="editorTextBgOpacity" type="range"
+                        min="0" max="100" value="75"></div>
                   </div>
                 </div>
               </div>
@@ -1107,12 +1240,14 @@
             <span class="tray-count-badge" id="editorShortsCountBadge">0 clips</span>
           </div>
           <div class="tray-hint">Click any clip below to load into Editor, customize captions &amp; re-export</div>
-          <button type="button" class="btn-refresh-tray" id="btnRefreshEditorShorts" title="Refresh clips">↻ Refresh Clips</button>
+          <button type="button" class="btn-refresh-tray" id="btnRefreshEditorShorts" title="Refresh clips">↻ Refresh
+            Clips</button>
         </div>
         <div class="editor-shorts-filmstrip" id="editorShortsFilmstrip">
           <div class="empty-tray-msg" id="emptyEditorShortsMsg">
             <span style="font-weight:700;display:block;margin-bottom:4px;">🎬 No rendered Shorts yet.</span>
-            <small style="opacity:0.65;">Clips generated in Create, Instant Clipping, or Beta will appear here for instant re-editing.</small>
+            <small style="opacity:0.65;">Clips generated in Create, Instant Clipping, or Beta will appear here for
+              instant re-editing.</small>
           </div>
         </div>
       </div>
@@ -1290,11 +1425,14 @@
                   <span>⚡ Generate Another Clip</span>
                 </button>
                 <a id="btnInstantDownload" class="btn btn-secondary" download href="#"
-                  style="flex:1;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;">Download Short ↓</a>
+                  style="flex:1;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;">Download
+                  Short ↓</a>
               </div>
               <div class="instant-export-row">
-                <button type="button" id="btnInstantDownloadAll" class="btn btn-secondary" style="flex:1;display:none;">Download All Clips ↓</button>
-                <button type="button" id="btnInstantOpenEditor" class="btn btn-secondary" style="flex:1;">Open in Editor ✂️</button>
+                <button type="button" id="btnInstantDownloadAll" class="btn btn-secondary"
+                  style="flex:1;display:none;">Download All Clips ↓</button>
+                <button type="button" id="btnInstantOpenEditor" class="btn btn-secondary" style="flex:1;">Open in Editor
+                  ✂️</button>
               </div>
             </div>
           </div>
@@ -1391,7 +1529,20 @@
               <div style="flex:1;height:1px;background:rgba(255,255,255,0.08);"></div>
             </div>
 
-            <div style="display:flex;gap:8px;margin-top:12px;">
+            <div id="betaSourcePlatformGroup"
+              style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;">
+              <span
+                style="font-size:0.75rem;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:0.06em;font-weight:700;margin-right:4px;">Source
+                Platform:</span>
+              <button type="button" class="beta-platform-pill active" data-platform="youtube"
+                style="padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,0.35);background:#ffffff;color:#050507;font-size:0.78rem;font-weight:700;cursor:pointer;">YouTube</button>
+              <button type="button" class="beta-platform-pill" data-platform="twitch"
+                style="padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,0.16);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.82);font-size:0.78rem;font-weight:600;cursor:pointer;">Twitch</button>
+              <button type="button" class="beta-platform-pill" data-platform="kick"
+                style="padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,0.16);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.82);font-size:0.78rem;font-weight:600;cursor:pointer;">Kick</button>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:8px;">
               <input type="url" id="betaYtUrl" name="beta_youtube_url_no_autofill"
                 placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" autocorrect="off"
                 autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true"
@@ -1510,8 +1661,9 @@
                     </select>
                   </label>
                   <div style="display:flex;align-items:center;padding-top:14px;">
-                    <label class="toggle-row compact" style="margin:0;"><input type="checkbox" id="betaPremiumCaptions" checked><span
-                        class="switch"></span><b style="font-size:0.75rem;">Scale Pop Animation</b></label>
+                    <label class="toggle-row compact" style="margin:0;"><input type="checkbox" id="betaPremiumCaptions"
+                        checked><span class="switch"></span><b style="font-size:0.75rem;">Scale Pop
+                        Animation</b></label>
                   </div>
                 </div>
                 <div style="margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.05);">
@@ -1523,7 +1675,13 @@
                 <div class="caption-studio-panel">
                   <div class="caption-studio-head">
                     <div class="caption-studio-title">
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="4"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="14" y2="13"/><line x1="7" y1="17" x2="11" y2="17"/></svg>
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                        stroke-width="2">
+                        <rect x="2" y="2" width="20" height="20" rx="4" />
+                        <line x1="7" y1="9" x2="17" y2="9" />
+                        <line x1="7" y1="13" x2="14" y2="13" />
+                        <line x1="7" y1="17" x2="11" y2="17" />
+                      </svg>
                       <span>Caption Designs &amp; Position Playground</span>
                     </div>
                     <span class="caption-studio-badge">DRAG &amp; RESIZE WITH MOUSE</span>
@@ -1531,7 +1689,9 @@
 
                   <!-- 1. All Caption Designs Showcase -->
                   <div style="display:flex;flex-direction:column;gap:6px;">
-                    <span style="font-size:0.75rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.04em;font-weight:700;">Choose Caption Design (Live Preview)</span>
+                    <span
+                      style="font-size:0.75rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.04em;font-weight:700;">Choose
+                      Caption Design (Live Preview)</span>
                     <div class="caption-styles-grid" id="captionStylesGrid">
                       <!-- Rendered dynamically by caption_playground.js -->
                     </div>
@@ -1539,13 +1699,19 @@
 
                   <!-- 2. Interactive 9:16 Phone Canvas & Mouse Adjusters -->
                   <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">
-                    <span style="font-size:0.75rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.04em;font-weight:700;">Interactive 9:16 Stage · Drag Position &amp; Scale with Mouse</span>
+                    <span
+                      style="font-size:0.75rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.04em;font-weight:700;">Interactive
+                      9:16 Stage · Drag Position &amp; Scale with Mouse</span>
                     <div class="caption-stage-container">
                       <!-- Phone Mockup Stage -->
-                      <div class="caption-phone-stage" id="captionPhoneStage" title="Click &amp; Drag caption with mouse to move vertically">
-                        <div class="caption-stage-guide caption-guide-top"><span class="caption-guide-label">Top Safe</span></div>
-                        <div class="caption-stage-guide caption-guide-center"><span class="caption-guide-label">Center Seam</span></div>
-                        <div class="caption-stage-guide caption-guide-lower"><span class="caption-guide-label">Lower Safe</span></div>
+                      <div class="caption-phone-stage" id="captionPhoneStage"
+                        title="Click &amp; Drag caption with mouse to move vertically">
+                        <div class="caption-stage-guide caption-guide-top"><span class="caption-guide-label">Top
+                            Safe</span></div>
+                        <div class="caption-stage-guide caption-guide-center"><span class="caption-guide-label">Center
+                            Seam</span></div>
+                        <div class="caption-stage-guide caption-guide-lower"><span class="caption-guide-label">Lower
+                            Safe</span></div>
 
                         <!-- Draggable / Resizable Caption Box -->
                         <div class="caption-drag-box" id="captionDragBox" style="top:75%;">
@@ -1553,7 +1719,8 @@
                           <div class="caption-drag-text cap-style-gold" id="captionDragText">
                             MAKE EVERY CLIP <span class="cap-word-pop">VIRAL</span> TODAY
                           </div>
-                          <div class="caption-resize-corner" id="captionResizeCorner" title="Drag corner or scroll mouse wheel to resize"></div>
+                          <div class="caption-resize-corner" id="captionResizeCorner"
+                            title="Drag corner or scroll mouse wheel to resize"></div>
                         </div>
                       </div>
 
@@ -1562,27 +1729,39 @@
                         <div class="caption-control-group">
                           <label>Vertical Position <span>Mouse Drag Enabled</span></label>
                           <div class="caption-pos-quick-row">
-                            <button type="button" class="caption-btn-pill caption-pos-pill" data-pos="top">Top (25%)</button>
-                            <button type="button" class="caption-btn-pill caption-pos-pill" data-pos="center">Center (50%)</button>
-                            <button type="button" class="caption-btn-pill caption-pos-pill active" data-pos="lower">Lower Safe (75%)</button>
-                            <button type="button" class="caption-btn-pill caption-pos-pill" data-pos="bottom">Bottom (84%)</button>
+                            <button type="button" class="caption-btn-pill caption-pos-pill" data-pos="top">Top
+                              (25%)</button>
+                            <button type="button" class="caption-btn-pill caption-pos-pill" data-pos="center">Center
+                              (50%)</button>
+                            <button type="button" class="caption-btn-pill caption-pos-pill active"
+                              data-pos="lower">Lower Safe (75%)</button>
+                            <button type="button" class="caption-btn-pill caption-pos-pill" data-pos="bottom">Bottom
+                              (84%)</button>
                           </div>
                         </div>
 
                         <div class="caption-control-group">
                           <label>Caption Size <span id="captionSizeBadge" class="caption-size-badge">44px</span></label>
                           <div class="caption-size-row">
-                            <button type="button" class="caption-btn-step" id="captionSizeDec" title="Decrease font size">-</button>
-                            <input type="range" class="caption-size-slider" id="captionSizeSlider" min="24" max="76" value="44">
-                            <button type="button" class="caption-btn-step" id="captionSizeInc" title="Increase font size">+</button>
+                            <button type="button" class="caption-btn-step" id="captionSizeDec"
+                              title="Decrease font size">-</button>
+                            <input type="range" class="caption-size-slider" id="captionSizeSlider" min="24" max="76"
+                              value="44">
+                            <button type="button" class="caption-btn-step" id="captionSizeInc"
+                              title="Increase font size">+</button>
                           </div>
                           <div class="caption-pos-quick-row" style="margin-top:4px;">
-                            <button type="button" class="caption-btn-pill caption-size-preset-pill" data-size="32">Small (32px)</button>
-                            <button type="button" class="caption-btn-pill caption-size-preset-pill active" data-size="44">Medium (44px)</button>
-                            <button type="button" class="caption-btn-pill caption-size-preset-pill" data-size="56">Large (56px)</button>
-                            <button type="button" class="caption-btn-pill caption-size-preset-pill" data-size="68">Extra Large (68px)</button>
+                            <button type="button" class="caption-btn-pill caption-size-preset-pill" data-size="32">Small
+                              (32px)</button>
+                            <button type="button" class="caption-btn-pill caption-size-preset-pill active"
+                              data-size="44">Medium (44px)</button>
+                            <button type="button" class="caption-btn-pill caption-size-preset-pill" data-size="56">Large
+                              (56px)</button>
+                            <button type="button" class="caption-btn-pill caption-size-preset-pill" data-size="68">Extra
+                              Large (68px)</button>
                           </div>
-                          <small style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-top:2px;">Tip: You can also hover over the caption and scroll your mouse wheel to resize!</small>
+                          <small style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-top:2px;">Tip: You can
+                            also hover over the caption and scroll your mouse wheel to resize!</small>
                         </div>
                       </div>
                     </div>
@@ -1690,9 +1869,11 @@
                 style="display:none;position:absolute;left:50%;top:25%;transform:translate(-50%,-50%);">
                 <div id="betaTextDragContent" class="beta-text-drag-content">WAIT FOR IT! 😱</div>
                 <div class="beta-drag-badge">
-                  <button type="button" class="ctrl-btn-size" id="betaTextSizeDec" title="Decrease font size (−)" style="margin-right:2px;">−</button>
+                  <button type="button" class="ctrl-btn-size" id="betaTextSizeDec" title="Decrease font size (−)"
+                    style="margin-right:2px;">−</button>
                   <span id="betaTextSizeBadge" class="ctrl-size-badge" style="margin-right:2px;">42px</span>
-                  <button type="button" class="ctrl-btn-size" id="betaTextSizeInc" title="Increase font size (+)" style="margin-right:6px;">+</button>
+                  <button type="button" class="ctrl-btn-size" id="betaTextSizeInc" title="Increase font size (+)"
+                    style="margin-right:6px;">+</button>
                   <span class="ctrl-drag-icon">✥ Drag</span> · <span id="betaDragCoordBadge">50%, 25%</span> · <span
                     id="betaDragTimeBadge">0.0s – 5.0s</span>
                 </div>
@@ -1922,6 +2103,36 @@
     </section>
 
     <!-- ==========================================================================
+         Storage & Data Locations (Black & White Aesthetic)
+         ========================================================================== -->
+    <section class="page-section" id="storage" style="display:none;">
+      <div class="storage-container" style="max-width:980px;margin:0 auto;padding:24px 20px;">
+        <header
+          style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.1);">
+          <div>
+            <span class="eyebrow"
+              style="color:rgba(255,255,255,0.55);font-size:0.72rem;letter-spacing:0.12em;font-weight:700;text-transform:uppercase;">SYSTEM
+              STORAGE &amp; PATHS</span>
+            <h1 style="margin:4px 0 6px;font-size:1.75rem;color:#ffffff;font-weight:800;letter-spacing:-0.02em;">Storage
+              Locations</h1>
+            <p style="margin:0;color:rgba(255,255,255,0.6);font-size:0.9rem;">Change where Clipify AI stores rendered
+              Shorts, Ollama models, and Whisper/Hugging Face caches. Optionally move your existing data cleanly.</p>
+          </div>
+          <button type="button" id="btnRefreshStorage" class="btn btn-secondary"
+            style="background:#111114;border:1px solid rgba(255,255,255,0.18);color:#fff;padding:9px 16px;border-radius:10px;font-weight:600;cursor:pointer;">↻
+            Refresh Usage</button>
+        </header>
+
+        <div id="storageCardsGrid" style="display:grid;grid-template-columns:1fr;gap:16px;">
+          <!-- Populated dynamically by loadStorageConfig() -->
+          <div
+            style="padding:28px;border:1px solid rgba(255,255,255,0.08);border-radius:14px;background:#09090b;color:rgba(255,255,255,0.6);">
+            Loading storage configuration…</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
          Trending Live Broadcasts & Gameplay Section (YouTube, Twitch, Kick)
          ========================================================================== -->
     <section class="page-section" id="trending" style="display:none;">
@@ -1930,25 +2141,36 @@
         <header class="trending-header">
           <div class="trending-hero-wrap">
             <div>
-              <span class="eyebrow" style="color:#ffffff;display:flex;align-items:center;gap:6px;font-size:0.72rem;letter-spacing:0.08em;font-weight:700;">
+              <span class="eyebrow"
+                style="color:#ffffff;display:flex;align-items:center;gap:6px;font-size:0.72rem;letter-spacing:0.08em;font-weight:700;">
                 <span class="trending-live-dot" style="margin-right:2px;"></span> LIVE DISCOVERY &amp; VIRAL CURATION
               </span>
               <h1>Trending Streams &amp; Gameplay</h1>
-              <p>Explore current live broadcasts and trending gaming clips across YouTube, Twitch &amp; Kick. Instant one-click clipping straight into Live Studio or Create Studio.</p>
+              <p>Explore current live broadcasts and trending gaming clips across YouTube, Twitch &amp; Kick. Instant
+                one-click clipping straight into Live Studio or Create Studio.</p>
             </div>
 
             <!-- Top 3 Platform Switcher (YouTube, Twitch, Kick) -->
             <div class="trending-platform-bar" role="tablist">
-              <button type="button" class="trending-tab-btn active" data-platform="youtube" role="tab" aria-selected="true">
-                <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+              <button type="button" class="trending-tab-btn active" data-platform="youtube" role="tab"
+                aria-selected="true">
+                <svg viewBox="0 0 24 24">
+                  <path
+                    d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                </svg>
                 <span>YouTube</span>
               </button>
               <button type="button" class="trending-tab-btn" data-platform="twitch" role="tab" aria-selected="false">
-                <svg viewBox="0 0 24 24"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></svg>
+                <svg viewBox="0 0 24 24">
+                  <path
+                    d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z" />
+                </svg>
                 <span>Twitch</span>
               </button>
               <button type="button" class="trending-tab-btn" data-platform="kick" role="tab" aria-selected="false">
-                <svg viewBox="0 0 24 24"><path d="M3 3h4.8v6.4L13.8 3h6L12.9 10.8 20.4 21h-6.2l-6.4-8.8V21H3z"/></svg>
+                <svg viewBox="0 0 24 24">
+                  <path d="M3 3h4.8v6.4L13.8 3h6L12.9 10.8 20.4 21h-6.2l-6.4-8.8V21H3z" />
+                </svg>
                 <span>Kick</span>
               </button>
             </div>
@@ -1957,8 +2179,13 @@
           <!-- Search & Filter Bar -->
           <div class="trending-toolbar">
             <div class="trending-search-wrap">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input type="text" class="trending-search-input" id="trendingSearchInput" placeholder="Search live streams, game titles or creators (e.g. GTA 6, Valorant, Speed, Kai)..." autocomplete="off" spellcheck="false">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input type="text" class="trending-search-input" id="trendingSearchInput"
+                placeholder="Search live streams, game titles or creators (e.g. GTA 6, Valorant, Speed, Kai)..."
+                autocomplete="off" spellcheck="false">
             </div>
 
             <div class="trending-quick-chips">
@@ -1972,7 +2199,9 @@
             </div>
 
             <button type="button" class="trending-refresh-btn" id="trendingRefreshBtn" title="Refresh live streams">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+              </svg>
               <span>Refresh</span>
             </button>
           </div>
@@ -1997,7 +2226,13 @@
           <div class="trending-section-block">
             <div class="trending-section-title-wrap">
               <h3 class="trending-section-title">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="6" cy="6" r="3" />
+                  <circle cx="6" cy="18" r="3" />
+                  <line x1="20" y1="4" x2="8.12" y2="15.88" />
+                  <line x1="14.47" y1="14.48" x2="20" y2="20" />
+                  <line x1="8.12" y1="8.12" x2="12" y2="12" />
+                </svg>
                 Trending Gameplay Videos
               </h3>
               <span class="trending-stream-count">High-CTR Clip Candidates</span>
@@ -2013,7 +2248,8 @@
           <div class="trending-section-block">
             <div class="trending-section-title-wrap">
               <h3 class="trending-section-title" id="trendingGenericTitle">
-                <span class="trending-live-dot" style="background:#9146FF;box-shadow:0 0 10px #9146FF;"></span> Top Live Broadcasts
+                <span class="trending-live-dot" style="background:#9146FF;box-shadow:0 0 10px #9146FF;"></span> Top Live
+                Broadcasts
               </h3>
               <span class="trending-stream-count">Real-time Stream Directory</span>
             </div>
@@ -2142,7 +2378,8 @@
     <!-- App-Themed Update Modal Popup with Live Moving Matrix Canvas Background -->
     <div id="updateModal" class="modal-overlay update-modal-overlay"
       style="display:none;position:fixed;inset:0;background:#050508;z-index:9999;align-items:center;justify-content:center;padding:20px;overflow:hidden;">
-      <canvas id="updateModalAsciiCanvas" class="restart-ascii-canvas update-modal-ascii-canvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;opacity:0.42;"></canvas>
+      <canvas id="updateModalAsciiCanvas" class="restart-ascii-canvas update-modal-ascii-canvas"
+        style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;opacity:0.42;"></canvas>
       <div class="modal-card panel update-modal-card"
         style="background:rgba(16,18,24,0.94);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,0.16);border-radius:22px;max-width:520px;width:100%;box-shadow:0 30px 90px rgba(0,0,0,0.85), 0 0 50px rgba(129,140,248,0.10);padding:26px;position:relative;z-index:10;animation:restartModalPop 0.35s cubic-bezier(0.16,1,0.3,1);">
         <button type="button" class="modal-close-btn" id="closeUpdateModal"
@@ -2397,8 +2634,7 @@
   <script src="static/gpu_selector.js"></script>
   <script>
     if (window.location.search.includes('open_support=1') || window.location.hash.includes('support')) {
-      window.addEventListener('load', () => setTimeout(() => window.showSupportModal && window.showSupportModal(), 300));
-    }
+      window.addEventListener('load', () => setTimeout(() => window.showSupportModal && window.showSupportModal(), 0))
   </script>
 </body>
 

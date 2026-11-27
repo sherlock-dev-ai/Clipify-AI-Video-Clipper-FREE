@@ -72,6 +72,7 @@ class StreamConnector:
         ffmpeg_bin: str,
         python_bin: Optional[str] = None,
         segment_duration: int = 5,
+        stream_quality: str = "1080p",
         on_segment_ready: Optional[Callable[[Path, int, float], None]] = None,
         on_status_change: Optional[Callable[[str, str], None]] = None,
         on_error: Optional[Callable[[str], None]] = None,
@@ -82,6 +83,7 @@ class StreamConnector:
         self.ffmpeg_bin = ffmpeg_bin
         self.python_bin = python_bin or "python"
         self.segment_duration = max(3, min(15, segment_duration))
+        self.stream_quality = (stream_quality or "1080p").lower().strip()
         self.on_segment_ready = on_segment_ready
         self.on_status_change = on_status_change
         self.on_error = on_error
@@ -156,6 +158,8 @@ class StreamConnector:
                 )
                 if proc.returncode == 0 and proc.stdout.strip():
                     data = json.loads(proc.stdout.strip().splitlines()[0])
+                    if data.get("id"):
+                        self.stream_metadata["video_id"] = str(data["id"])
                     self.stream_metadata["title"] = data.get("title", "YouTube Live Stream")
                     self.stream_metadata["author"] = data.get("uploader", "")
                     self.stream_metadata["is_live"] = bool(data.get("is_live", True))
@@ -248,15 +252,22 @@ class StreamConnector:
         return self.stream_metadata
 
     def _resolve_youtube_stream(self) -> tuple[bool, list[str], str]:
-        """Resolve YouTube Live stream manifests using yt-dlp with anti-bot arguments."""
-        self._notify_status("resolving", "Resolving YouTube Live stream feed...")
+        """Resolve YouTube Live stream manifests using yt-dlp with HD quality preference."""
+        self._notify_status("resolving", f"Resolving YouTube Live stream ({self.stream_quality.upper()})...")
+        q_map = {
+            "best": ("bv*+ba/b", "res:2160,res:1440,res:1080,fps:60,vbr"),
+            "1080p": ("bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b", "res:1080,fps:60,vbr"),
+            "720p": ("bv*[height<=720]+ba/b[height<=720]/b", "res:720,fps:60,vbr"),
+            "480p": ("bv*[height<=480]+ba/b[height<=480]/b", "res:480,vbr"),
+        }
+        fmt_sel, fmt_sort = q_map.get(self.stream_quality, q_map["1080p"])
         try:
             cmd = [
                 self.python_bin, "-m", "yt_dlp",
                 "-g", "--no-warnings", "--no-playlist",
-                "--extractor-args", "youtube:player_client=android,web",
-                "-f", "bv*+ba/best/b",
-                "--format-sort", "res:2160,res:1440,res:1080,fps:60,vbr",
+                "--extractor-args", "youtube:player_client=web,tv,android",
+                "-f", fmt_sel,
+                "--format-sort", fmt_sort,
                 "--socket-timeout", "15",
                 self.source_url,
             ]
@@ -430,11 +441,19 @@ class StreamConnector:
         """Construct the FFmpeg command for the configured source."""
         out_pattern = str(self.buffer_dir / "chunk_%05d.mp4")
 
-        # High-performance encoding for rolling buffer segments (max quality, high bitrate)
+        # High-performance encoding for rolling buffer segments (hardware accelerated via selected GPU)
+        try:
+            from clipify.platform.gpu_manager import get_ffmpeg_video_encoder_flags
+            enc_flags = get_ffmpeg_video_encoder_flags(bitrate="16M", preset="veryfast", crf=14)
+        except Exception:
+            enc_flags = [
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "14",
+                "-b:v", "16M", "-maxrate", "24M", "-bufsize", "32M",
+                "-pix_fmt", "yuv420p"
+            ]
+
         common_output = [
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "14",
-            "-b:v", "16M", "-maxrate", "24M", "-bufsize", "32M",
-            "-pix_fmt", "yuv420p",
+            *enc_flags,
             "-c:a", "aac", "-b:a", "192k", "-ar", "16000",
             "-f", "segment",
             "-segment_time", str(self.segment_duration),

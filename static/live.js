@@ -57,6 +57,11 @@
   const chipSensitivity = document.getElementById('chipSensitivity');
   const bufferWindowSelect = document.getElementById('bufferWindowSelect');
   const liveModelSelect = document.getElementById('liveModelSelect');
+  const liveAiProviderSelect = document.getElementById('liveAiProviderSelect');
+  const liveOllamaModelRow = document.getElementById('liveOllamaModelRow');
+  const liveHfConfigRow = document.getElementById('liveHfConfigRow');
+  const liveHfModelSelect = document.getElementById('liveHfModelSelect');
+  const liveHfTokenInput = document.getElementById('liveHfTokenInput');
   const clipFormatSelect = document.getElementById('clipFormatSelect');
 
   // AI Smart Editing Preferences
@@ -130,6 +135,7 @@
   const modalPreviewEditBtn = document.getElementById('modalPreviewEditBtn');
   const closeClipModal = document.getElementById('closeClipModal');
   const captionLanguageSelect = document.getElementById('captionLanguageSelect');
+  const streamQualitySelect = document.getElementById('streamQualitySelect');
 
   // Clip Quick Edit Modal elements
   const clipEditModal = document.getElementById('clipEditModal');
@@ -221,6 +227,20 @@
   async function loadOllamaModels() {
     if (!liveModelSelect) return;
     try {
+      const cfgResp = await fetch('/api/models/config').catch(() => null);
+      if (cfgResp && cfgResp.ok) {
+        const cfg = await cfgResp.json();
+        if (liveAiProviderSelect && cfg.provider && (cfg.provider === 'ollama' || cfg.provider === 'huggingface')) {
+          liveAiProviderSelect.value = cfg.provider;
+          toggleLiveProviderUI(cfg.provider);
+        }
+        if (liveHfModelSelect && cfg.hf_model) {
+          liveHfModelSelect.value = cfg.hf_model;
+        }
+        if (liveHfTokenInput && cfg.hf_token_masked) {
+          liveHfTokenInput.placeholder = `Saved: ${cfg.hf_token_masked}`;
+        }
+      }
       const resp = await fetch('/api/models');
       const data = await resp.json();
       const models = (data && Array.isArray(data.models)) ? data.models : [];
@@ -383,7 +403,11 @@
         auto_captions: toggleAutoCaptions ? toggleAutoCaptions.checked : true,
         auto_clip_interval: autoClipIntervalSelect ? parseInt(autoClipIntervalSelect.value, 10) : 5,
         auto_clip_target: autoClipTargetInput ? parseInt(autoClipTargetInput.value, 10) : 10,
-        model_name: liveModelSelect ? liveModelSelect.value : 'qwen2.5:3b',
+        model_name: (liveAiProviderSelect && liveAiProviderSelect.value === 'huggingface')
+          ? (liveHfModelSelect ? liveHfModelSelect.value : 'Qwen/Qwen2.5-7B-Instruct')
+          : (liveModelSelect ? liveModelSelect.value : 'qwen2.5:3b'),
+        ai_provider: liveAiProviderSelect ? liveAiProviderSelect.value : 'ollama',
+        hf_model: liveHfModelSelect ? liveHfModelSelect.value : 'Qwen/Qwen2.5-7B-Instruct',
         caption_style: captionStyleSelect ? captionStyleSelect.value : 'highlight',
         caption_font: captionFontSelect ? captionFontSelect.value : 'Montserrat Extra Bold',
         caption_language: captionLanguageSelect ? captionLanguageSelect.value : 'en',
@@ -398,6 +422,50 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       }).catch(() => {});
+    }
+
+    function toggleLiveProviderUI(prov) {
+      const isHf = prov === 'huggingface';
+      if (liveOllamaModelRow) liveOllamaModelRow.style.display = isHf ? 'none' : 'grid';
+      if (liveHfConfigRow) liveHfConfigRow.style.display = isHf ? 'grid' : 'none';
+    }
+
+    async function saveLiveProviderConfig() {
+      const payload = {
+        provider: liveAiProviderSelect ? liveAiProviderSelect.value : 'ollama',
+        hf_model: liveHfModelSelect ? liveHfModelSelect.value : 'Qwen/Qwen2.5-7B-Instruct',
+      };
+      if (liveHfTokenInput && liveHfTokenInput.value.trim()) {
+        payload.hf_token = liveHfTokenInput.value.trim();
+      }
+      await fetch('/api/models/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
+    }
+
+    if (liveAiProviderSelect) {
+      liveAiProviderSelect.addEventListener('change', () => {
+        const prov = liveAiProviderSelect.value;
+        toggleLiveProviderUI(prov);
+        appendConsoleLog(`AI Engine switched to: ${prov === 'huggingface' ? 'Free Hugging Face API' : 'Local Ollama'}`, 'info');
+        saveLiveProviderConfig();
+        sendLivePrefs();
+      });
+    }
+
+    if (liveHfModelSelect) {
+      liveHfModelSelect.addEventListener('change', () => {
+        saveLiveProviderConfig();
+        sendLivePrefs();
+      });
+    }
+
+    if (liveHfTokenInput) {
+      liveHfTokenInput.addEventListener('change', () => {
+        saveLiveProviderConfig();
+      });
     }
 
     if (liveModelSelect) {
@@ -693,13 +761,18 @@
         body: JSON.stringify({
           source_type: sourceType,
           source_url: sourceUrl,
+          stream_quality: streamQualitySelect ? streamQualitySelect.value : '1080p',
           auto_clip: toggleAutoClip ? toggleAutoClip.checked : false,
           caption_language: captionLanguageSelect ? captionLanguageSelect.value : 'en',
           auto_clip_interval: autoClipIntervalSelect ? parseInt(autoClipIntervalSelect.value, 10) : 5,
           auto_clip_target: autoClipTargetInput ? parseInt(autoClipTargetInput.value, 10) : 10,
           sensitivity: sensitivitySlider ? parseInt(sensitivitySlider.value, 10) : 5,
           buffer_minutes: bufferWindowSelect ? parseInt(bufferWindowSelect.value, 10) : 10,
-          model_name: liveModelSelect ? liveModelSelect.value : 'qwen2.5:3b',
+          model_name: (liveAiProviderSelect && liveAiProviderSelect.value === 'huggingface')
+          ? (liveHfModelSelect ? liveHfModelSelect.value : 'Qwen/Qwen2.5-7B-Instruct')
+          : (liveModelSelect ? liveModelSelect.value : 'qwen2.5:3b'),
+        ai_provider: liveAiProviderSelect ? liveAiProviderSelect.value : 'ollama',
+        hf_model: liveHfModelSelect ? liveHfModelSelect.value : 'Qwen/Qwen2.5-7B-Instruct',
           auto_edit: toggleAutoEdit ? toggleAutoEdit.checked : true,
           face_tracking: toggleFaceTrack ? toggleFaceTrack.checked : true,
           gaming_layout: toggleGamingLayout ? toggleGamingLayout.checked : true,
@@ -853,7 +926,8 @@
     openFullEditorBtn?.addEventListener('click', () => {
       if (!activeEditingClip) return;
       const videoSrc = activeEditingClip.vertical_video || '';
-      window.location.href = `/#editor?video=${encodeURIComponent(videoSrc)}&title=${encodeURIComponent(activeEditingClip.title)}`;
+      const editorBase = (window.AndroidBridge || window.location.protocol === 'file:') ? 'index.html#editor' : '/#editor';
+      window.location.href = `${editorBase}?video=${encodeURIComponent(videoSrc)}&title=${encodeURIComponent(activeEditingClip.title)}`;
     });
   }
 
@@ -939,12 +1013,12 @@
 
       // Check YouTube or Twitch or Kick live stream URL for embedded playback
       const streamUrl = statusData.source_url || (liveSourceUrl ? liveSourceUrl.value.trim() : '');
-      const ytId = extractYoutubeId(streamUrl);
+      const ytId = (statusData.metadata && statusData.metadata.video_id) || extractYoutubeId(streamUrl);
       const twitchCh = (statusData.source_type === 'twitch' || currentSourceType === 'twitch') ? extractTwitchChannel(streamUrl) : null;
       const kickCh = (statusData.source_type === 'kick' || currentSourceType === 'kick') ? extractKickChannel(streamUrl) : null;
 
       if (ytId && monitorLiveEmbed) {
-        const expectedSrc = `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&mute=0&controls=1&modestbranding=1&rel=0`;
+        const expectedSrc = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&playsinline=1&controls=1&modestbranding=1&rel=0`;
         if (!monitorLiveEmbed.src || !monitorLiveEmbed.src.includes(ytId)) {
           monitorLiveEmbed.src = expectedSrc;
         }

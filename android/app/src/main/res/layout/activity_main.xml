@@ -66,6 +66,23 @@
             android:layout_height="0dp"
             android:layout_weight="1" />
 
+        <TextView
+            android:id="@+id/btn_header_update"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:gravity="center"
+            android:text="↓ Update"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:background="#18181B"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_marginEnd="6dp" />
+
         <ImageButton
             android:id="@+id/btn_header_tour"
             android:layout_width="34dp"
@@ -103,7 +120,7 @@
         android:scrollbars="vertical"
         android:background="#000000"
         app:layout_constraintTop_toBottomOf="@id/header_divider"
-        app:layout_constraintBottom_toTopOf="@id/bottom_navigation" />
+        app:layout_constraintBottom_toTopOf="@id/bottom_nav_scroll" />
 
     <!-- Progress Indicator Overlay -->
     <ProgressBar
@@ -115,18 +132,163 @@
         android:visibility="gone"
         app:layout_constraintTop_toBottomOf="@id/header_divider" />
 
-    <!-- Bottom Navigation Bar for Mobile Ergonomics -->
-    <com.google.android.material.bottomnavigation.BottomNavigationView
-        android:id="@+id/bottom_navigation"
+    <!-- Slideable Horizontal Bottom Navigation Bar -->
+    <HorizontalScrollView
+        android:id="@+id/bottom_nav_scroll"
         android:layout_width="match_parent"
-        android:layout_height="58dp"
+        android:layout_height="68dp"
         android:background="#09090b"
-        app:itemTextColor="@color/nav_item_color"
-        app:itemIconTint="@color/nav_item_color"
-        app:itemActiveIndicatorStyle="@style/ClipifyNavActiveIndicator"
-        app:itemRippleColor="@null"
-        app:labelVisibilityMode="labeled"
-        app:menu="@menu/bottom_nav_menu"
-        app:layout_constraintBottom_toBottomOf="parent" />
+        android:scrollbars="none"
+        android:overScrollMode="always"
+        android:fillViewport="true"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <LinearLayout
+            android:id="@+id/bottom_nav_container"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
+
+            <LinearLayout
+                android:id="@+id/nav_tab_create"
+                android:layout_width="wrap_content"
+                android:layout_height="52dp"
+                android:minWidth="72dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:background="#18181B"
+                android:clickable="true"
+                android:focusable="true">
+                <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_nav_create" android:tint="#FFFFFF" android:contentDescription="Create" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Create" android:textColor="#FFFFFF" android:textSize="11sp" android:textStyle="bold" android:layout_marginTop="3dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/nav_tab_instant"
+                android:layout_width="wrap_content"
+                android:layout_height="52dp"
+                android:minWidth="72dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:clickable="true"
+                android:focusable="true">
+                <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_nav_instant" android:tint="#71717A" android:contentDescription="Instant" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Instant" android:textColor="#71717A" android:textSize="11sp" android:layout_marginTop="3dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/nav_tab_trending"
+                android:layout_width="wrap_content"
+                android:layout_height="52dp"
+                android:minWidth="72dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:clickable="true"
+                android:focusable="true">
+                <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_nav_trending" android:tint="#71717A" android:contentDescription="Trending" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Trending" android:textColor="#71717A" android:textSize="11sp" android:layout_marginTop="3dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/nav_tab_editor"
+                android:layout_width="wrap_content"
+                android:layout_height="52dp"
+                android:minWidth="72dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:clickable="true"
+                android:focusable="true">
+                <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_nav_editor" android:tint="#71717A" android:contentDescription="Editor" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Editor" android:textColor="#71717A" android:textSize="11sp" android:layout_marginTop="3dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/nav_tab_live"
+                android:layout_width="wrap_content"
+                android:layout_height="52dp"
+                android:minWidth="72dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:clickable="true"
+                android:focusable="true">
+                <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_nav_live" android:tint="#71717A" android:contentDescription="Live" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Live" android:textColor="#71717A" android:textSize="11sp" android:layout_marginTop="3dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/nav_tab_narrate"
+                android:layout_width="wrap_content"
+                android:layout_height="52dp"
+                android:minWidth="72dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:clickable="true"
+                android:focusable="true">
+                <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_nav_narrate" android:tint="#71717A" android:contentDescription="Narrate" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Narrate" android:textColor="#71717A" android:textSize="11sp" android:layout_marginTop="3dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/nav_tab_projects"
+                android:layout_width="wrap_content"
+                android:layout_height="52dp"
+                android:minWidth="72dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:clickable="true"
+                android:focusable="true">
+                <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_nav_projects" android:tint="#71717A" android:contentDescription="Projects" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Projects" android:textColor="#71717A" android:textSize="11sp" android:layout_marginTop="3dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/nav_tab_beta"
+                android:layout_width="wrap_content"
+                android:layout_height="52dp"
+                android:minWidth="72dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:clickable="true"
+                android:focusable="true">
+                <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_nav_instant" android:tint="#71717A" android:contentDescription="Beta" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Beta" android:textColor="#71717A" android:textSize="11sp" android:layout_marginTop="3dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/nav_tab_more"
+                android:layout_width="wrap_content"
+                android:layout_height="52dp"
+                android:minWidth="72dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:clickable="true"
+                android:focusable="true">
+                <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_nav_more" android:tint="#71717A" android:contentDescription="More" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="More" android:textColor="#71717A" android:textSize="11sp" android:layout_marginTop="3dp" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </HorizontalScrollView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

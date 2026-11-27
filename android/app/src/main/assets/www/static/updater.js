@@ -60,17 +60,52 @@
           gitBehind: !!data.git_behind
         };
 
-        if (badge) badge.textContent = data.current_version || 'v5.0.3';
-        if (navVersionTag) navVersionTag.textContent = data.current_version || 'v5.0.3';
+        if (badge) badge.textContent = data.current_version || 'v5.0.7';
+        if (navVersionTag) navVersionTag.textContent = data.current_version || 'v5.0.7';
+        const topBadgeEl = document.getElementById('topBrandVersionBadge');
         const topBadgeNum = document.querySelector('#topBrandVersionBadge .version-num');
-        if (topBadgeNum) topBadgeNum.textContent = data.current_version || 'v5.0.3';
+        if (topBadgeNum) topBadgeNum.textContent = data.current_version || 'v5.0.7';
+        const mobileUpdBtn = document.getElementById('mobileHeaderUpdateBtn');
+
+        if (!document.getElementById('clipify-update-highlight-css')) {
+          const st = document.createElement('style');
+          st.id = 'clipify-update-highlight-css';
+          st.textContent = `
+            #navUpdateLink.clipify-update-highlight {
+              background: linear-gradient(90deg, rgba(34,197,94,0.20), rgba(16,185,129,0.08)) !important;
+              border: 1px solid rgba(34,197,94,0.65) !important;
+              color: #ecfdf5 !important;
+              box-shadow: 0 0 16px rgba(34,197,94,0.28) !important;
+              animation: clipifyUpdPulse 2.2s infinite ease-in-out;
+            }
+            #topBrandVersionBadge.clipify-update-highlight,
+            #mobileHeaderUpdateBtn.clipify-update-highlight {
+              border-color: rgba(34,197,94,0.75) !important;
+              background: rgba(34,197,94,0.18) !important;
+              color: #4ade80 !important;
+              box-shadow: 0 0 14px rgba(34,197,94,0.32) !important;
+            }
+            @keyframes clipifyUpdPulse {
+              0%, 100% { box-shadow: 0 0 10px rgba(34,197,94,0.22); }
+              50% { box-shadow: 0 0 22px rgba(34,197,94,0.52); }
+            }
+          `;
+          (document.head || document.documentElement).appendChild(st);
+        }
 
         if (updateState.updateAvailable) {
           if (card) card.classList.add('has-update');
+          if (navUpdateLink) navUpdateLink.classList.add('clipify-update-highlight');
+          if (topBadgeEl) topBadgeEl.classList.add('clipify-update-highlight');
+          if (mobileUpdBtn) {
+            mobileUpdBtn.classList.add('clipify-update-highlight');
+            mobileUpdBtn.textContent = `↓ ${updateState.latestVersion || 'Update'}`;
+          }
           if (navVersionTag) {
-            navVersionTag.textContent = 'Update';
+            navVersionTag.textContent = `New ${updateState.latestVersion || 'Update'}`;
             navVersionTag.style.background = '#22c55e';
             navVersionTag.style.color = '#052e16';
+            navVersionTag.style.fontWeight = '800';
           }
           if (statusMsg) statusMsg.textContent = `New: ${updateState.latestVersion}`;
           if (btn) {
@@ -82,12 +117,16 @@
           }
         } else {
           if (card) card.classList.remove('has-update');
+          if (navUpdateLink) navUpdateLink.classList.remove('clipify-update-highlight');
+          if (topBadgeEl) topBadgeEl.classList.remove('clipify-update-highlight');
+          if (mobileUpdBtn) mobileUpdBtn.classList.remove('clipify-update-highlight');
           if (navVersionTag) {
-            navVersionTag.textContent = data.current_version || 'v5.0.3';
+            navVersionTag.textContent = data.current_version || 'v5.0.7';
             navVersionTag.style.background = '';
             navVersionTag.style.color = '';
+            navVersionTag.style.fontWeight = '';
           }
-          if (badge) badge.textContent = data.current_version || 'v5.0.3';
+          if (badge) badge.textContent = data.current_version || 'v5.0.7';
           if (statusMsg) statusMsg.textContent = 'Up to date ✓';
           if (btn) {
             btn.innerHTML = '<span class="btn-update-icon">↻</span> Update';
@@ -163,6 +202,24 @@
 
     async function applyUpdate() {
       if (!btnExecute) return;
+      if (window.AndroidBridge || window.location.protocol === 'file:') {
+        btnExecute.disabled = true;
+        btnExecute.innerHTML = '<span class="btn-update-icon spinning">↻</span> Fetching Mobile APK…';
+        try {
+          if (typeof window.openClipifyMobileUpdate === 'function') {
+            await window.openClipifyMobileUpdate();
+          } else {
+            const url = updateState.releaseUrl || 'https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/latest';
+            if (window.AndroidBridge && window.AndroidBridge.openBrowser) window.AndroidBridge.openBrowser(url);
+            else window.open(url, '_blank');
+          }
+        } finally {
+          btnExecute.disabled = false;
+          btnExecute.innerHTML = 'Download Latest APK →';
+          if (modal) modal.style.display = 'none';
+        }
+        return;
+      }
       btnExecute.disabled = true;
       btnExecute.innerHTML = '<span class="btn-update-icon spinning">↻</span> Updating…';
 
@@ -187,7 +244,7 @@
           actionRow.style.display = 'flex';
           actionRow.style.gap = '10px';
           actionRow.innerHTML = `
-            <a href="https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/tag/v5.0.3" target="_blank" class="btn-restart-retry" style="text-align:center;text-decoration:none;background:#22c55e;color:#000;font-weight:700;">Download v5.0.3 Installer →</a>
+            <a href="https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/tag/v5.0.5" target="_blank" class="btn-restart-retry" style="text-align:center;text-decoration:none;background:#22c55e;color:#000;font-weight:700;">Download v5.0.5 Installer →</a>
             <button type="button" class="btn-restart-retry" id="btnRestartForceReload">Retry / Reload</button>
           `;
           document.getElementById('btnRestartForceReload')?.addEventListener('click', () => window.location.reload());
@@ -355,7 +412,7 @@
         try {
           const res = await fetch('/api/health?t=' + Date.now(), { cache: 'no-store' });
           if (res.ok) {
-            if (serverWentDown || elapsedSec >= 1.2) {
+            if (serverWentDown) {
               clearInterval(pollInterval);
               updateProg(100, 'Update Complete!');
               if (consoleBadge) {
@@ -417,8 +474,9 @@
 
       const SYMBOLS = ['!', '@', '#', '$', '%', '^', '&', '*', '0', '1', '7', '8', 'X', 'Q', 'G', '~', '/', '\\', '+', '?'];
       const LOGO_SYMBOLS = ['✦', '★', '●', '■', '1', '0', '#', '*', '%', 'V'];
-      let width = canvas.width = window.innerWidth;
-      let height = canvas.height = window.innerHeight;
+      const initialRect = canvas.getBoundingClientRect();
+      let width = canvas.width = Math.max(1, Math.round(initialRect.width || canvas.clientWidth || window.innerWidth));
+      let height = canvas.height = Math.max(1, Math.round(initialRect.height || canvas.clientHeight || window.innerHeight));
 
       const SPACING = 20;
       let cols = Math.floor(width / SPACING);
@@ -453,8 +511,12 @@
       buildGrid();
 
       function onResize() {
-        width = canvas.width = window.innerWidth;
-        height = canvas.height = window.innerHeight;
+        const rect = canvas.getBoundingClientRect();
+        const nextW = Math.max(1, Math.round(rect.width || canvas.clientWidth || window.innerWidth));
+        const nextH = Math.max(1, Math.round(rect.height || canvas.clientHeight || window.innerHeight));
+        if (nextW === width && nextH === height && grid.length > 0) return;
+        width = canvas.width = nextW;
+        height = canvas.height = nextH;
         cols = Math.floor(width / SPACING);
         rows = Math.floor(height / SPACING);
         buildGrid();
@@ -463,8 +525,11 @@
 
       let mouse = { x: -9999, y: -9999, active: false };
       window.addEventListener('mousemove', (e) => {
-        mouse.x = e.clientX;
-        mouse.y = e.clientY;
+        if (!running) return;
+        const rect = canvas.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        mouse.x = ((e.clientX - rect.left) / rect.width) * width;
+        mouse.y = ((e.clientY - rect.top) / rect.height) * height;
         mouse.active = true;
       });
 
@@ -720,6 +785,9 @@
 
       function animate() {
         if (!running) return;
+        if (canvas.clientWidth > 0 && canvas.clientHeight > 0 && (canvas.clientWidth !== width || canvas.clientHeight !== height)) {
+          onResize();
+        }
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, width, height);
 
@@ -1019,6 +1087,10 @@
     window.triggerRestartTakeover = triggerRestartTakeover;
 
     window.openClipifyUpdate = () => {
+      if ((window.AndroidBridge || window.location.protocol === 'file:') && typeof window.openClipifyMobileUpdate === 'function') {
+        window.openClipifyMobileUpdate();
+        return;
+      }
       if (updateState.checked && updateState.updateAvailable) {
         openModalWithRelease(updateState);
       } else {

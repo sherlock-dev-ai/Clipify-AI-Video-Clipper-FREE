@@ -15,6 +15,7 @@ import logging
 import os
 import re
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -59,25 +60,51 @@ class SmartEditor:
         if not raw_video_path.exists() or raw_video_path.stat().st_size < 1000:
             return []
         
-        lang_arg = None if language in ("auto", "", None) else language
+        lang_arg = None if language in ("auto", "", None) else ("hi" if language in ("hinglish", "hi-en") else language)
 
         # 1. Try in-process faster-whisper if available
         try:
             logger.info("Running fast direct clip transcription for %s (lang=%s)...", raw_video_path.name, lang_arg or "auto")
             from faster_whisper import WhisperModel
-            if SmartEditor._shared_direct_whisper is None:
-                SmartEditor._shared_direct_whisper = WhisperModel("tiny", device="cpu", compute_type="int8")
+            try:
+                from clipify.platform.gpu_manager import get_whisper_device_and_type
+                w_dev, w_ctype = get_whisper_device_and_type()
+            except Exception:
+                w_dev, w_ctype = ("cpu", "int8")
+            if SmartEditor._shared_direct_whisper is None or getattr(SmartEditor, "_shared_direct_whisper_dev", None) != w_dev:
+                try:
+                    SmartEditor._shared_direct_whisper = WhisperModel("base", device=w_dev, compute_type=w_ctype)
+                    SmartEditor._shared_direct_whisper_dev = w_dev
+                except Exception:
+                    SmartEditor._shared_direct_whisper = WhisperModel("base", device="cpu", compute_type="int8")
+                    SmartEditor._shared_direct_whisper_dev = "cpu"
             model = SmartEditor._shared_direct_whisper
-            kwargs = {"word_timestamps": True, "beam_size": 1}
+            kwargs: Dict[str, Any] = {
+                "word_timestamps": True,
+                "beam_size": 1,
+                "vad_filter": True,
+                "vad_parameters": {"min_silence_duration_ms": 500},
+                "no_speech_threshold": 0.6,
+                "log_prob_threshold": -1.0,
+                "compression_ratio_threshold": 2.4,
+                "condition_on_previous_text": False,
+            }
             if lang_arg:
                 kwargs["language"] = lang_arg
             segments, _ = model.transcribe(str(raw_video_path), **kwargs)
+            try:
+                from hindi_transliterator import has_devanagari, transliterate_devanagari_to_hinglish
+            except Exception:
+                has_devanagari = lambda s: False
+                transliterate_devanagari_to_hinglish = lambda s: s
             results = []
             for seg in segments:
                 words = []
                 if hasattr(seg, "words") and seg.words:
                     for w in seg.words:
                         w_text = w.word.strip()
+                        if w_text and has_devanagari(w_text):
+                            w_text = transliterate_devanagari_to_hinglish(w_text)
                         if w_text:
                             words.append({
                                 "word": w_text,
@@ -85,6 +112,8 @@ class SmartEditor:
                                 "end": round(w.end, 2),
                             })
                 txt = seg.text.strip()
+                if txt and has_devanagari(txt):
+                    txt = transliterate_devanagari_to_hinglish(txt)
                 if txt:
                     results.append({
                         "start": round(seg.start, 2),
@@ -238,20 +267,18 @@ class SmartEditor:
                         effective_transcripts, 0.0, effective_duration, uppercase=False
                     )
 
-            # If audio was silent or non-verbal, generate high-energy viral captions so they are never missing
-            if not words:
-                fallback_phrase = custom_text or (transcript_snippet.strip() if transcript_snippet else "") or "INSANE MOMENT 🔥"
-                words_list = fallback_phrase.split()[:8]
-                if not words_list:
-                    words_list = ["INSANE", "HIGHLIGHT", "MOMENT", "🔥"]
+            # If audio was silent or non-verbal, only use custom_text if provided (never spam fake words)
+            if not words and custom_text:
+                words_list = custom_text.split()[:8]
                 step = effective_duration / max(1, len(words_list))
-                words = []
-                for i, w in enumerate(words_list):
-                    words.append({
+                words = [
+                    {
                         "word": w,
                         "start": round(effective_start + i * step, 2),
                         "end": round(effective_start + (i + 1) * step, 2),
-                    })
+                    }
+                    for i, w in enumerate(words_list)
+                ]
                 effective_transcripts = [{
                     "start": round(effective_start, 2),
                     "end": round(effective_start + effective_duration, 2),
@@ -297,17 +324,21 @@ class SmartEditor:
         )
 
         # 6. Execute FFmpeg Rendering with synchronized audio resampling
+        try:
+            from clipify.platform.gpu_manager import get_ffmpeg_video_encoder_flags
+            enc_flags = get_ffmpeg_video_encoder_flags(bitrate="12M", preset="fast", crf=16)
+        except Exception:
+            enc_flags = ["-c:v", "libx264", "-preset", "fast", "-crf", "18", "-b:v", "10M", "-maxrate", "14M", "-bufsize", "16M", "-pix_fmt", "yuv420p"]
+
         cmd = [
             self.ffmpeg_bin, "-y",
             "-i", str(raw_video_path),
             "-filter_complex", filter_str,
             "-map", "[vout]", "-map", "0:a?",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "18",
-            "-b:v", "10M", "-maxrate", "14M", "-bufsize", "16M",
+            *enc_flags,
             "-af", "aresample=async=1:first_pts=0",
             "-c:a", "aac", "-b:a", "192k",
             "-fps_mode", "cfr",
-            "-pix_fmt", "yuv420p",
             "-movflags", "+faststart",
             str(output_vertical),
         ]
@@ -384,7 +415,7 @@ class SmartEditor:
 
         if layout == "gaming_split":
             box = profile.facecam_box
-            user_webcam_pos = str(webcam_position).lower()
+            user_webcam_pos = (webcam_position or "").lower()
             cam_presets = {
                 "bottom_right": {"x": 0.76, "y": 0.68, "w": 0.22, "h": 0.26},
                 "bottom_left": {"x": 0.04, "y": 0.68, "w": 0.22, "h": 0.26},
@@ -525,13 +556,18 @@ class SmartEditor:
             "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease[fg];"
             f"[bg][fg]overlay=(W-w)/2:(H-h)/2{ass_filter}[v]"
         )
+        try:
+            from clipify.platform.gpu_manager import get_ffmpeg_video_encoder_flags
+            enc_flags = get_ffmpeg_video_encoder_flags(bitrate="12M", preset="fast", crf=16)
+        except Exception:
+            enc_flags = ["-c:v", "libx264", "-preset", "fast", "-crf", "18", "-b:v", "10M", "-maxrate", "14M", "-bufsize", "16M", "-pix_fmt", "yuv420p"]
+
         cmd = [
             self.ffmpeg_bin, "-y",
             "-i", str(raw_video_path),
             "-filter_complex", fallback_filter,
             "-map", "[v]", "-map", "0:a?",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "18",
-            "-b:v", "10M", "-maxrate", "14M", "-bufsize", "16M",
+            *enc_flags,
             "-af", "aresample=async=1:first_pts=0",
             "-c:a", "aac", "-b:a", "192k",
             "-fps_mode", "cfr",

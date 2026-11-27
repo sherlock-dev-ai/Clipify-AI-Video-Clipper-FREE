@@ -121,7 +121,8 @@
     renderSkeletons();
 
     try {
-      const url = `/api/trending/${currentPlatform}?q=${encodeURIComponent(currentQuery)}`;
+      const refreshParam = forceSpin ? `&refresh=1&_t=${Date.now()}` : '';
+      const url = `/api/trending/${currentPlatform}?q=${encodeURIComponent(currentQuery)}${refreshParam}`;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 7000);
       const resp = await fetch(url, { signal: controller.signal }).catch(() => null);

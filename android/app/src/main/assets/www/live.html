@@ -3,13 +3,14 @@
 
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Clipify AI · Live Studio</title>
   <link rel="icon" type="image/png" href="static/icon.png">
   <link rel="stylesheet" href="static/style.css">
   <link rel="stylesheet" href="static/live.css">
   <link rel="stylesheet" href="static/tour.css">
   <link rel="stylesheet" href="static/cache_manager.css">
+  <link rel="stylesheet" href="static/mobile.css">
 </head>
 
 <body class="tweak-theme">
@@ -23,9 +24,9 @@
         <div class="brand-title-wrap">
           <b>Clipify AI</b>
           <span class="cool-version-badge" id="topBrandVersionBadge"
-            title="Clipify AI v5.0.1 · Click for updates & release info">
+            title="Clipify AI v5.0.7 · Click for updates & release info">
             <span class="version-dot"></span>
-            <span class="version-num">v5.0.1</span>
+            <span class="version-num">v5.0.7</span>
             <span class="version-shimmer-sweep"></span>
           </span>
         </div>
@@ -34,21 +35,39 @@
     </div>
     <a class="sidebar-github" href="https://github.com/sherlock-dev-ai" target="_blank"
       rel="noopener noreferrer"><span>↗</span> GitHub</a>
+    <div class="sidebar-gpu-wrapper gpu-dropdown-wrapper" id="sidebarGpuWrapper">
+      <button type="button" class="gpu-dropdown-btn sidebar-gpu-btn" title="Switch active GPU / Hardware Accelerator">
+        <span class="gpu-indicator-dot nvidia"></span>
+        <span class="gpu-current-label">GPU: Detecting…</span>
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" class="gpu-chevron">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      <div class="gpu-dropdown-menu sidebar-gpu-menu">
+        <div class="gpu-menu-header">
+          <span>Hardware Accelerator</span>
+          <span class="gpu-menu-subtitle">Active Engine GPU</span>
+        </div>
+        <div class="gpu-menu-list">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
     <nav>
-      <a href="/" data-nav="create" id="navCreateLink">
+      <a href="index.html" data-nav="create" id="navCreateLink">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M12 3.75 18.25 12 12 20.25 5.75 12 12 3.75Zm0 3.5L8.25 12 12 15.75 15.75 12 12 7.25Z" />
         </svg>
         <span>Create</span>
       </a>
-      <a href="/narrate" class="narrate-nav" data-nav="narrate" id="navNarrateLink">
+      <a href="narrate.html" class="narrate-nav" data-nav="narrate" id="navNarrateLink">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path
             d="M12 3a5 5 0 0 0-5 5v4a5 5 0 0 0 10 0V8a5 5 0 0 0-5-5Zm-2.5 5a2.5 2.5 0 0 1 5 0v4a2.5 2.5 0 0 1-5 0V8ZM4 11h2a6 6 0 0 0 12 0h2a8 8 0 0 1-7 7.94V21h-2v-2.06A8 8 0 0 1 4 11Z" />
         </svg>
         <span>Narrate</span>
       </a>
-      <a href="/live" class="live-nav active" data-nav="live" id="navLiveLink">
+      <a href="live.html" class="live-nav active" data-nav="live" id="navLiveLink">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="12" r="3" />
           <path
@@ -56,28 +75,28 @@
         </svg>
         <span>Live Studio</span>
       </a>
-      <a href="/#projects" data-nav="projects" id="navProjectsLink">
+      <a href="index.html#projects" data-nav="projects" id="navProjectsLink">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path
             d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-9Zm2.5-.5a.5.5 0 0 0-.5.5v9c0 .28.22.5.5.5h11a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-11Zm2 2.5h7v2h-7v-2Zm0 4h7v2h-7v-2Z" />
         </svg>
         <span>Projects</span>
       </a>
-      <a href="/#editor" data-nav="editor" id="navEditorLink">
+      <a href="index.html#editor" data-nav="editor" id="navEditorLink">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path
             d="M6 16.5 14.5 8l2.5 2.5L8.5 19H6v-2.5Zm9.7-10.8 2.1 2.1a1 1 0 0 1 0 1.4l-1.1 1.1-3.5-3.5 1.1-1.1a1 1 0 0 1 1.4 0Z" />
         </svg>
         <span>Editor</span>
       </a>
-      <a href="/#instant" data-nav="instant" id="navInstantLink">
+      <a href="index.html#instant" data-nav="instant" id="navInstantLink">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
         </svg>
         <span>Instant Clipping</span> <span class="nav-beta-tag">BETA</span>
       </a>
-      <a href="/#trending" data-nav="trending" id="navTrendingLink"
+      <a href="index.html#trending" data-nav="trending" id="navTrendingLink"
         title="Discover live broadcasts & trending gameplay across YouTube, Twitch & Kick">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
@@ -90,14 +109,14 @@
 
       <div class="sidebar-nav-divider"></div>
 
-      <a href="/#beta" data-nav="beta" id="navBetaLink">
+      <a href="index.html#beta" data-nav="beta" id="navBetaLink">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path
             d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z" />
         </svg>
         <span>Beta Features</span> <span class="nav-beta-tag">BETA</span>
       </a>
-      <a href="/#models" id="navModelsLink" data-nav="models" class="models-nav-link"
+      <a href="index.html#models" id="navModelsLink" data-nav="models" class="models-nav-link"
         title="Open AI Models & Engine Hub">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path
@@ -106,11 +125,11 @@
         <span>Models</span> <span class="nav-count-tag" id="navModelCount"
           style="margin-left:auto;background:rgba(56,189,248,0.18);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;font-size:0.68rem;padding:1px 6px;border-radius:10px;font-weight:700;">5</span>
       </a>
-      <a href="/#update" id="navUpdateLink" title="Check GitHub for software updates">
+      <a href="index.html#update" id="navUpdateLink" title="Check GitHub for software updates">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
         </svg>
-        <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v5.0.1</span>
+        <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v5.0.7</span>
       </a>
       <a href="#cache" id="navClearCacheLink" title="Clear transcription cache & imported YouTube videos">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -408,6 +427,12 @@
             placeholder="https://www.youtube.com/watch?v=... or https://www.youtube.com/live/..." autocomplete="off"
             autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true"
             data-form-type="other">
+          <select id="streamQualitySelect" title="Stream Capture Quality" style="width:auto;min-width:128px;height:42px;padding:0 10px;border-radius:10px;background:#111318;border:1px solid rgba(255,255,255,0.16);color:#fff;font-size:0.84rem;font-weight:600;">
+            <option value="1080p" selected>1080p HD</option>
+            <option value="best">Best / 4K</option>
+            <option value="720p">720p HD</option>
+            <option value="480p">480p SD</option>
+          </select>
           <button type="button" class="primary" id="btnConnectStream">Connect & Start Clipping</button>
           <button type="button" class="ghost" id="btnDisconnectStream" style="display:none;">Disconnect</button>
         </div>
@@ -636,11 +661,38 @@
                 </select>
               </div>
               <div>
-                <label for="liveModelSelect">AI Model</label>
+                <label for="liveAiProviderSelect">AI Engine Provider</label>
+                <select id="liveAiProviderSelect">
+                  <option value="ollama" selected>🖥 Local Ollama</option>
+                  <option value="huggingface">☁ Free Hugging Face API</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="pref-grid-two" id="liveOllamaModelRow">
+              <div>
+                <label for="liveModelSelect">Ollama AI Model</label>
                 <select id="liveModelSelect">
                   <option value="qwen2.5:3b" selected>Qwen 2.5 (Local)</option>
                   <option value="heuristic">Built-in Fast AI</option>
                 </select>
+              </div>
+              <div></div>
+            </div>
+
+            <div class="pref-grid-two" id="liveHfConfigRow" style="display:none;">
+              <div>
+                <label for="liveHfModelSelect">Hugging Face Model</label>
+                <select id="liveHfModelSelect">
+                  <option value="Qwen/Qwen2.5-7B-Instruct" selected>Qwen 2.5 7B Instruct (Free)</option>
+                  <option value="meta-llama/Llama-3.2-3B-Instruct">Meta Llama 3.2 3B Instruct</option>
+                  <option value="mistralai/Mistral-7B-Instruct-v0.3">Mistral 7B Instruct v0.3</option>
+                  <option value="google/gemma-2-9b-it">Google Gemma 2 9B IT</option>
+                </select>
+              </div>
+              <div>
+                <label for="liveHfTokenInput">Hugging Face Token</label>
+                <input type="password" id="liveHfTokenInput" placeholder="hf_... (optional if already saved)" autocomplete="off" style="width:100%;height:38px;padding:0 10px;border-radius:8px;background:#111318;border:1px solid rgba(255,255,255,0.14);color:#fff;font-size:0.82rem;">
               </div>
             </div>
 
@@ -716,7 +768,9 @@
                   <option value="de">German (Deutsch)</option>
                   <option value="ja">Japanese (日本語)</option>
                   <option value="pt">Portuguese (Português)</option>
-                  <option value="hi">Hindi (हिन्दी)</option>
+                  <option value="hi">Hindi (Written in English / Hinglish)</option>
+                  <option value="ko">Korean (한국어)</option>
+                  <option value="ar">Arabic (العربية)</option>
                   <option value="auto">Auto-Detect Language</option>
                 </select>
               </div>
@@ -1156,6 +1210,7 @@
       </div>
     </div>
 
+    <script src="static/android_bridge.js"></script>
     <script src="static/forest_game.js"></script>
     <script src="static/updater.js"></script>
     <script src="static/live.js"></script>

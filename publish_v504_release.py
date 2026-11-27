@@ -9,8 +9,8 @@ import urllib.parse
 from pathlib import Path
 
 REPO = "sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE"
-TAG = "v5.0.4"
-RELEASE_NAME = "Clipify AI v5.0.4: GPU Switching Cockpit, Max-Quality Live Facecam & Trending Auto-Preview"
+TAG = "v5.0.5"
+RELEASE_NAME = "Clipify AI v5.0.5: Fast Startup Fix, Hinglish Captions, Live Studio & GPU Switcher"
 
 RELEASE_NOTES = """<p align="center">
   <img src="https://raw.githubusercontent.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/main/docs/screenshots/dashboard.png" alt="Clipify AI Video Clipper" width="100%">
@@ -129,9 +129,9 @@ def main():
 
     # Assets to upload
     assets_to_upload = [
-        ("Clipify.AI.Setup.5.0.4.exe", r"L:\ClipifyAI\Clipify.AI.Setup.5.0.4.exe", "application/octet-stream"),
-        ("update-v5.0.4.zip", r"L:\ClipifyAI\update-v5.0.4.zip", "application/zip"),
-        ("Clipify.AI.v5.0.4.apk", r"L:\ClipifyAI\android\app\build\outputs\apk\release\app-release.apk", "application/vnd.android.package-archive"),
+        ("Clipify.AI.Setup.5.0.5.exe", r"L:\ClipifyAI\Clipify.AI.Setup.5.0.5.exe", "application/octet-stream"),
+        ("update-v5.0.5.zip", r"L:\ClipifyAI\update-v5.0.5.zip", "application/zip"),
+        ("Clipify.AI.v5.0.5.apk", r"L:\ClipifyAI\android\app\build\outputs\apk\release\app-release.apk", "application/vnd.android.package-archive"),
         ("dashboard.png", r"L:\ClipifyAI\docs\screenshots\dashboard.png", "image/png"),
     ]
 
@@ -181,3 +181,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

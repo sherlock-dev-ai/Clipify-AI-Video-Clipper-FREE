@@ -474,8 +474,9 @@
 
       const SYMBOLS = ['!', '@', '#', '$', '%', '^', '&', '*', '0', '1', '7', '8', 'X', 'Q', 'G', '~', '/', '\\', '+', '?'];
       const LOGO_SYMBOLS = ['✦', '★', '●', '■', '1', '0', '#', '*', '%', 'V'];
-      let width = canvas.width = window.innerWidth;
-      let height = canvas.height = window.innerHeight;
+      const initialRect = canvas.getBoundingClientRect();
+      let width = canvas.width = Math.max(1, Math.round(initialRect.width || canvas.clientWidth || window.innerWidth));
+      let height = canvas.height = Math.max(1, Math.round(initialRect.height || canvas.clientHeight || window.innerHeight));
 
       const SPACING = 20;
       let cols = Math.floor(width / SPACING);
@@ -510,8 +511,12 @@
       buildGrid();
 
       function onResize() {
-        width = canvas.width = window.innerWidth;
-        height = canvas.height = window.innerHeight;
+        const rect = canvas.getBoundingClientRect();
+        const nextW = Math.max(1, Math.round(rect.width || canvas.clientWidth || window.innerWidth));
+        const nextH = Math.max(1, Math.round(rect.height || canvas.clientHeight || window.innerHeight));
+        if (nextW === width && nextH === height && grid.length > 0) return;
+        width = canvas.width = nextW;
+        height = canvas.height = nextH;
         cols = Math.floor(width / SPACING);
         rows = Math.floor(height / SPACING);
         buildGrid();
@@ -520,8 +525,11 @@
 
       let mouse = { x: -9999, y: -9999, active: false };
       window.addEventListener('mousemove', (e) => {
-        mouse.x = e.clientX;
-        mouse.y = e.clientY;
+        if (!running) return;
+        const rect = canvas.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        mouse.x = ((e.clientX - rect.left) / rect.width) * width;
+        mouse.y = ((e.clientY - rect.top) / rect.height) * height;
         mouse.active = true;
       });
 
@@ -777,6 +785,9 @@
 
       function animate() {
         if (!running) return;
+        if (canvas.clientWidth > 0 && canvas.clientHeight > 0 && (canvas.clientWidth !== width || canvas.clientHeight !== height)) {
+          onResize();
+        }
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, width, height);
 

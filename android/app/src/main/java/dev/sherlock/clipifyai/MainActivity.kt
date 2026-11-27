@@ -23,8 +23,11 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import dev.sherlock.clipifyai.databinding.ActivityMainBinding
 import dev.sherlock.clipifyai.media.AndroidMediaProcessor
+import dev.sherlock.clipifyai.media.MobileLiveManager
 import dev.sherlock.clipifyai.media.ProjectManager
 import dev.sherlock.clipifyai.network.DesktopSyncClient
+import dev.sherlock.clipifyai.network.MobileTrendingFetcher
+import dev.sherlock.clipifyai.network.YouTubeStreamDownloader
 import dev.sherlock.clipifyai.onboarding.OnboardingActivity
 import dev.sherlock.clipifyai.service.RenderForegroundService
 import dev.sherlock.clipifyai.service.RenderState
@@ -32,6 +35,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.Locale
+import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
 
@@ -43,7 +47,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var prefs: SharedPreferences
     private lateinit var projectManager: ProjectManager
     private lateinit var mediaProcessor: AndroidMediaProcessor
+    private lateinit var liveManager: MobileLiveManager
     private lateinit var syncClient: DesktopSyncClient
+    private val apiExecutor = Executors.newCachedThreadPool()
     private var tts: TextToSpeech? = null
     private var mCurrentVideoUri: Uri? = null
 
@@ -85,6 +91,7 @@ class MainActivity : AppCompatActivity() {
 
         projectManager = ProjectManager(this)
         mediaProcessor = AndroidMediaProcessor(this)
+        liveManager = MobileLiveManager(this)
         val desktopHost = prefs.getString("desktop_ip", "http://127.0.0.1:5000") ?: "http://127.0.0.1:5000"
         syncClient = DesktopSyncClient(desktopHost)
 
@@ -200,6 +207,13 @@ class MainActivity : AppCompatActivity() {
                     binding.webProgress.visibility = android.view.View.GONE
                 }
             }
+
+            override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
+                if (consoleMessage != null) {
+                    Log.d("ClipifyWebConsole", "[${consoleMessage.messageLevel()}] ${consoleMessage.message()} (${consoleMessage.sourceId()}:${consoleMessage.lineNumber()})")
+                }
+                return super.onConsoleMessage(consoleMessage)
+            }
         }
 
         binding.webView.webViewClient = object : WebViewClient() {
@@ -221,9 +235,11 @@ class MainActivity : AppCompatActivity() {
     private fun setupRenderListener() {
         RenderState.listener = { progress, stage, outputPath ->
             runOnUiThread {
-                val outJson = outputPath?.replace("\\", "/") ?: ""
-                val stageEsc = stage.replace("'", "\\'")
-                val js = "if (window.onMobileRenderProgress) window.onMobileRenderProgress($progress, '$stageEsc', '$outJson');"
+                val outJson = JSONObject.quote(outputPath?.replace("\\", "/") ?: "")
+                val stageQ = JSONObject.quote(stage)
+                val metaQ = JSONObject.quote(RenderState.lastMetadataJson)
+                val outsQ = JSONObject.quote(RenderState.lastOutputsJson)
+                val js = "if (window.onMobileRenderProgress) window.onMobileRenderProgress($progress, $stageQ, $outJson, $metaQ, $outsQ);"
                 binding.webView.evaluateJavascript(js, null)
             }
         }
@@ -254,6 +270,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupHeaderListeners() {
+        binding.btnHeaderUpdate.setOnClickListener {
+            binding.webView.evaluateJavascript(
+                "(function(){ if (typeof window.openClipifyUpdate === 'function') { window.openClipifyUpdate(); } else { window.location.href = 'index.html#update'; } })();",
+                null
+            )
+        }
         binding.btnHeaderGithub.setOnClickListener {
             openExternalUrl("https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE")
         }
@@ -266,29 +288,48 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupNavigation() {
-        binding.bottomNavigation.setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_create -> {
-                    binding.webView.evaluateJavascript("if (typeof navigateTo === 'function') navigateTo('create'); else window.location.hash = '#create';", null)
-                    true
+        val tabs = listOf(
+            binding.navTabCreate to "create",
+            binding.navTabInstant to "instant",
+            binding.navTabTrending to "trending",
+            binding.navTabEditor to "editor",
+            binding.navTabLive to "live",
+            binding.navTabNarrate to "narrate",
+            binding.navTabProjects to "projects",
+            binding.navTabBeta to "beta",
+            binding.navTabMore to "more"
+        )
+
+        fun selectTabUi(activeView: android.view.View) {
+            val activeColor = android.graphics.Color.parseColor("#FFFFFF")
+            val mutedColor = android.graphics.Color.parseColor("#71717A")
+            val activeBg = android.graphics.Color.parseColor("#18181B")
+            for ((v, _) in tabs) {
+                val isSelected = v == activeView
+                v.setBackgroundColor(if (isSelected) activeBg else android.graphics.Color.TRANSPARENT)
+                if (v is android.view.ViewGroup && v.childCount >= 2) {
+                    val icon = v.getChildAt(0) as? android.widget.ImageView
+                    val label = v.getChildAt(1) as? android.widget.TextView
+                    icon?.setColorFilter(if (isSelected) activeColor else mutedColor)
+                    label?.setTextColor(if (isSelected) activeColor else mutedColor)
+                    label?.setTypeface(null, if (isSelected) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
                 }
-                R.id.nav_instant -> {
-                    binding.webView.evaluateJavascript("if (typeof navigateTo === 'function') navigateTo('instant'); else window.location.hash = '#instant';", null)
-                    true
+            }
+            binding.bottomNavScroll.post {
+                val scrollX = (activeView.left - (binding.bottomNavScroll.width - activeView.width) / 2).coerceAtLeast(0)
+                binding.bottomNavScroll.smoothScrollTo(scrollX, 0)
+            }
+        }
+
+        for ((tabView, target) in tabs) {
+            tabView.setOnClickListener {
+                selectTabUi(tabView)
+                when (target) {
+                    "live" -> binding.webView.evaluateJavascript("if (typeof window.closeMobileMoreDrawer === 'function') window.closeMobileMoreDrawer(); window.location.href = 'live.html';", null)
+                    "narrate" -> binding.webView.evaluateJavascript("if (typeof window.closeMobileMoreDrawer === 'function') window.closeMobileMoreDrawer(); window.location.href = 'narrate.html';", null)
+                    "more" -> binding.webView.evaluateJavascript("if (typeof window.toggleMobileMoreDrawer === 'function') window.toggleMobileMoreDrawer();", null)
+                    else -> binding.webView.evaluateJavascript("if (typeof window.closeMobileMoreDrawer === 'function') window.closeMobileMoreDrawer(); if (typeof navigateTo === 'function') navigateTo('$target'); else window.location.href = 'index.html#$target';", null)
                 }
-                R.id.nav_trending -> {
-                    binding.webView.evaluateJavascript("if (typeof navigateTo === 'function') navigateTo('trending'); else window.location.hash = '#trending';", null)
-                    true
-                }
-                R.id.nav_editor -> {
-                    binding.webView.evaluateJavascript("if (typeof navigateTo === 'function') navigateTo('editor'); else window.location.hash = '#editor';", null)
-                    true
-                }
-                R.id.nav_more -> {
-                    binding.webView.evaluateJavascript("if (typeof window.toggleMobileMoreDrawer === 'function') window.toggleMobileMoreDrawer();", null)
-                    true
-                }
-                else -> false
             }
         }
     }
@@ -349,6 +390,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         try { unregisterReceiver(commandReceiver) } catch (_: Exception) {}
+        try { apiExecutor.shutdownNow() } catch (_: Exception) {}
         RenderState.listener = null
         tts?.stop()
         tts?.shutdown()
@@ -398,6 +440,262 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
+        fun callApiAsync(requestId: String, method: String, endpoint: String, body: String?, headers: String?) {
+            apiExecutor.execute {
+                var resJson = try {
+                    syncClient.executeApiCall(method, endpoint, body, headers)
+                } catch (e: Exception) {
+                    JSONObject().apply {
+                        put("ok", false)
+                        put("status", 503)
+                        put("error", e.message ?: "Bridge error")
+                    }.toString()
+                }
+                // If PC server is offline, handle standalone mobile endpoints on-device
+                try {
+                    val parsed = JSONObject(resJson)
+                    if (parsed.optInt("status", 503) == 503) {
+                        if (endpoint.startsWith("/api/trending/")) {
+                            val pathPart = endpoint.substringAfter("/api/trending/").substringBefore("?")
+                            val queryParam = if (endpoint.contains("q=")) {
+                                java.net.URLDecoder.decode(endpoint.substringAfter("q=").substringBefore("&"), "UTF-8")
+                            } else ""
+                            val trendingBody = MobileTrendingFetcher.fetchTrending(pathPart, queryParam)
+                            resJson = JSONObject().apply {
+                                put("ok", true)
+                                put("status", 200)
+                                put("body", trendingBody)
+                            }.toString()
+                        } else if (endpoint == "/api/models/config" || endpoint.startsWith("/api/models/config?")) {
+                            if (method.equals("POST", ignoreCase = true)) {
+                                val reqJson = try { JSONObject(body ?: "{}") } catch (_: Exception) { JSONObject() }
+                                val editor = prefs.edit()
+                                val prov = reqJson.optString("provider", "")
+                                if (prov in listOf("ollama", "huggingface", "heuristic", "mediacodec")) {
+                                    editor.putString("ai_provider", prov)
+                                }
+                                val tok = reqJson.optString("hf_token", "").trim()
+                                if (tok.isNotEmpty() && !tok.startsWith("hf_...")) {
+                                    editor.putString("hf_token", tok)
+                                }
+                                val hfModel = reqJson.optString("hf_model", "").trim()
+                                if (hfModel.isNotEmpty()) {
+                                    editor.putString("hf_model", hfModel)
+                                }
+                                editor.apply()
+                                val cfgObj = JSONObject().apply {
+                                    put("provider", prefs.getString("ai_provider", "huggingface") ?: "huggingface")
+                                    put("hf_token", prefs.getString("hf_token", "") ?: "")
+                                    put("hf_model", prefs.getString("hf_model", "Qwen/Qwen2.5-7B-Instruct") ?: "Qwen/Qwen2.5-7B-Instruct")
+                                }
+                                val respBody = JSONObject().apply {
+                                    put("ok", true)
+                                    put("config", cfgObj)
+                                }.toString()
+                                resJson = JSONObject().apply {
+                                    put("ok", true)
+                                    put("status", 200)
+                                    put("body", respBody)
+                                }.toString()
+                            } else {
+                                val hfToken = prefs.getString("hf_token", "") ?: ""
+                                val masked = when {
+                                    hfToken.length > 8 -> "hf_...${hfToken.takeLast(4)}"
+                                    hfToken.isNotEmpty() -> "hf_configured"
+                                    else -> ""
+                                }
+                                val modelsArr = JSONArray().apply {
+                                    put(JSONObject().apply {
+                                        put("id", "Qwen/Qwen2.5-7B-Instruct")
+                                        put("name", "Qwen 2.5 7B Instruct (Recommended - Fast & Free)")
+                                        put("recommended", true)
+                                    })
+                                    put(JSONObject().apply {
+                                        put("id", "meta-llama/Llama-3.2-3B-Instruct")
+                                        put("name", "Meta Llama 3.2 3B Instruct (Ultra-Fast - Free)")
+                                        put("recommended", false)
+                                    })
+                                    put(JSONObject().apply {
+                                        put("id", "mistralai/Mistral-7B-Instruct-v0.3")
+                                        put("name", "Mistral 7B Instruct v0.3 (Free)")
+                                        put("recommended", false)
+                                    })
+                                    put(JSONObject().apply {
+                                        put("id", "google/gemma-2-9b-it")
+                                        put("name", "Google Gemma 2 9B IT (Free)")
+                                        put("recommended", false)
+                                    })
+                                }
+                                val respBody = JSONObject().apply {
+                                    put("ok", true)
+                                    put("provider", prefs.getString("ai_provider", "huggingface") ?: "huggingface")
+                                    put("hf_token_configured", hfToken.isNotEmpty())
+                                    put("hf_token_masked", masked)
+                                    put("hf_model", prefs.getString("hf_model", "Qwen/Qwen2.5-7B-Instruct") ?: "Qwen/Qwen2.5-7B-Instruct")
+                                    put("available_hf_models", modelsArr)
+                                    put("ollama_models", JSONArray())
+                                    put("default_ollama_model", "")
+                                }.toString()
+                                resJson = JSONObject().apply {
+                                    put("ok", true)
+                                    put("status", 200)
+                                    put("body", respBody)
+                                }.toString()
+                            }
+                        } else if (endpoint == "/api/models/huggingface/verify" || endpoint == "/api/models/verify-hf") {
+                            val reqJson = try { JSONObject(body ?: "{}") } catch (_: Exception) { JSONObject() }
+                            var token = (reqJson.optString("token", "").ifBlank {
+                                reqJson.optString("hf_token", "").ifBlank { reqJson.optString("url", "") }
+                            }).trim()
+                            if (token.lowercase().contains("huggingface.co/settings/tokens") && !token.contains("hf_")) {
+                                val errBody = JSONObject().apply {
+                                    put("ok", false)
+                                    put("error", "You pasted the settings page URL. Please copy an Access Token from that page (starts with hf_...) and paste it here.")
+                                }.toString()
+                                resJson = JSONObject().apply {
+                                    put("ok", false)
+                                    put("status", 400)
+                                    put("body", errBody)
+                                }.toString()
+                            } else {
+                                if (token.startsWith("Bearer ")) token = token.substring(7).trim()
+                                token = token.trim('"', '\'', ' ', '\t', '\r', '\n')
+                                val hfMatch = Regex("hf_[A-Za-z0-9]+").find(token)
+                                if (hfMatch != null) token = hfMatch.value
+                                if (token.isEmpty() || token.startsWith("hf_...")) {
+                                    token = prefs.getString("hf_token", "") ?: ""
+                                }
+                                if (token.isEmpty()) {
+                                    val errBody = JSONObject().apply {
+                                        put("ok", false)
+                                        put("error", "Please enter a valid Hugging Face token (starts with hf_).")
+                                    }.toString()
+                                    resJson = JSONObject().apply {
+                                        put("ok", false)
+                                        put("status", 400)
+                                        put("body", errBody)
+                                    }.toString()
+                                } else {
+                                    val client = okhttp3.OkHttpClient.Builder()
+                                        .connectTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
+                                        .readTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
+                                        .build()
+                                    val request = okhttp3.Request.Builder()
+                                        .url("https://huggingface.co/api/whoami-v2")
+                                        .header("Authorization", "Bearer $token")
+                                        .header("User-Agent", "ClipifyAI/5.0.6")
+                                        .get()
+                                        .build()
+                                    client.newCall(request).execute().use { resp ->
+                                        val raw = resp.body?.string().orEmpty()
+                                        if (resp.isSuccessful) {
+                                            val data = try { JSONObject(raw) } catch (_: Exception) { JSONObject() }
+                                            val userName = data.optString("name", "User")
+                                            val userType = data.optString("type", "user")
+                                            prefs.edit()
+                                                .putString("hf_token", token)
+                                                .putString("ai_provider", "huggingface")
+                                                .apply()
+                                            val okBody = JSONObject().apply {
+                                                put("ok", true)
+                                                put("name", userName)
+                                                put("user", userName)
+                                                put("type", userType)
+                                                put("message", "Verified Hugging Face token for @$userName")
+                                            }.toString()
+                                            resJson = JSONObject().apply {
+                                                put("ok", true)
+                                                put("status", 200)
+                                                put("body", okBody)
+                                            }.toString()
+                                        } else if (resp.code == 401) {
+                                            val errBody = JSONObject().apply {
+                                                put("ok", false)
+                                                put("error", "Invalid Hugging Face token. Please check your token at huggingface.co/settings/tokens.")
+                                            }.toString()
+                                            resJson = JSONObject().apply {
+                                                put("ok", false)
+                                                put("status", 401)
+                                                put("body", errBody)
+                                            }.toString()
+                                        } else {
+                                            prefs.edit().putString("hf_token", token).apply()
+                                            val okBody = JSONObject().apply {
+                                                put("ok", true)
+                                                put("name", "Cloud User")
+                                                put("message", "Token saved (HF returned ${resp.code})")
+                                            }.toString()
+                                            resJson = JSONObject().apply {
+                                                put("ok", true)
+                                                put("status", 200)
+                                                put("body", okBody)
+                                            }.toString()
+                                        }
+                                    }
+                                }
+                            }
+                        } else if (endpoint.startsWith("/api/live/")) {
+                            val reqJson = try { JSONObject(body ?: "{}") } catch (_: Exception) { JSONObject() }
+                            val respObj = when {
+                                endpoint.contains("/api/live/connect") -> {
+                                    liveManager.connect(
+                                        reqJson.optString("source_url", ""),
+                                        reqJson.optString("source_type", "youtube")
+                                    )
+                                }
+                                endpoint.contains("/api/live/status") -> liveManager.getStatusJson()
+                                endpoint.contains("/api/live/instant-clip") -> {
+                                    liveManager.instantClip(
+                                        reqJson.optInt("duration", 30),
+                                        reqJson.optString("layout", "split"),
+                                        reqJson.optBoolean("captions", true)
+                                    )
+                                }
+                                endpoint.contains("/api/live/auto-clip") -> {
+                                    liveManager.setAutoClip(reqJson.optBoolean("enabled", true))
+                                }
+                                endpoint.contains("/api/live/preferences") -> {
+                                    if (reqJson.has("auto_clip_enabled")) {
+                                        liveManager.setAutoClip(reqJson.optBoolean("auto_clip_enabled", false))
+                                    } else {
+                                        JSONObject().apply { put("ok", true) }
+                                    }
+                                }
+                                endpoint.contains("/api/live/disconnect") -> liveManager.disconnect()
+                                endpoint.contains("/api/live/clips") -> liveManager.getClipsJson()
+                                endpoint.contains("/api/live/transcript") -> liveManager.getTranscriptJson()
+                                else -> JSONObject().apply { put("ok", true) }
+                            }
+                            val okFlag = respObj.optBoolean("ok", true)
+                            resJson = JSONObject().apply {
+                                put("ok", okFlag)
+                                put("status", if (okFlag) 200 else 400)
+                                put("body", respObj.toString())
+                            }.toString()
+                        }
+                    }
+                } catch (_: Exception) {}
+                val quoted = JSONObject.quote(resJson)
+                val reqQuoted = JSONObject.quote(requestId)
+                runOnUiThread {
+                    binding.webView.evaluateJavascript(
+                        "if (window.__onAndroidApiResult) window.__onAndroidApiResult($reqQuoted, $quoted);",
+                        null
+                    )
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun getAppVersionName(): String {
+            return try {
+                packageManager.getPackageInfo(packageName, 0).versionName ?: "5.0.6-beta"
+            } catch (_: Exception) {
+                "5.0.6-beta"
+            }
+        }
+
+        @JavascriptInterface
         fun pickVideo() {
             runOnUiThread {
                 selectVideoLauncher.launch("video/*")
@@ -419,7 +717,21 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
+        fun speakText(text: String) {
+            runOnUiThread {
+                try {
+                    tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "clipify_preview_${System.currentTimeMillis()}")
+                } catch (_: Exception) {}
+            }
+        }
+
+        @JavascriptInterface
         fun startRender(uriStr: String?, durationSec: Int, layout: String?, captionsEnabled: Boolean) {
+            startRenderWithCount(uriStr, durationSec, layout, captionsEnabled, 1)
+        }
+
+        @JavascriptInterface
+        fun startRenderWithCount(uriStr: String?, durationSec: Int, layout: String?, captionsEnabled: Boolean, clipsCount: Int) {
             runOnUiThread {
                 val savedUserVideo = File(filesDir, "user_selected_video.mp4")
                 val extUserVideo = File(getExternalFilesDir(null), "user_selected_video.mp4")
@@ -439,8 +751,9 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 val dur = if (durationSec in 5..180) durationSec else 30
+                val count = clipsCount.coerceIn(1, 5)
                 val projId = projectManager.createProject("Mobile Clip " + System.currentTimeMillis(), targetPath)
-                Toast.makeText(this@MainActivity, "Rendering 9:16 Short with MediaCodec acceleration...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "Rendering $count 9:16 Short(s) with Media3 HD...", Toast.LENGTH_SHORT).show()
 
                 val serviceIntent = Intent(this@MainActivity, RenderForegroundService::class.java).apply {
                     action = RenderForegroundService.ACTION_START_RENDER
@@ -449,8 +762,39 @@ class MainActivity : AppCompatActivity() {
                     putExtra("duration_sec", dur)
                     putExtra("layout", layout ?: "center")
                     putExtra("captions", captionsEnabled)
+                    putExtra("clipsCount", count)
                 }
                 startForegroundService(serviceIntent)
+            }
+        }
+
+        @JavascriptInterface
+        fun startYouTubeImport(url: String) {
+            apiExecutor.execute {
+                val destFile = File(filesDir, "user_selected_video.mp4")
+                val res = YouTubeStreamDownloader.downloadYouTubeMp4(url, destFile) { pct, msg ->
+                    val msgQ = JSONObject.quote(msg)
+                    runOnUiThread {
+                        binding.webView.evaluateJavascript(
+                            "if (window.onMobileImportProgress) window.onMobileImportProgress($pct, $msgQ, '', '', '');",
+                            null
+                        )
+                    }
+                }
+                val pathClean = if (res.ok && res.file != null) res.file.absolutePath.replace("\\", "/") else ""
+                val pathQ = JSONObject.quote(pathClean)
+                val titleQ = JSONObject.quote(res.title)
+                val errQ = JSONObject.quote(res.error)
+                if (res.ok && res.file != null) {
+                    mCurrentVideoUri = Uri.fromFile(res.file)
+                }
+                runOnUiThread {
+                    val stageMsg = if (res.ok) JSONObject.quote("Download complete: ${res.title}") else JSONObject.quote(res.error)
+                    binding.webView.evaluateJavascript(
+                        "if (window.onMobileImportProgress) window.onMobileImportProgress(100, $stageMsg, $pathQ, $titleQ, $errQ);",
+                        null
+                    )
+                }
             }
         }
 

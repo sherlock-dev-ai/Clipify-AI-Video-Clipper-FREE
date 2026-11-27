@@ -11,8 +11,8 @@ android {
         applicationId "dev.sherlock.clipifyai"
         minSdk 26
         targetSdk 34
-        versionCode 5004
-        versionName "5.0.4"
+        versionCode 5007
+        versionName "5.0.7"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -67,13 +67,18 @@ dependencies {
     // Background WorkManager for rendering
     implementation 'androidx.work:work-runtime-ktx:2.9.0'
 
-    // Media3 / ExoPlayer for 9:16 Video Preview
+    // Media3 / ExoPlayer & Transformer for real hardware 9:16 Video Rendering & Preview
     implementation 'androidx.media3:media3-exoplayer:1.3.1'
     implementation 'androidx.media3:media3-ui:1.3.1'
+    implementation 'androidx.media3:media3-transformer:1.3.1'
+    implementation 'androidx.media3:media3-effect:1.3.1'
 
     // Networking for Local LAN Desktop Sync
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'com.google.code.gson:gson:2.10.1'
+
+    // Real On-Device Offline Voice-to-Text (Vosk Speech Recognition)
+    implementation 'com.alphacephei:vosk-android:0.3.47'
 
     // Tests
     testImplementation 'junit:junit:4.13.2'

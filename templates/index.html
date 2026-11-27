@@ -27,9 +27,9 @@
       <div class="brand-copy">
         <div class="brand-title-wrap">
           <b>Clipify AI</b>
-          <span class="cool-version-badge" id="topBrandVersionBadge" title="Clipify AI v5.0.4 · Click for updates & release info">
+          <span class="cool-version-badge" id="topBrandVersionBadge" title="Clipify AI v5.0.7 · Click for updates & release info">
             <span class="version-dot"></span>
-            <span class="version-num">v5.0.4</span>
+            <span class="version-num">v5.0.7</span>
             <span class="version-shimmer-sweep"></span>
           </span>
         </div>
@@ -38,6 +38,24 @@
     </div>
     <a class="sidebar-github" href="https://github.com/sherlock-dev-ai" target="_blank"
       rel="noopener noreferrer"><span>↗</span> GitHub</a>
+    <div class="sidebar-gpu-wrapper gpu-dropdown-wrapper" id="sidebarGpuWrapper">
+      <button type="button" class="gpu-dropdown-btn sidebar-gpu-btn" title="Switch active GPU / Hardware Accelerator">
+        <span class="gpu-indicator-dot nvidia"></span>
+        <span class="gpu-current-label">GPU: Detecting…</span>
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" class="gpu-chevron">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      <div class="gpu-dropdown-menu sidebar-gpu-menu">
+        <div class="gpu-menu-header">
+          <span>Hardware Accelerator</span>
+          <span class="gpu-menu-subtitle">Active Engine GPU</span>
+        </div>
+        <div class="gpu-menu-list">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
     <nav>
       <a class="active" href="#create" data-nav="create" id="navCreateLink">
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -108,11 +126,19 @@
         <span>Models</span> <span class="nav-count-tag" id="navModelCount"
           style="margin-left:auto;background:rgba(56,189,248,0.18);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;font-size:0.68rem;padding:1px 6px;border-radius:10px;font-weight:700;">5</span>
       </a>
+      <a href="#storage" id="navStorageLink" data-nav="storage" title="Manage Output, Ollama & Cache Storage Locations">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+          <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+          <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+        </svg>
+        <span>Storage</span>
+      </a>
       <a href="#update" id="navUpdateLink" title="Check GitHub for software updates">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
         </svg>
-        <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v5.0.3</span>
+        <span>Update</span> <span class="nav-ver-tag" id="navVersionTag">v5.0.7</span>
       </a>
       <a href="#cache" id="navClearCacheLink" title="Clear transcription cache & imported YouTube videos">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -629,6 +655,11 @@
               <small>Accelerates transcription up to 10× with 16 threads. Turn off for High Accuracy / Deep
                 Scan.</small>
             </div>
+            <div class="split-toggle-row" style="margin-top: 10px;">
+              <label class="toggle-row"><input type="checkbox" id="useExistingTranscriptToggle" checked><span
+                  class="switch"></span><b>Look for Existing Transcription File in Video</b></label>
+              <small>Automatically reuses embedded subtitle tracks (MKV/MP4) or sidecar .srt/.vtt files instead of running WhisperX (saves minutes).</small>
+            </div>
             <div class="split-toggle-row" id="upscaleQualityRow" style="margin-top: 10px;">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
                 <label for="upscaleQuality"
@@ -759,6 +790,27 @@
                   id="textBgOpacity" type="range" min="0" max="100" value="65"></div>
             </div>
           </section>
+          <div class="panel" style="padding:14px 18px;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+              <div>
+                <span class="kicker">CAPTION LANGUAGE</span>
+                <div style="font-size:0.86rem;font-weight:700;color:#fff;">Speech &amp; Caption Language</div>
+                <small style="color:rgba(255,255,255,0.6);">Hindi speech is automatically written in English (Hinglish) captions.</small>
+              </div>
+              <select id="createLanguageSelect" style="min-width:230px;height:38px;padding:0 12px;border-radius:8px;background:#0d1117;border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:0.84rem;">
+                <option value="auto" selected>Auto-Detect Speech</option>
+                <option value="en">English</option>
+                <option value="hinglish">Hindi (Written in English / Hinglish)</option>
+                <option value="es">Spanish</option>
+                <option value="pt">Portuguese</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+                <option value="ja">Japanese</option>
+                <option value="ko">Korean</option>
+                <option value="ar">Arabic</option>
+              </select>
+            </div>
+          </div>
           <button class="primary big" id="createBtn" disabled><span>Generate Shorts</span><b>→</b></button>
         </div>
         <aside class="preview-column">
@@ -1917,6 +1969,27 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         Storage & Data Locations (Black & White Aesthetic)
+         ========================================================================== -->
+    <section class="page-section" id="storage" style="display:none;">
+      <div class="storage-container" style="max-width:980px;margin:0 auto;padding:24px 20px;">
+        <header style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.1);">
+          <div>
+            <span class="eyebrow" style="color:rgba(255,255,255,0.55);font-size:0.72rem;letter-spacing:0.12em;font-weight:700;text-transform:uppercase;">SYSTEM STORAGE &amp; PATHS</span>
+            <h1 style="margin:4px 0 6px;font-size:1.75rem;color:#ffffff;font-weight:800;letter-spacing:-0.02em;">Storage Locations</h1>
+            <p style="margin:0;color:rgba(255,255,255,0.6);font-size:0.9rem;">Change where Clipify AI stores rendered Shorts, Ollama models, and Whisper/Hugging Face caches. Optionally move your existing data cleanly.</p>
+          </div>
+          <button type="button" id="btnRefreshStorage" class="btn btn-secondary" style="background:#111114;border:1px solid rgba(255,255,255,0.18);color:#fff;padding:9px 16px;border-radius:10px;font-weight:600;cursor:pointer;">↻ Refresh Usage</button>
+        </header>
+
+        <div id="storageCardsGrid" style="display:grid;grid-template-columns:1fr;gap:16px;">
+          <!-- Populated dynamically by loadStorageConfig() -->
+          <div style="padding:28px;border:1px solid rgba(255,255,255,0.08);border-radius:14px;background:#09090b;color:rgba(255,255,255,0.6);">Loading storage configuration…</div>
         </div>
       </div>
     </section>

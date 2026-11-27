@@ -121,11 +121,8 @@ if os.name == "nt":
 clear_ffmpeg_report_environment()
 install_hidden_subprocess_defaults()
 
-try:
-    from main import _patch_clipsai_media_file
-    _patch_clipsai_media_file()
-except Exception:
-    pass
+# Note: main.py is executed as a subprocess by run_job(); avoid importing it at
+# web-server startup because it eagerly loads heavy ML libraries (torch/whisperx).
 
 import logging
 logger = logging.getLogger("clipify")
@@ -172,6 +169,56 @@ JOBS = USER_DATA_DIR / "jobs"
 JOBS.mkdir(parents=True, exist_ok=True)
 NARRATE_THUMBS = USER_DATA_DIR / "cache" / "narrate_thumbs"
 NARRATE_THUMBS.mkdir(parents=True, exist_ok=True)
+_STORAGE_CONFIG_PATH = USER_DATA_DIR / "settings" / "storage_config.json"
+
+
+def _default_storage_paths() -> dict[str, Path]:
+    return {
+        "jobs_dir": USER_DATA_DIR / "jobs",
+        "ollama_models_dir": Path.home() / ".ollama" / "models",
+        "cache_dir": USER_DATA_DIR / "cache",
+    }
+
+
+def _load_storage_config() -> dict[str, str]:
+    defaults = {k: str(v) for k, v in _default_storage_paths().items()}
+    try:
+        if _STORAGE_CONFIG_PATH.is_file():
+            saved = json.loads(_STORAGE_CONFIG_PATH.read_text(encoding="utf-8"))
+            for k in defaults:
+                val = str(saved.get(k, "")).strip()
+                if val:
+                    defaults[k] = val
+    except Exception:
+        pass
+    return defaults
+
+
+def _apply_storage_config(cfg: dict[str, str]) -> None:
+    global JOBS, NARRATE_THUMBS
+    try:
+        j = Path(cfg["jobs_dir"])
+        j.mkdir(parents=True, exist_ok=True)
+        JOBS = j
+    except Exception:
+        pass
+    try:
+        o = Path(cfg["ollama_models_dir"])
+        o.mkdir(parents=True, exist_ok=True)
+        os.environ["OLLAMA_MODELS"] = str(o)
+    except Exception:
+        pass
+    try:
+        c = Path(cfg["cache_dir"])
+        c.mkdir(parents=True, exist_ok=True)
+        os.environ["HF_HOME"] = str(c)
+        NARRATE_THUMBS = c / "narrate_thumbs"
+        NARRATE_THUMBS.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+
+
+_apply_storage_config(_load_storage_config())
 
 # main.py already reads .env, but this web process also discovers Ollama before
 # it starts the pipeline. Keep the two entry points on the same configuration.
@@ -334,6 +381,8 @@ jobs: dict[str, dict[str, Any]] = {}
 jobs_lock = threading.Lock()
 OLLAMA_RUNTIME_BASE_URL: str | None = None
 _OLLAMA_AUTOSTART_ATTEMPTED = False
+_STARTED_OLLAMA_PIDS: list[int] = []
+_CLEANUP_DONE = False
 NARRATE = NarratePipeline(ROOT, USER_DATA_DIR)
 narrate_jobs: dict[str, dict[str, Any]] = {}
 narrate_jobs_lock = threading.Lock()
@@ -825,9 +874,13 @@ def _try_start_ollama(models_dir: str | None = None, force: bool = False) -> boo
         os.environ["OLLAMA_MODELS"] = models_dir
 
     try:
-        subprocess.Popen([binary, "serve"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                         stdin=subprocess.DEVNULL, creationflags=creationflags, start_new_session=True)
-        print(f"[Ollama] Auto-started 'ollama serve' via {binary} (models: {models_dir or 'default'})")
+        ol_proc = subprocess.Popen(
+            [binary, "serve"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL, creationflags=creationflags, start_new_session=True
+        )
+        if ol_proc and ol_proc.pid:
+            _STARTED_OLLAMA_PIDS.append(ol_proc.pid)
+        print(f"[Ollama] Auto-started 'ollama serve' via {binary} (pid={getattr(ol_proc, 'pid', '?')}, models: {models_dir or 'default'})")
         return True
     except Exception as exc:
         print(f"[Ollama] Auto-start failed: {type(exc).__name__}: {exc}")
@@ -1490,11 +1543,20 @@ def apply_branding_to_file(input_video: str, output_video: str, branding: dict[s
         current = "vtext"
 
     fc = ";".join(filters)
+    try:
+        from clipify.platform.gpu_manager import get_ffmpeg_video_encoder_flags
+        enc_flags = get_ffmpeg_video_encoder_flags(bitrate=prof.get("video_bitrate", "12M"), preset=prof.get("preset", "fast"), crf=int(prof.get("crf", 18)))
+    except Exception:
+        enc_flags = [
+            "-c:v", "libx264", "-preset", prof["preset"], "-crf", prof["crf"],
+            "-b:v", prof["video_bitrate"], "-maxrate", prof["maxrate"], "-bufsize", prof["bufsize"],
+            "-pix_fmt", "yuv420p"
+        ]
+
     cmd = [
         ffmpeg, "-y", *inputs, "-filter_complex", fc, "-map", f"[{current}]", "-map", "0:a?",
-        "-c:v", "libx264", "-preset", prof["preset"], "-crf", prof["crf"],
-        "-b:v", prof["video_bitrate"], "-maxrate", prof["maxrate"], "-bufsize", prof["bufsize"],
-        "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", output_video
+        *enc_flags,
+        "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", output_video
     ]
     proc = _run_hidden(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     if temp_text:
@@ -1551,7 +1613,7 @@ def _pipeline_command(input_dir: Path) -> list[str]:
 
 
 def run_job(
-job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, max_duration: int, branding: dict[str, Any], split_screen: bool = False, fast_whisper: bool = True, gaming_split: bool = True, split_ratio: int = 50, upscale_quality: str = "high", language: str = "auto", disable_captions: bool = False) -> None:
+job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, max_duration: int, branding: dict[str, Any], split_screen: bool = False, fast_whisper: bool = True, gaming_split: bool = True, split_ratio: int = 50, upscale_quality: str = "high", language: str = "auto", disable_captions: bool = False, use_existing_transcription: bool = True) -> None:
     with jobs_lock:
         job = jobs[job_id]
         job["status"] = "running"
@@ -1626,6 +1688,7 @@ job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, ma
         "CLIPPEDAI_GAMING_SPLIT": "1" if gaming_split else "0",
         "CLIPPEDAI_SPLIT_RATIO": str(split_ratio),
         "CLIPPEDAI_FAST_WHISPER": "1" if fast_whisper else "0",
+        "CLIPPEDAI_USE_EXISTING_TRANSCRIPTION": "1" if use_existing_transcription else "0",
         "TRANSCRIPTION_MODEL": os.getenv("TRANSCRIPTION_MODEL", "tiny" if fast_whisper else ("medium" if _is_cuda_available() else "base")),
         "CLIPPEDAI_ALLOW_FALLBACK": "1",
         "HF_HUB_OFFLINE": os.getenv("HF_HUB_OFFLINE", "0"),
@@ -1634,7 +1697,7 @@ job_id: str, mode: str, clips: int, model: str, font: str, min_duration: int, ma
         "KMP_STACKSIZE": "64M",
         "DISABLE_CAPTIONS": "1" if (disable_captions or font == "none" or branding.get("disable_captions") or not branding.get("captions_enabled", True)) else "0",
         "WHISPERX_THREADS": os.getenv("WHISPERX_THREADS", str(max(4, os.cpu_count() or 4)) if fast_whisper else "4"),
-        "WHISPERX_LANGUAGE": str(language if (language and language != "auto") else (branding.get("language") if (branding.get("language") and branding.get("language") != "auto") else (os.getenv("WHISPERX_LANGUAGE") or "auto"))).strip().lower(),
+        "WHISPERX_LANGUAGE": ("hi" if str(language if (language and language != "auto") else (branding.get("language") if (branding.get("language") and branding.get("language") != "auto") else (os.getenv("WHISPERX_LANGUAGE") or "auto"))).strip().lower() in ("hinglish", "hi-en") else str(language if (language and language != "auto") else (branding.get("language") if (branding.get("language") and branding.get("language") != "auto") else (os.getenv("WHISPERX_LANGUAGE") or "auto"))).strip().lower()),
         "OMP_NUM_THREADS": str(max(4, os.cpu_count() or 4)) if fast_whisper else "4",
         "MKL_NUM_THREADS": str(max(4, os.cpu_count() or 4)) if fast_whisper else "4",
         "OPENBLAS_NUM_THREADS": str(max(4, os.cpu_count() or 4)) if fast_whisper else "4",
@@ -1851,15 +1914,16 @@ def api_trending(platform: str):
     Supports ?q=<query> for live search across streams and gaming content.
     """
     q = request.args.get("q", "").strip()
+    force_refresh = request.args.get("refresh", "").strip().lower() in ("1", "true", "yes")
     try:
         import trending_service
         plat = platform.lower().strip()
         if plat == "youtube":
-            data = trending_service.get_youtube_trending(q)
+            data = trending_service.get_youtube_trending(q, force_refresh=force_refresh)
         elif plat == "twitch":
-            data = trending_service.get_twitch_trending(q)
+            data = trending_service.get_twitch_trending(q, force_refresh=force_refresh)
         elif plat == "kick":
-            data = trending_service.get_kick_trending(q)
+            data = trending_service.get_kick_trending(q, force_refresh=force_refresh)
         else:
             return jsonify({"error": f"Unknown platform '{platform}'", "live_streams": [], "gameplay_videos": []}), 400
         return jsonify(data)
@@ -1905,6 +1969,7 @@ def live_connect():
     sensitivity = int(data.get("sensitivity", 5))
     buffer_minutes = int(data.get("buffer_minutes", 10))
     model_name = str(data.get("model_name", "qwen2.5:3b"))
+    stream_quality = str(data.get("stream_quality", "1080p"))
     editing_prefs = {
         "auto_edit": bool(data.get("auto_edit", True)),
         "face_tracking": bool(data.get("face_tracking", True)),
@@ -1919,6 +1984,8 @@ def live_connect():
         "custom_text": str(data.get("custom_text", "")),
         "custom_text_pos": str(data.get("custom_text_pos", "top-center")),
         "custom_text_color": str(data.get("custom_text_color", "#FFFFFF")),
+        "ai_provider": str(data.get("ai_provider", os.getenv("CLIPPEDAI_AI_PROVIDER", "ollama"))),
+        "hf_model": str(data.get("hf_model", os.getenv("CLIPPEDAI_HF_MODEL", "Qwen/Qwen2.5-7B-Instruct"))),
     }
 
     mgr = _get_live_studio_mgr()
@@ -1929,6 +1996,7 @@ def live_connect():
         sensitivity=sensitivity,
         buffer_minutes=buffer_minutes,
         model_name=model_name,
+        stream_quality=stream_quality,
         editing_prefs=editing_prefs,
     )
     if not ok:
@@ -1965,7 +2033,8 @@ def live_instant_clip():
     mgr = _get_live_studio_mgr()
     clip = mgr.instant_clip(duration_sec=duration)
     if not clip:
-        return jsonify({"error": "Failed generating instant clip. Ensure the stream is actively recording."}), 400
+        err_msg = getattr(mgr, "last_instant_clip_error", "") or "Failed generating instant clip. Ensure the stream is actively recording."
+        return jsonify({"error": err_msg}), 400
     return jsonify({"success": True, "clip": clip})
 
 
@@ -3290,16 +3359,18 @@ def start():
     upscale_quality = str(data.get("upscale_quality", data.get("upscaleQuality", "high"))).strip().lower()
     if upscale_quality not in UPSCALE_PROFILES:
         upscale_quality = "high"
+    use_existing_transcription = str(data.get("use_existing_transcription", data.get("useExistingTranscription", "1"))).strip().lower() in {"1", "true", "yes", "on"}
     with jobs_lock:
         jobs[job_id]["branding"] = branding
         jobs[job_id]["split_screen"] = split_screen
         jobs[job_id]["gaming_split"] = gaming_split
         jobs[job_id]["split_ratio"] = split_ratio
         jobs[job_id]["fast_whisper"] = fast_whisper
+        jobs[job_id]["use_existing_transcription"] = use_existing_transcription
         jobs[job_id]["upscale_quality"] = upscale_quality
         jobs[job_id]["disable_captions"] = disable_captions
         jobs[job_id]["language"] = language
-    threading.Thread(target=run_job, args=(job_id, mode, clips, model, font, min_duration, max_duration, branding, split_screen, fast_whisper, gaming_split, split_ratio, upscale_quality, language, disable_captions), daemon=True).start()
+    threading.Thread(target=run_job, args=(job_id, mode, clips, model, font, min_duration, max_duration, branding, split_screen, fast_whisper, gaming_split, split_ratio, upscale_quality, language, disable_captions, use_existing_transcription), daemon=True).start()
     return jsonify({"ok": True, "job_id": job_id, "model": model, "font": font, "min_duration": min_duration, "max_duration": max_duration, "branding": branding, "split_screen": split_screen, "gaming_split": gaming_split, "split_ratio": split_ratio, "fast_whisper": fast_whisper, "upscale_quality": upscale_quality, "disable_captions": disable_captions, "language": language})
 
 
@@ -3492,9 +3563,13 @@ def _fast_generate_captions(audio_path: Path, ass_path: Path, clip_dur: float, l
     try:
         _ensure_cuda_dlls()
         from faster_whisper import WhisperModel
-        use_cuda = _is_cuda_available()
-        device = "cuda" if use_cuda else "cpu"
-        compute_type = "float16" if use_cuda else "int8"
+        try:
+            from clipify.platform.gpu_manager import get_whisper_device_and_type
+            device, compute_type = get_whisper_device_and_type()
+        except Exception:
+            use_cuda = _is_cuda_available()
+            device = "cuda" if use_cuda else "cpu"
+            compute_type = "float16" if use_cuda else "int8"
         try:
             model = WhisperModel("tiny", device=device, compute_type=compute_type)
         except Exception:
@@ -3839,15 +3914,19 @@ def _instant_worker(
                 out_name = f"instant_{job_id[:8]}_short_{c_idx + 1}.mp4" if num_clips > 1 else f"instant_{job_id[:8]}_short.mp4"
             out_path = out_dir / out_name
 
+            try:
+                from clipify.platform.gpu_manager import get_ffmpeg_video_encoder_flags
+                enc_flags = get_ffmpeg_video_encoder_flags(bitrate="12M", preset="veryfast", crf=20)
+            except Exception:
+                enc_flags = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "22"]
+
             cmd = [
                 ffmpeg, "-y",
                 "-ss", f"{start_sec:.2f}",
                 "-i", str(input_path),
                 "-t", f"{c_dur:.2f}",
                 "-filter_complex" if is_complex else "-vf", filter_str,
-                "-c:v", "libx264",
-                "-preset", "veryfast",
-                "-crf", "22",
+                *enc_flags,
                 "-c:a", "aac",
                 "-b:a", "192k",
                 "-movflags", "+faststart",
@@ -4329,6 +4408,16 @@ def status(job_id: str):
         job = jobs.get(job_id)
         if not job:
             return jsonify({"error": "Job not found."}), 404
+        outputs = list(job.get("outputs") or [])
+        if not outputs and job.get("status") == "done":
+            out_dir = JOBS / job_id / "output"
+            if out_dir.exists():
+                vfiles = [p for p in sorted(out_dir.iterdir()) if p.is_file() and p.suffix.lower() == ".mp4" and p.stat().st_size >= 1024]
+                outputs = [p.name for p in vfiles if not p.name.startswith("_tmp_") and not p.name.endswith("_with_subtitles.mp4") and not p.stem.endswith("_clean")]
+                if not outputs:
+                    outputs = [p.name for p in vfiles if p.name.endswith("_with_subtitles.mp4")]
+                if outputs:
+                    job["outputs"] = outputs
         return jsonify(
             {
                 "id": job["id"],
@@ -4336,7 +4425,7 @@ def status(job_id: str):
                 "status": job["status"],
                 "progress": job["progress"],
                 "stage": job["stage"],
-                "outputs": job.get("outputs", []),
+                "outputs": outputs,
                 "min_duration": job.get("min_duration", 25),
                 "max_duration": job.get("max_duration", 60),
                 "mode": job.get("mode"),
@@ -4518,6 +4607,181 @@ def update_model_config():
         cfg["ollama_model"] = payload["ollama_model"].strip()
     _save_ai_config(cfg)
     return jsonify({"ok": True, "config": cfg})
+
+
+def _dir_usage_info(path_str: str) -> dict[str, Any]:
+    p = Path(path_str)
+    total_bytes = 0
+    file_count = 0
+    if p.exists():
+        try:
+            for root_dir, _, files in os.walk(p):
+                for fn in files:
+                    file_count += 1
+                    try:
+                        total_bytes += (Path(root_dir) / fn).stat().st_size
+                    except OSError:
+                        pass
+        except OSError:
+            pass
+    free_bytes = 0
+    try:
+        probe = p if p.exists() else p.parent
+        while probe and not probe.exists() and probe != probe.parent:
+            probe = probe.parent
+        if probe and probe.exists():
+            free_bytes = shutil.disk_usage(probe).free
+    except OSError:
+        pass
+
+    def _fmt_bytes(b: int) -> str:
+        if b >= 1024 ** 3:
+            return f"{b / (1024 ** 3):.2f} GB"
+        if b >= 1024 ** 2:
+            return f"{b / (1024 ** 2):.1f} MB"
+        if b >= 1024:
+            return f"{b / 1024:.1f} KB"
+        return f"{b} B"
+
+    return {
+        "used_bytes": total_bytes,
+        "used_human": _fmt_bytes(total_bytes),
+        "free_bytes": free_bytes,
+        "free_human": _fmt_bytes(free_bytes),
+        "file_count": file_count,
+        "exists": p.exists(),
+    }
+
+
+@app.get("/api/storage/config")
+def get_storage_config():
+    cfg = _load_storage_config()
+    defaults = {k: str(v) for k, v in _default_storage_paths().items()}
+    items = [
+        {
+            "key": "jobs_dir",
+            "title": "Output Clips & Jobs",
+            "description": "Where imported videos, transcription caches, and rendered Shorts are stored.",
+            "path": cfg["jobs_dir"],
+            "default_path": defaults["jobs_dir"],
+            **_dir_usage_info(cfg["jobs_dir"]),
+        },
+        {
+            "key": "ollama_models_dir",
+            "title": "Ollama Models",
+            "description": "Directory where local Ollama LLM weights are stored (OLLAMA_MODELS).",
+            "path": cfg["ollama_models_dir"],
+            "default_path": defaults["ollama_models_dir"],
+            **_dir_usage_info(cfg["ollama_models_dir"]),
+        },
+        {
+            "key": "cache_dir",
+            "title": "AI, Whisper & Hugging Face Cache",
+            "description": "Cache for WhisperX, Hugging Face weights (HF_HOME), and Narrate thumbnails.",
+            "path": cfg["cache_dir"],
+            "default_path": defaults["cache_dir"],
+            **_dir_usage_info(cfg["cache_dir"]),
+        },
+    ]
+    return jsonify({"ok": True, "locations": items, "config": cfg})
+
+
+@app.post("/api/storage/browse")
+def browse_storage_folder():
+    payload = request.get_json(silent=True) or {}
+    initial = str(payload.get("current_path", "")).strip()
+    ps_script = (
+        "Add-Type -AssemblyName System.Windows.Forms; "
+        "$d = New-Object System.Windows.Forms.FolderBrowserDialog; "
+        "$d.Description = 'Select Clipify AI storage folder'; "
+        f"if (Test-Path '{initial.replace(chr(39), chr(39)*2)}') {{ $d.SelectedPath = '{initial.replace(chr(39), chr(39)*2)}' }}; "
+        "if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $d.SelectedPath }"
+    )
+    try:
+        res = _run_hidden(
+            ["powershell", "-NoProfile", "-STA", "-Command", ps_script],
+            capture_output=True, text=True, timeout=90, check=False,
+        )
+        chosen = (res.stdout or "").strip()
+        if chosen:
+            return jsonify({"ok": True, "path": chosen})
+        return jsonify({"ok": False, "cancelled": True, "error": "Folder selection cancelled."})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.post("/api/storage/update")
+def update_storage_config():
+    payload = request.get_json(silent=True) or {}
+    key = str(payload.get("key", "")).strip()
+    new_path_str = str(payload.get("new_path", "")).strip()
+    move_data = bool(payload.get("move_data", False))
+    reset_default = bool(payload.get("reset_default", False))
+
+    defaults = {k: str(v) for k, v in _default_storage_paths().items()}
+    if key not in defaults:
+        return jsonify({"ok": False, "error": "Invalid storage key."}), 400
+    if reset_default:
+        new_path_str = defaults[key]
+    if not new_path_str:
+        return jsonify({"ok": False, "error": "Target folder path cannot be empty."}), 400
+
+    cfg = _load_storage_config()
+    old_path = Path(cfg[key])
+    new_path = Path(new_path_str).expanduser()
+
+    try:
+        new_path.mkdir(parents=True, exist_ok=True)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"Cannot create folder '{new_path}': {exc}"}), 400
+
+    moved_files = 0
+    moved_bytes = 0
+    skipped_files = 0
+    if move_data and old_path.exists() and old_path.resolve() != new_path.resolve():
+        for root_dir, _, files in os.walk(old_path):
+            rel = Path(root_dir).relative_to(old_path)
+            dest_dir = new_path / rel
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            for fn in files:
+                src_f = Path(root_dir) / fn
+                dst_f = dest_dir / fn
+                try:
+                    sz = src_f.stat().st_size
+                    shutil.copy2(src_f, dst_f)
+                    moved_files += 1
+                    moved_bytes += sz
+                    try:
+                        src_f.unlink()
+                    except OSError:
+                        pass
+                except Exception:
+                    skipped_files += 1
+        # Clean empty directories left behind
+        for root_dir, dirs, files in os.walk(old_path, topdown=False):
+            if not dirs and not files:
+                try:
+                    Path(root_dir).rmdir()
+                except OSError:
+                    pass
+
+    cfg[key] = str(new_path)
+    _STORAGE_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _STORAGE_CONFIG_PATH.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+    _apply_storage_config(cfg)
+
+    return jsonify({
+        "ok": True,
+        "key": key,
+        "path": str(new_path),
+        "moved_files": moved_files,
+        "moved_bytes": moved_bytes,
+        "skipped_files": skipped_files,
+        "message": (
+            f"Updated to {new_path} (moved {moved_files} file(s))."
+            if move_data else f"Storage path updated to {new_path}."
+        ),
+    })
 
 @app.route("/api/models/verify-hf", methods=["POST"])
 @app.post("/api/models/huggingface/verify")
@@ -5220,7 +5484,7 @@ def cache_clear():
         "message": f"Successfully cleared {formatted} of disk space ({yt_deleted} YouTube video(s) and {cache_deleted} cache file(s) removed)."
     })
 
-APP_VERSION = "v5.0.4"
+APP_VERSION = "v5.0.7"
 try:
     _v_file = ROOT / "version.json"
     if _v_file.exists():
@@ -5368,25 +5632,32 @@ def updater_apply():
         import time
         time.sleep(1.2)
         try:
-            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
             app_exe = ROOT / "Clipify AI.exe"
-            if app_exe.is_file():
-                restart_cmd = (
-                    f'powershell.exe -NoProfile -Command "'
-                    f'Start-Sleep -Milliseconds 800; '
-                    f'while (Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 400 }}; '
-                    f'Start-Process \'{str(app_exe)}\'"'
-                )
-                subprocess.Popen(restart_cmd, shell=True, creationflags=creationflags)
-            else:
-                py = sys.executable
-                restart_cmd = (
-                    f'powershell.exe -NoProfile -Command "'
-                    f'Start-Sleep -Milliseconds 800; '
-                    f'while (Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 400 }}; '
-                    f'Start-Process \'{py}\' -ArgumentList \'app.py\' -WorkingDirectory \'{str(ROOT)}\'"'
-                )
-                subprocess.Popen(restart_cmd, shell=True, creationflags=creationflags)
+            target_args = [str(app_exe)] if app_exe.is_file() else [sys.executable, str(ROOT / "app.py")]
+            helper_code = (
+                "import os, socket, subprocess, time\n"
+                "time.sleep(1.0)\n"
+                "for _ in range(25):\n"
+                "    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:\n"
+                "        s.settimeout(0.2)\n"
+                "        if s.connect_ex(('127.0.0.1', 5000)) != 0:\n"
+                "            break\n"
+                "    time.sleep(0.3)\n"
+                "env = os.environ.copy()\n"
+                "env['CLIPPEDAI_NO_BROWSER'] = '1'\n"
+                f"subprocess.Popen({repr(target_args)}, cwd={repr(str(ROOT))}, env=env, "
+                "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, "
+                f"creationflags={creationflags})\n"
+            )
+            subprocess.Popen(
+                [sys.executable, "-c", helper_code],
+                cwd=str(ROOT),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=creationflags,
+            )
         except Exception:
             pass
         finally:
@@ -5549,8 +5820,8 @@ def api_system_gpus_select():
         selected = apply_gpu_selection(gpu_id)
         # Invalidate encoder cache so next render immediately adopts the chosen accelerator
         try:
-            from clipify.platform.hardware import detect_best_encoder
-            detect_best_encoder(force_refresh=True)
+            from clipify.platform.hardware import get_hardware_accelerator
+            get_hardware_accelerator().detect_best_encoder(force_refresh=True)
         except Exception:
             pass
         status = get_gpu_status()
@@ -5813,7 +6084,8 @@ def _open_app_window(host: str, port: int, timeout: float = 40.0) -> None:
     import threading
     import time
 
-    url = f"http://{host}:{port}/"
+    connect_host = "127.0.0.1" if host in ("0.0.0.0", "::", "") else host
+    url = f"http://{connect_host}:{port}/"
 
     def wait_then_open() -> None:
         deadline = time.time() + timeout
@@ -5862,6 +6134,14 @@ def _open_app_window(host: str, port: int, timeout: float = 40.0) -> None:
                 opened = (poll_code is None or poll_code == 0)
                 with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
                     _lf.write(f"[{datetime.now()}] _open_app_window Popen poll={poll_code} opened={opened}\n")
+                # If this browser instance owns the app window (poll_code is None), shut down Clipify & child processes when closed
+                if poll_code is None:
+                    try:
+                        proc.wait()
+                    except Exception:
+                        pass
+                    _cleanup_all_child_processes()
+                    os._exit(0)
             except Exception as _e:
                 opened = False
                 with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
@@ -6356,6 +6636,84 @@ def clippy_chat():
     })
 
 
+def _cleanup_all_child_processes() -> None:
+    """Terminate Ollama, FFmpeg, Live Studio, and any active job processes when Clipify closes."""
+    global _CLEANUP_DONE
+    if _CLEANUP_DONE:
+        return
+    _CLEANUP_DONE = True
+
+    # 1. Stop Live Studio session (stops StreamConnector ffmpeg & LiveTranscriber)
+    try:
+        mgr = globals().get("_LIVE_STUDIO_MGR")
+        if mgr is not None and getattr(mgr, "session_active", False):
+            mgr.stop_session()
+    except Exception:
+        pass
+
+    # 2. Terminate active job subprocesses
+    pids_to_kill: list[int] = list(_STARTED_OLLAMA_PIDS)
+    try:
+        with jobs_lock:
+            for j in jobs.values():
+                pid = j.get("pid")
+                if pid and j.get("status") == "running":
+                    pids_to_kill.append(int(pid))
+    except Exception:
+        pass
+
+    creationflags = _hidden_creationflags()
+    if os.name == "nt":
+        for pid in set(pids_to_kill):
+            try:
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    capture_output=True, timeout=5, creationflags=creationflags, check=False,
+                )
+            except Exception:
+                pass
+        # Ensure Ollama and any Clipify-bundled FFmpeg processes do not linger in background
+        for img in ("ollama.exe", "ollama_llama_server.exe", "ffmpeg.exe", "ffprobe.exe"):
+            try:
+                subprocess.run(
+                    ["taskkill", "/F", "/IM", img, "/T"],
+                    capture_output=True, timeout=5, creationflags=creationflags, check=False,
+                )
+            except Exception:
+                pass
+    else:
+        import signal as _sig
+        for pid in set(pids_to_kill):
+            try:
+                os.kill(pid, _sig.SIGTERM)
+            except Exception:
+                pass
+        for proc_name in ("ollama", "ffmpeg", "ffprobe"):
+            try:
+                subprocess.run(["pkill", "-f", proc_name], capture_output=True, timeout=3, check=False)
+            except Exception:
+                pass
+
+
+import atexit as _atexit
+import signal as _signal
+_atexit.register(_cleanup_all_child_processes)
+
+
+def _handle_exit_signal(signum, frame):
+    _cleanup_all_child_processes()
+    os._exit(0)
+
+
+for _sig_name in ("SIGINT", "SIGTERM", "SIGBREAK"):
+    _sig_val = getattr(_signal, _sig_name, None)
+    if _sig_val is not None:
+        try:
+            _signal.signal(_sig_val, _handle_exit_signal)
+        except Exception:
+            pass
+
+
 def _is_port_in_use(host: str, port: int) -> bool:
     import socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -6365,14 +6723,15 @@ def _is_port_in_use(host: str, port: int) -> bool:
 
 if __name__ == "__main__":
     _host, _port = APP_HOST, APP_PORT
+    _connect_host = "127.0.0.1" if _host in ("0.0.0.0", "::", "") else _host
     with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
-        _lf.write(f"[{datetime.now()}] Startup check: host={_host}, port={_port}\n")
-    if _is_port_in_use(_host, _port):
+        _lf.write(f"[{datetime.now()}] Startup check: host={_host}, connect={_connect_host}, port={_port}\n")
+    if _is_port_in_use(_connect_host, _port):
         with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
             _lf.write(f"[{datetime.now()}] Port {_port} is in use, checking health\n")
         is_healthy = False
         try:
-            with urllib.request.urlopen(f"http://{_host}:{_port}/api/health", timeout=1.2) as r:
+            with urllib.request.urlopen(f"http://{_connect_host}:{_port}/api/health", timeout=1.2) as r:
                 if r.status == 200:
                     is_healthy = True
         except Exception as _he:
@@ -6393,13 +6752,13 @@ if __name__ == "__main__":
                 except Exception:
                     pass
                 try:
-                    subprocess.Popen([browser, f"--app=http://{_host}:{_port}/", "--window-size=1440,900"], startupinfo=si)
+                    subprocess.Popen([browser, f"--app=http://{_connect_host}:{_port}/", "--window-size=1440,900"], startupinfo=si)
                 except Exception:
                     import webbrowser
-                    webbrowser.open(f"http://{_host}:{_port}/")
+                    webbrowser.open(f"http://{_connect_host}:{_port}/")
             else:
                 import webbrowser
-                webbrowser.open(f"http://{_host}:{_port}/")
+                webbrowser.open(f"http://{_connect_host}:{_port}/")
             sys.exit(0)
         else:
             with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:
@@ -6423,7 +6782,7 @@ if __name__ == "__main__":
     except Exception as _gpu_init_err:
         pass
     if os.environ.get("CLIPPEDAI_NO_BROWSER", "").strip() not in {"1", "true", "yes"}:
-        _open_app_window(_host, _port)
+        _open_app_window(_connect_host, _port)
     try:
         app.run(host=_host, port=_port, debug=False, threaded=True)
         with open(os.path.join(ROOT, "app_startup.log"), "a", encoding="utf-8") as _lf:

@@ -14,12 +14,15 @@ import androidx.core.app.NotificationCompat
 import dev.sherlock.clipifyai.R
 import dev.sherlock.clipifyai.media.AndroidMediaProcessor
 import dev.sherlock.clipifyai.network.DesktopSyncClient
+import dev.sherlock.clipifyai.network.YouTubeStreamDownloader
 import java.io.File
 
 object RenderState {
     var listener: ((progress: Int, stage: String, outputPath: String?) -> Unit)? = null
     var isRendering: Boolean = false
     var lastExportPath: String? = null
+    var lastMetadataJson: String = "{}"
+    var lastOutputsJson: String = "[]"
 }
 
 class RenderForegroundService : Service() {
@@ -30,6 +33,7 @@ class RenderForegroundService : Service() {
         const val ACTION_START_RENDER = "ACTION_START_RENDER"
         const val ACTION_CANCEL_RENDER = "ACTION_CANCEL_RENDER"
         private const val TAG = "ClipifyAI_RenderService"
+        private val renderExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
     }
 
     override fun onCreate() {
@@ -54,7 +58,7 @@ class RenderForegroundService : Service() {
         startForeground(NOTIFICATION_ID, notification)
         RenderState.isRendering = true
 
-        Thread {
+        renderExecutor.execute {
             try {
                 val processor = AndroidMediaProcessor(this)
                 val syncClient = DesktopSyncClient()
@@ -131,10 +135,101 @@ class RenderForegroundService : Service() {
                             return@Thread
                         }
                     } else {
-                        // Desktop offline
-                        val msg = "Desktop AI engine required for web stream links. Connect to PC or pick a video from your gallery."
-                        updateNotification("Desktop AI engine offline", 100)
-                        RenderState.listener?.invoke(100, msg, null)
+                        // Independent Mobile Mode: download YouTube or direct MP4 stream on-device, then render 9:16 Short!
+                        val dlFile = File(filesDir, "user_selected_video.mp4")
+                        var dlCaptions: List<YouTubeStreamDownloader.CaptionSegment> = emptyList()
+                        var dlTitle = ""
+                        val sourceFile: File? = if (YouTubeStreamDownloader.isYouTubeUrl(videoUriStr)) {
+                            updateNotification("Downloading YouTube HD video on mobile...", 10)
+                            RenderState.listener?.invoke(10, "[YouTube] Resolving HD stream & captions...", null)
+                            val res = YouTubeStreamDownloader.downloadYouTubeMp4(videoUriStr, dlFile) { pct, msg ->
+                                val scaled = (pct * 0.45).toInt().coerceIn(10, 48)
+                                updateNotification(msg, scaled)
+                                RenderState.listener?.invoke(scaled, msg, null)
+                            }
+                            if (!res.ok || res.file == null) {
+                                updateNotification(res.error, 100)
+                                RenderState.listener?.invoke(100, "ERROR: ${res.error}", null)
+                                return@Thread
+                            }
+                            dlCaptions = res.captions
+                            dlTitle = res.title
+                            res.file
+                        } else {
+                            updateNotification("Downloading video stream...", 15)
+                            RenderState.listener?.invoke(15, "[Download] Fetching direct video stream...", null)
+                            processor.resolveSourceVideoFile(videoUriStr)
+                        }
+
+                        if (sourceFile == null || !sourceFile.exists() || sourceFile.length() < 1024) {
+                            val msg = "ERROR: Could not download video stream. Pick a video from Gallery or try another link."
+                            updateNotification(msg, 100)
+                            RenderState.listener?.invoke(100, msg, null)
+                            return@Thread
+                        }
+
+                        val clipsCount = intent?.getIntExtra("clipsCount", 1)?.coerceIn(1, 5) ?: 1
+                        val sourceKey = YouTubeStreamDownloader.extractVideoId(videoUriStr) ?: videoUriStr
+                        val windows = processor.findHighlightWindowsMs(
+                            sourceFile = sourceFile,
+                            targetDurationSec = durationSec,
+                            count = clipsCount,
+                            sourceKey = sourceKey,
+                            captions = dlCaptions
+                        ) { pct, msg ->
+                            val scaled = 48 + (pct / 5)
+                            RenderState.listener?.invoke(scaled.coerceAtMost(55), msg, null)
+                        }
+
+                        var lastSavedFile: File? = null
+                        val savedUrls = mutableListOf<String>()
+                        val metaMap = org.json.JSONObject()
+                        val candArr = org.json.JSONArray()
+                        for ((idx, win) in windows.withIndex()) {
+                            val exportFile = processor.getExportFile()
+                            val clipPrefix = if (windows.size > 1) "[Clip ${idx + 1}/${windows.size}] " else ""
+                            RenderState.listener?.invoke(52 + (idx * 10), "$clipPrefix Rendering $layout 9:16 MP4 (${win.first / 1000}s–${win.second / 1000}s)...", null)
+                            val success = processor.processAndRenderShort(
+                                sourceFile = sourceFile,
+                                exportFile = exportFile,
+                                targetDurationSec = durationSec,
+                                layout = layout,
+                                captionsEnabled = captions,
+                                captions = dlCaptions,
+                                videoTitle = dlTitle,
+                                windowOverride = win
+                            ) { progress, stage ->
+                                val base = 50 + ((idx * 48) / windows.size)
+                                val span = 48 / windows.size
+                                val scaled = base + ((progress * span) / 100)
+                                updateNotification("$clipPrefix$stage", scaled)
+                                RenderState.listener?.invoke(scaled.coerceAtMost(99), "$clipPrefix$stage", null)
+                            }
+                            if (success && exportFile.exists() && exportFile.length() > 1024) {
+                                lastSavedFile = exportFile
+                                val fUrl = "file://${exportFile.absolutePath.replace("\\", "/")}"
+                                savedUrls.add(fUrl)
+                                try {
+                                    val m = org.json.JSONObject(processor.lastClipMetadataJson)
+                                    metaMap.put(fUrl, m)
+                                    candArr.put(m)
+                                } catch (_: Exception) {}
+                            }
+                        }
+
+                        if (lastSavedFile != null) {
+                            RenderState.lastExportPath = lastSavedFile.absolutePath
+                            RenderState.lastOutputsJson = org.json.JSONArray(savedUrls).toString()
+                            RenderState.lastMetadataJson = org.json.JSONObject().apply {
+                                put("metadata", metaMap)
+                                put("candidates", candArr)
+                            }.toString()
+                            updateNotification("✓ ${savedUrls.size} Short(s) saved to Gallery!", 100)
+                            RenderState.listener?.invoke(100, "✔ Render complete! Saved ${savedUrls.size} Short(s).", lastSavedFile.absolutePath)
+                        } else {
+                            updateNotification("Could not render short", 100)
+                            RenderState.listener?.invoke(100, "ERROR: Could not render MP4 short.", null)
+                        }
                         return@Thread
                     }
                 } else {
@@ -145,24 +240,61 @@ class RenderForegroundService : Service() {
                         RenderState.listener?.invoke(100, "Please choose a video from your gallery first", null)
                         return@Thread
                     }
-                    val exportFile = processor.getExportFile()
-
-                    RenderState.listener?.invoke(10, "Initializing hardware video engine...", null)
-                    updateNotification("Analyzing video stream & smart framing...", 15)
-
-                    val success = processor.processAndRenderShort(
+                    val clipsCount = intent?.getIntExtra("clipsCount", 1)?.coerceIn(1, 5) ?: 1
+                    RenderState.listener?.invoke(10, "Scanning local video for best highlight moments...", null)
+                    updateNotification("Scanning local video for highlights...", 15)
+                    val windows = processor.findHighlightWindowsMs(
                         sourceFile = sourceFile,
-                        exportFile = exportFile,
-                        targetDurationSec = durationSec
-                    ) { progress, stage ->
-                        updateNotification(stage, progress)
-                        RenderState.listener?.invoke(progress, stage, null)
+                        targetDurationSec = durationSec,
+                        count = clipsCount,
+                        sourceKey = sourceFile.name + "_" + sourceFile.length()
+                    ) { pct, msg ->
+                        RenderState.listener?.invoke(pct.coerceIn(10, 20), msg, null)
                     }
 
-                    if (success && exportFile.exists() && exportFile.length() > 1024) {
-                        RenderState.lastExportPath = exportFile.absolutePath
-                        updateNotification("✓ 9:16 Short saved to Gallery!", 100)
-                        RenderState.listener?.invoke(100, "Render complete! Saved to Movies/ClipifyAI.", exportFile.absolutePath)
+                    var lastSavedFile: File? = null
+                    val savedUrls = mutableListOf<String>()
+                    val metaMap = org.json.JSONObject()
+                    val candArr = org.json.JSONArray()
+                    for ((idx, win) in windows.withIndex()) {
+                        val exportFile = processor.getExportFile()
+                        val clipPrefix = if (windows.size > 1) "[Clip ${idx + 1}/${windows.size}] " else ""
+                        val success = processor.processAndRenderShort(
+                            sourceFile = sourceFile,
+                            exportFile = exportFile,
+                            targetDurationSec = durationSec,
+                            layout = layout,
+                            captionsEnabled = captions,
+                            videoTitle = sourceFile.nameWithoutExtension,
+                            windowOverride = win
+                        ) { progress, stage ->
+                            val base = (idx * 98) / windows.size
+                            val span = 98 / windows.size
+                            val scaled = (base + ((progress * span) / 100)).coerceIn(12, 99)
+                            updateNotification("$clipPrefix$stage", scaled)
+                            RenderState.listener?.invoke(scaled, "$clipPrefix$stage", null)
+                        }
+                        if (success && exportFile.exists() && exportFile.length() > 1024) {
+                            lastSavedFile = exportFile
+                            val fUrl = "file://${exportFile.absolutePath.replace("\\", "/")}"
+                            savedUrls.add(fUrl)
+                            try {
+                                val m = org.json.JSONObject(processor.lastClipMetadataJson)
+                                metaMap.put(fUrl, m)
+                                candArr.put(m)
+                            } catch (_: Exception) {}
+                        }
+                    }
+
+                    if (lastSavedFile != null) {
+                        RenderState.lastExportPath = lastSavedFile.absolutePath
+                        RenderState.lastOutputsJson = org.json.JSONArray(savedUrls).toString()
+                        RenderState.lastMetadataJson = org.json.JSONObject().apply {
+                            put("metadata", metaMap)
+                            put("candidates", candArr)
+                        }.toString()
+                        updateNotification("✓ ${savedUrls.size} Short(s) saved to Gallery!", 100)
+                        RenderState.listener?.invoke(100, "Render complete! Saved ${savedUrls.size} Short(s).", lastSavedFile.absolutePath)
                     } else {
                         updateNotification("Could not complete render", 100)
                         RenderState.listener?.invoke(100, "Could not render short.", null)
@@ -178,7 +310,7 @@ class RenderForegroundService : Service() {
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
-        }.start()
+        }
 
         return START_NOT_STICKY
     }

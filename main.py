@@ -832,15 +832,23 @@ def _scale_filter(w: int | str, h: int | str, force_original_aspect_ratio: str |
 
 def _video_encode_args(quality_override: str | None = None) -> list[str]:
     prof = get_upscale_profile(quality_override)
-    return [
-        "-c:v", "libx264",
-        "-preset", prof["preset"],
-        "-crf", prof["crf"],
-        "-b:v", prof["video_bitrate"],
-        "-maxrate", prof["maxrate"],
-        "-bufsize", prof["bufsize"],
-        "-pix_fmt", "yuv420p",
-    ]
+    try:
+        from clipify.platform.gpu_manager import get_ffmpeg_video_encoder_flags
+        return get_ffmpeg_video_encoder_flags(
+            bitrate=prof["video_bitrate"],
+            preset=prof["preset"],
+            crf=int(prof["crf"]),
+        )
+    except Exception:
+        return [
+            "-c:v", "libx264",
+            "-preset", prof["preset"],
+            "-crf", prof["crf"],
+            "-b:v", prof["video_bitrate"],
+            "-maxrate", prof["maxrate"],
+            "-bufsize", prof["bufsize"],
+            "-pix_fmt", "yuv420p",
+        ]
 
 # --- Groq API ---
 GROQ_API_KEY = os.getenv(
@@ -1496,6 +1504,151 @@ def _clean_corrupted_hf_cache() -> int:
             except Exception:
                 pass
     return cleaned
+
+
+def _parse_subtitle_time_sec(ts: str) -> float:
+    ts = ts.strip().replace(",", ".")
+    parts = ts.split(":")
+    try:
+        if len(parts) == 3:
+            return float(parts[0]) * 3600.0 + float(parts[1]) * 60.0 + float(parts[2])
+        if len(parts) == 2:
+            return float(parts[0]) * 60.0 + float(parts[1])
+        return float(parts[0])
+    except ValueError:
+        return 0.0
+
+
+def _try_load_existing_subtitle_transcription(input_path: str):
+    """Find sidecar (.srt/.vtt) or embedded subtitle tracks in input_path and convert to ClipsAI Transcription."""
+    if os.getenv("CLIPPEDAI_USE_EXISTING_TRANSCRIPTION", "1").strip().lower() not in ("1", "true", "yes", "on"):
+        return None
+    try:
+        import datetime
+        import tempfile
+        from pathlib import Path
+        from clipsai.transcribe.transcription import Transcription
+
+        p = Path(input_path)
+        sub_text = ""
+        source_label = ""
+
+        # 1. Check sidecar subtitle files next to the video
+        candidates = [
+            p.with_suffix(".srt"),
+            p.with_suffix(".vtt"),
+            p.with_name(f"{p.stem}.en.srt"),
+            p.with_name(f"{p.stem}.en.vtt"),
+        ]
+        if p.parent.is_dir():
+            for ext in ("*.srt", "*.vtt"):
+                for f in sorted(p.parent.glob(ext)):
+                    if f not in candidates:
+                        candidates.append(f)
+
+        for cand in candidates:
+            if cand.is_file() and cand.stat().st_size > 20:
+                sub_text = cand.read_text(encoding="utf-8", errors="replace")
+                source_label = f"sidecar:{cand.name}"
+                break
+
+        # 2. Probe embedded subtitle stream inside MKV/MP4/WebM via ffprobe & ffmpeg
+        if not sub_text.strip():
+            probe_cmd = [
+                FFPROBE_BIN, "-v", "error", "-select_streams", "s",
+                "-show_entries", "stream=index:stream_tags=language",
+                "-of", "csv=p=0", str(p),
+            ]
+            try:
+                raw_streams = _check_output_hidden(probe_cmd, stderr=subprocess.DEVNULL).decode("utf-8", errors="replace").strip()
+                if raw_streams:
+                    lines = [ln.strip() for ln in raw_streams.splitlines() if ln.strip()]
+                    chosen_idx = 0
+                    for i, ln in enumerate(lines):
+                        if "eng" in ln.lower() or ",en" in ln.lower():
+                            chosen_idx = i
+                            break
+                    with tempfile.NamedTemporaryFile(suffix=".srt", delete=False) as tf:
+                        tmp_srt = tf.name
+                    try:
+                        ext_cmd = [
+                            FFMPEG_BIN, "-y", "-i", str(p),
+                            "-map", f"0:s:{chosen_idx}", "-f", "srt", tmp_srt,
+                        ]
+                        _check_output_hidden(ext_cmd, stderr=subprocess.DEVNULL)
+                        if os.path.exists(tmp_srt) and os.path.getsize(tmp_srt) > 20:
+                            sub_text = Path(tmp_srt).read_text(encoding="utf-8", errors="replace")
+                            source_label = f"embedded:stream_{chosen_idx}"
+                    finally:
+                        try:
+                            os.remove(tmp_srt)
+                        except OSError:
+                            pass
+            except Exception:
+                pass
+
+        if not sub_text.strip():
+            return None
+
+        # Parse SRT/VTT timestamp cues into char_info
+        time_re = re.compile(r"(\d{1,2}:?\d{2}:\d{2}[.,]\d{1,3})\s*-->\s*(\d{1,2}:?\d{2}:\d{2}[.,]\d{1,3})")
+        tag_re = re.compile(r"<[^>]+>|\{[^}]+\}")
+        char_info: list[dict] = []
+        cue_count = 0
+
+        blocks = re.split(r"\r?\n\s*\r?\n", sub_text.strip())
+        for block in blocks:
+            lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
+            ts_line_idx = -1
+            m = None
+            for idx, ln in enumerate(lines):
+                m = time_re.search(ln)
+                if m:
+                    ts_line_idx = idx
+                    break
+            if m is None or ts_line_idx < 0:
+                continue
+            start_s = _parse_subtitle_time_sec(m.group(1))
+            end_s = max(start_s + 0.2, _parse_subtitle_time_sec(m.group(2)))
+            cue_txt = " ".join(lines[ts_line_idx + 1:])
+            cue_txt = tag_re.sub("", cue_txt)
+            cue_txt = re.sub(r"\s+", " ", cue_txt).strip()
+            if not cue_txt:
+                continue
+
+            cue_count += 1
+            n_chars = len(cue_txt)
+            dur = end_s - start_s
+            for ci, ch in enumerate(cue_txt):
+                c_start = start_s + (dur * ci) / n_chars
+                c_end = start_s + (dur * (ci + 1)) / n_chars
+                char_info.append({
+                    "char": ch,
+                    "start_time": round(c_start, 3),
+                    "end_time": round(c_end, 3),
+                    "speaker": None,
+                })
+            char_info.append({
+                "char": " ",
+                "start_time": round(end_s, 3),
+                "end_time": round(end_s + 0.01, 3),
+                "speaker": None,
+            })
+
+        if cue_count == 0 or not char_info:
+            return None
+
+        print(f"  [Transcribe] Found existing transcription ({source_label}, {cue_count} cues) — skipping WhisperX!", flush=True)
+        return Transcription({
+            "source_software": f"existing-{source_label}",
+            "time_created": datetime.datetime.now(),
+            "language": "en",
+            "num_speakers": 1,
+            "char_info": char_info,
+        })
+    except Exception as exc:
+        print(f"  [Transcribe] Existing subtitle check skipped: {exc}", flush=True)
+        return None
 
 
 def transcribe_with_progress(audio_file_path, transcriber):
@@ -2421,6 +2574,16 @@ def create_animated_subtitles(video_path, transcription, clip, output_path):
         if consec_count <= 2:
             cleaned_clip_words.append(w)
     clip_words_local = cleaned_clip_words or clip_words_local
+
+    # Convert Hindi Devanagari script into Romanized Hinglish (Hindi written in English)
+    try:
+        from hindi_transliterator import has_devanagari, transliterate_devanagari_to_hinglish
+        for w in clip_words_local:
+            txt = str(w.get("word", ""))
+            if has_devanagari(txt):
+                w["word"] = transliterate_devanagari_to_hinglish(txt)
+    except Exception:
+        pass
 
     # Apply ALL CAPS for Premium Caption grammar
     if PREMIUM_CAPTIONS:
@@ -5902,10 +6065,14 @@ def _hold_missing_split_people(output_path: str, panel_h: int,
                 pass
         raise RuntimeError(f"split panel hold decoded {frame_index}/{frame_count} frames")
 
+    try:
+        from clipify.platform.gpu_manager import get_ffmpeg_video_encoder_flags
+        _sp_enc = get_ffmpeg_video_encoder_flags(bitrate="10M", preset="fast", crf=22)
+    except Exception:
+        _sp_enc = ["-c:v", "libx264", "-preset", "fast", "-crf", "22", "-pix_fmt", "yuv420p"]
     cmd = [FFMPEG_BIN, "-hide_banner", "-v", "error", "-y",
            "-i", temp_video, "-i", output_path,
-           "-map", "0:v:0", "-map", "1:a?", "-c:v", "libx264",
-           "-preset", "fast", "-crf", "22", "-pix_fmt", "yuv420p",
+           "-map", "0:v:0", "-map", "1:a?", *_sp_enc,
            "-c:a", "copy", "-movflags", "+faststart", muxed_video]
     try:
         _run_hidden(cmd, check=True, capture_output=True, text=True)
@@ -6874,6 +7041,12 @@ def process_single_video(
             if transcription is None:
                 print("  [Transcribe] Cache invalid or corrupt, will re-transcribe.")
         if transcription is None:
+            transcription = _try_load_existing_subtitle_transcription(input_path)
+            if transcription is not None:
+                save_p = transcription_path or get_transcription_file_path(input_path)
+                save_transcription(transcription, save_p)
+                print(f"  [Transcribe] Cached existing transcription: {os.path.basename(save_p)}")
+        if transcription is None:
             transcriber = create_transcriber(
                 model_size=os.getenv("TRANSCRIPTION_MODEL", TRANSCRIPTION_MODEL)
             )
@@ -7240,6 +7413,11 @@ def process_single_video(
             # Frame-accurate and sample-accurate trim to guarantee caption sound and timing align 100%
             dur = max(0.1, clip.end_time - clip.start_time)
             print(f"     [1/5] Trim {clip.start_time:.2f}s–{clip.end_time:.2f}s ({dur:.2f}s, frame-accurate A/V sync)")
+            try:
+                from clipify.platform.gpu_manager import get_ffmpeg_video_encoder_flags
+                _trim_enc = get_ffmpeg_video_encoder_flags(bitrate="20M", preset="ultrafast", crf=14)
+            except Exception:
+                _trim_enc = ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "0"]
             trim_cmd = [
                 FFMPEG_BIN, "-hide_banner", "-y",
                 "-ss", f"{clip.start_time:.3f}",
@@ -7247,7 +7425,7 @@ def process_single_video(
                 "-t", f"{dur:.3f}",
                 "-filter_complex", "[0:v]setpts=PTS-STARTPTS[v];[0:a]asetpts=PTS-STARTPTS[a]",
                 "-map", "[v]", "-map", "[a]",
-                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
+                *_trim_enc,
                 "-c:a", "aac", "-b:a", "192k",
                 trimmed_path,
             ]

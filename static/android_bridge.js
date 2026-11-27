@@ -6,7 +6,7 @@
  * - Standalone rendering via Android MediaCodec foreground service
  * - Interactive Clippy assistant & offline status polling
  */
-(function() {
+(function () {
   'use strict';
 
   const isAndroid = !!(window.AndroidBridge || navigator.userAgent.includes('Android') || window.location.protocol === 'file:');
@@ -16,28 +16,103 @@
     return;
   }
 
+  // Force clean mobile layout: completely remove desktop sidebar since native bottom bar exists
+  document.documentElement.classList.add('is-android');
+  const injectMobileStyle = () => {
+    if (document.getElementById('clipify-mobile-clean-style')) return;
+    const style = document.createElement('style');
+    style.id = 'clipify-mobile-clean-style';
+    style.textContent = `
+      .sidebar,
+      .sidebar-creature-card,
+      #clippyFloatingCard,
+      .aurora,
+      .noise,
+      .topbar {
+        display: none !important;
+      }
+      .main {
+        margin-left: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 14px 14px 90px 14px !important;
+        box-sizing: border-box !important;
+      }
+      .page-section {
+        padding: 0 !important;
+      }
+    `;
+    (document.head || document.documentElement).appendChild(style);
+  };
+  if (document.head) injectMobileStyle();
+  else document.addEventListener('DOMContentLoaded', injectMobileStyle);
+
   console.log('[ClipifyAI Android] Initializing Standalone Native Bridge...');
 
   // Shim EventSource so that SSE failures in WebView on file:/// do not throw or terminate the polling fallback
   const OriginalEventSource = window.EventSource;
-  window.EventSource = function(url) {
+  window.EventSource = function (url) {
     const urlStr = String(url);
     if (urlStr.includes('/api/events/')) {
       const esMock = new EventTarget();
-      esMock.close = function() {};
+      esMock.close = function () { };
       esMock.readyState = 1;
       return esMock;
     }
     if (OriginalEventSource) {
-      try { return new OriginalEventSource(url); } catch (_) {}
+      try { return new OriginalEventSource(url); } catch (_) { }
     }
-    return { close: () => {}, readyState: 2 };
+    return { close: () => { }, readyState: 2 };
   };
+
+  // Async Bridge Callback Registry (prevents WebView UI thread blocking)
+  window.__androidApiCallbacks = window.__androidApiCallbacks || {};
+  window.__androidApiSeq = 0;
+  window.__onAndroidApiResult = function (reqId, rawResult) {
+    const cb = window.__androidApiCallbacks[reqId];
+    if (cb) {
+      delete window.__androidApiCallbacks[reqId];
+      cb(rawResult);
+    }
+  };
+
+  function callDesktopBridgeAsync(method, endpoint, body, headers) {
+    return new Promise((resolve) => {
+      if (window.AndroidBridge && window.AndroidBridge.callApiAsync) {
+        const reqId = 'api_' + (++window.__androidApiSeq) + '_' + Date.now();
+        const timer = setTimeout(() => {
+          if (window.__androidApiCallbacks[reqId]) {
+            delete window.__androidApiCallbacks[reqId];
+            resolve(null);
+          }
+        }, 12000);
+        window.__androidApiCallbacks[reqId] = (rawResult) => {
+          clearTimeout(timer);
+          resolve(rawResult);
+        };
+        try {
+          window.AndroidBridge.callApiAsync(reqId, method, endpoint, body, headers);
+        } catch (_) {
+          clearTimeout(timer);
+          delete window.__androidApiCallbacks[reqId];
+          resolve(null);
+        }
+      } else if (window.AndroidBridge && window.AndroidBridge.callApi) {
+        try {
+          resolve(window.AndroidBridge.callApi(method, endpoint, body, headers));
+        } catch (_) {
+          resolve(null);
+        }
+      } else {
+        resolve(null);
+      }
+    });
+  }
 
   // Intercept window.fetch for API routes inside Android WebView
   const originalFetch = window.fetch;
 
-  window.fetch = async function(url, options = {}) {
+  window.fetch = async function (url, options = {}) {
     const urlStr = String(url);
 
     if (urlStr.startsWith('/api/') || urlStr.includes('/api/')) {
@@ -46,8 +121,8 @@
         endpoint = '/api/' + endpoint.split('/api/')[1];
       }
 
-      // Try desktop bridge connection if available
-      if (window.AndroidBridge && window.AndroidBridge.callApi) {
+      // Try desktop bridge connection asynchronously if available
+      if (window.AndroidBridge && (window.AndroidBridge.callApiAsync || window.AndroidBridge.callApi)) {
         try {
           const method = (options.method || 'GET').toUpperCase();
           let body = null;
@@ -55,7 +130,7 @@
             body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
           }
           const headers = options.headers ? JSON.stringify(options.headers) : '{}';
-          const rawResult = window.AndroidBridge.callApi(method, endpoint, body, headers);
+          const rawResult = await callDesktopBridgeAsync(method, endpoint, body, headers);
           if (rawResult) {
             const parsed = JSON.parse(rawResult);
             if (parsed.status !== 503) {
@@ -67,74 +142,155 @@
               });
             }
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       // Standalone Mobile Engine Handlers (Zero hang, instant response)
 
-      // 1. YouTube Import
+      // Real Mobile Render Progress Listener (driven by RenderForegroundService -> AndroidMediaProcessor)
+      function appendMobileLog(jobObj, line) {
+        if (!jobObj || !line) return;
+        if (!Array.isArray(jobObj.logs)) jobObj.logs = [];
+        if (jobObj.logs[jobObj.logs.length - 1] !== line) {
+          jobObj.logs.push(line);
+        }
+      }
+
+      window.onMobileImportProgress = function (progress, stage, filePath, title, err) {
+        const pct = Math.max(0, Math.min(100, Number(progress) || 0));
+        if (!window._activeMobileYtJob) return;
+        window._activeMobileYtJob.progress = pct;
+        window._activeMobileYtJob.stage = stage || 'Downloading...';
+        window._activeMobileYtJob.detail = stage || `${pct}%`;
+        appendMobileLog(window._activeMobileYtJob, stage);
+
+        if (pct >= 100) {
+          if (err && err.length > 0) {
+            window._activeMobileYtJob.status = 'error';
+            window._activeMobileYtJob.error = err;
+          } else if (filePath && filePath.length > 0) {
+            window._activeMobileYtJob.status = 'uploaded';
+            window._activeMobileYtJob.filename = (title ? title.replace(/[^a-zA-Z0-9 _-]/g, '').trim() : 'YouTube_Video') + '.mp4';
+            window._lastAndroidUri = filePath;
+            const srcPrev = document.getElementById('sourcePreview');
+            if (srcPrev) {
+              const fUrl = filePath.startsWith('file://') ? filePath : ('file://' + filePath);
+              srcPrev.src = fUrl;
+              srcPrev.hidden = false;
+              try { srcPrev.load(); } catch (_) {}
+            }
+            if (window.onAndroidVideoSelected) {
+              window.onAndroidVideoSelected(filePath, window._activeMobileYtJob.filename, 0);
+            }
+          }
+        }
+      };
+
+      window.onMobileRenderProgress = function (progress, stage, outputPath, metaJson, outputsJson) {
+        const pct = Math.max(0, Math.min(100, Number(progress) || 0));
+        const hasOutput = Boolean(outputPath && outputPath.length > 0);
+        const fileUrl = hasOutput ? (outputPath.startsWith('file://') ? outputPath : 'file://' + outputPath) : '';
+        let allOutputs = [];
+        try {
+          const parsedOuts = outputsJson ? JSON.parse(outputsJson) : [];
+          if (Array.isArray(parsedOuts) && parsedOuts.length > 0) allOutputs = parsedOuts;
+        } catch (_) {}
+        if (allOutputs.length === 0 && fileUrl) allOutputs = [fileUrl];
+
+        let metaPayload = {};
+        try { metaPayload = metaJson ? JSON.parse(metaJson) : {}; } catch (_) {}
+        const metaMap = metaPayload.metadata || {};
+        const candList = Array.isArray(metaPayload.candidates) && metaPayload.candidates.length > 0
+          ? metaPayload.candidates
+          : allOutputs.map((u, i) => ({
+              title: metaPayload.title || `Clipify Viral Short ${i + 1}`,
+              description: metaPayload.description || 'Generated on-device by Clipify AI.',
+              start: metaPayload.start || 0,
+              end: metaPayload.end || 30,
+              score: 95
+            }));
+        const outMetaObj = {};
+        allOutputs.forEach((u, i) => {
+          outMetaObj[u] = metaMap[u] || {
+            title: (candList[i] && candList[i].title) || metaPayload.title || `Clipify Viral Short ${i + 1}`,
+            description: (candList[i] && candList[i].description) || metaPayload.description || 'Generated on-device by Clipify AI.'
+          };
+        });
+        const clipsArr = allOutputs.map((u, i) => ({
+          path: u,
+          title: outMetaObj[u]?.title || `Short ${i + 1}`,
+          description: outMetaObj[u]?.description || ''
+        }));
+
+        if (window._activeMobileRenderJob) {
+          window._activeMobileRenderJob.ok = true;
+          window._activeMobileRenderJob.progress = pct;
+          window._activeMobileRenderJob.stage = stage || 'Rendering MP4...';
+          window._activeMobileRenderJob.detail = stage || `${pct}%`;
+          appendMobileLog(window._activeMobileRenderJob, stage);
+          if (pct >= 100 && allOutputs.length > 0) {
+            window._activeMobileRenderJob.status = 'done';
+            window._activeMobileRenderJob.outputs = allOutputs;
+            window._activeMobileRenderJob.filename = allOutputs[0].split('/').pop();
+            window._activeMobileRenderJob.candidates = candList;
+            window._activeMobileRenderJob.output_metadata = outMetaObj;
+            window._activeMobileRenderJob.clips = clipsArr;
+          } else if (pct >= 100 && !hasOutput) {
+            window._activeMobileRenderJob.status = 'error';
+            window._activeMobileRenderJob.error = stage || 'Render failed';
+          }
+        }
+        if (window._activeInstantJob) {
+          window._activeInstantJob.ok = true;
+          window._activeInstantJob.progress = pct;
+          window._activeInstantJob.stage = stage || 'Encoding 9:16 MP4...';
+          window._activeInstantJob.detail = stage || `${pct}%`;
+          appendMobileLog(window._activeInstantJob, stage);
+          if (pct >= 100 && allOutputs.length > 0) {
+            window._activeInstantJob.status = 'done';
+            window._activeInstantJob.outputs = allOutputs;
+            window._activeInstantJob.filename = allOutputs[0].split('/').pop();
+            window._activeInstantJob.clip_paths = allOutputs;
+            window._activeInstantJob.candidates = candList;
+            window._activeInstantJob.output_metadata = outMetaObj;
+            window._activeInstantJob.clips = clipsArr;
+          } else if (pct >= 100 && !hasOutput) {
+            window._activeInstantJob.status = 'error';
+            window._activeInstantJob.error = stage || 'Instant render failed';
+          }
+        }
+      };
+
+      // 1. YouTube Import (Real independent on-device download via YouTubeStreamDownloader.kt)
       if (endpoint.includes('/api/import-youtube')) {
         let reqUrl = '';
         try {
           const b = typeof options.body === 'string' ? JSON.parse(options.body) : (options.body || {});
-          reqUrl = b.url || '';
+          reqUrl = (b.url || '').trim();
         } catch (_) {}
 
-        const jId = 'mobile_yt_' + Date.now();
-        const randId = Math.floor(Math.random() * 899 + 100);
-        window._activeMobileYtJob = {
-          job_id: jId,
-          id: jId,
-          filename: 'YouTube_Clip_' + randId + '.mp4',
-          status: 'downloading',
-          progress: 15,
-          stage: 'Connecting to YouTube…',
-          detail: 'Downloading 1080p stream…',
-          events: []
-        };
-
-        if (window.AndroidBridge && window.AndroidBridge.startYouTubeClip && reqUrl) {
-          try { window.AndroidBridge.startYouTubeClip(reqUrl, 'viral'); } catch (_) {}
+        if (!reqUrl) {
+          return new Response(JSON.stringify({ ok: false, error: 'Please paste a video URL first.' }), {
+            status: 400, headers: { 'Content-Type': 'application/json' }
+          });
         }
 
-        let prog = 15;
-        if (window._mobileYtInterval) clearInterval(window._mobileYtInterval);
-        window._mobileYtInterval = setInterval(() => {
-          prog += 18;
-          if (!window._activeMobileYtJob) { clearInterval(window._mobileYtInterval); return; }
-          if (prog < 100) {
-            window._activeMobileYtJob.progress = prog;
-            window._activeMobileYtJob.stage = prog < 55 ? `Downloading YouTube video (${prog}%)…` : `Reframing 9:16 vertical viewport (${prog}%)…`;
-            window._activeMobileYtJob.detail = `${prog}% complete`;
-          } else {
-            clearInterval(window._mobileYtInterval);
-            window._activeMobileYtJob.progress = 100;
-            window._activeMobileYtJob.status = 'uploaded';
-            window._activeMobileYtJob.stage = 'Download complete. Video ready to clip!';
-            window._activeMobileYtJob.detail = '100% · Ready to clip';
+        const jId = 'mobile_yt_' + Date.now();
+        window._activeMobileYtJob = {
+          ok: true,
+          job_id: jId,
+          id: jId,
+          filename: 'YouTube_Download.mp4',
+          status: 'downloading',
+          progress: 5,
+          stage: 'Connecting to YouTube...',
+          detail: 'Resolving mobile MP4 stream...',
+          logs: ['[YouTube] Connecting to YouTube stream...']
+        };
 
-            const vidName = window._activeMobileYtJob.filename;
-            if (window.state) {
-              window.state.jobId = jId;
-              window.state.source = { name: vidName, size: 25 * 1024 * 1024, origin: 'youtube', jobId: jId };
-            }
-            if (window.betaState) {
-              window.betaState.jobId = jId;
-              window.betaState.sourceFile = { name: vidName, size: 25 * 1024 * 1024 };
-            }
-
-            ['createBtn', 'submitBtn', 'betaRunPipelineBtn', 'btnStartInstantClip'].forEach(id => {
-              const b = document.getElementById(id);
-              if (b) b.disabled = false;
-            });
-            const dropTitle = document.querySelector('.dropzone strong, .drop-title, #fileName, #betaSourceName');
-            if (dropTitle) dropTitle.textContent = vidName;
-            const dropMeta = document.querySelector('.dropzone small, .drop-subtitle, #previewMeta, #betaSourceMeta');
-            if (dropMeta) dropMeta.textContent = '100% · Ready to clip';
-            const chip = document.getElementById('fileChip');
-            if (chip) chip.hidden = false;
-          }
-        }, 320);
+        if (window.AndroidBridge && window.AndroidBridge.startYouTubeImport) {
+          window.AndroidBridge.startYouTubeImport(reqUrl);
+        }
 
         return new Response(JSON.stringify({
           ok: true,
@@ -147,20 +303,19 @@
         });
       }
 
-      // 2. Status Polling
+      // 2. Status Polling (Real RenderState / Import job status)
       if (endpoint.includes('/api/status/')) {
         const parts = endpoint.split('/api/status/');
-        const rawId = parts[1] || '';
-        const reqId = rawId.split('?')[0].trim();
+        const rawId = (parts[1] || '').split('?')[0].trim();
 
-        if (window._activeMobileYtJob && (reqId === window._activeMobileYtJob.job_id || reqId.startsWith('mobile_yt_'))) {
+        if (window._activeMobileYtJob && (rawId === window._activeMobileYtJob.job_id || rawId.startsWith('mobile_yt_'))) {
           return new Response(JSON.stringify(window._activeMobileYtJob), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
           });
         }
 
-        if (window._activeMobileRenderJob && (reqId === window._activeMobileRenderJob.job_id || reqId.startsWith('mobile_job_'))) {
+        if (window._activeMobileRenderJob && (rawId === window._activeMobileRenderJob.job_id || rawId.startsWith('mobile_job_'))) {
           return new Response(JSON.stringify(window._activeMobileRenderJob), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
@@ -168,113 +323,135 @@
         }
 
         return new Response(JSON.stringify({
-          ok: true,
-          status: 'uploaded',
-          progress: 100,
-          stage: 'Video ready',
-          filename: 'clipify_mobile.mp4',
-          outputs: ['short_1.mp4', 'short_2.mp4']
+          ok: false,
+          status: 'error',
+          progress: 0,
+          error: 'Job not found or Desktop Engine offline.'
         }), {
-          status: 200,
+          status: 404,
           headers: { 'Content-Type': 'application/json' }
         });
       }
 
-      // 3. Pipeline Start (/api/start)
+      // 3. Pipeline Start (/api/start) -> Real RenderForegroundService MP4 processing
       if (endpoint.includes('/api/start')) {
+        let reqBody = {};
+        try {
+          if (typeof FormData !== 'undefined' && options.body instanceof FormData) {
+            options.body.forEach((v, k) => { if (typeof v === 'string') reqBody[k] = v; });
+          } else if (typeof options.body === 'string') {
+            reqBody = JSON.parse(options.body);
+          } else {
+            reqBody = options.body || {};
+          }
+        } catch (_) {}
+
+        if (!window._lastAndroidUri) {
+          return new Response(JSON.stringify({
+            ok: false,
+            error: 'Please choose a video from your phone gallery or import a link first.'
+          }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (window._activeMobileRenderJob && window._activeMobileRenderJob.status === 'running' &&
+            (Date.now() - (window._lastRenderStartMs || 0)) < 4000) {
+          return new Response(JSON.stringify({
+            ok: true,
+            job_id: window._activeMobileRenderJob.job_id,
+            message: 'Render already in progress.'
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        window._lastRenderStartMs = Date.now();
+
         const rId = 'mobile_job_' + Date.now();
+        const dur = Math.max(5, Math.min(180, Number(reqBody.max_duration || reqBody.duration || 30)));
+        const isSplit = reqBody.layout === 'split' || reqBody.split_screen === '1' || reqBody.gaming_split === '1';
+        const layoutMode = isSplit ? 'split' : 'center';
+        const captionsOn = reqBody.captions !== 'no' && reqBody.disable_captions !== '1' && reqBody.captions_enabled !== '0';
+        const count = Math.max(1, Math.min(5, Number(reqBody.clips || reqBody.clips_count || reqBody.num_clips || 1)));
+
         window._activeMobileRenderJob = {
+          ok: true,
           job_id: rId,
           id: rId,
           status: 'running',
-          progress: 10,
-          stage: 'Starting Clipify AI',
-          detail: 'MediaCodec hardware acceleration active…',
-          outputs: []
+          progress: 5,
+          stage: 'Initializing hardware Media3 HD engine...',
+          detail: 'Preparing real MP4 render...',
+          logs: [`[Media3] Starting ${layoutMode} HD render (${dur}s, ${count} clip(s), captions=${captionsOn})...`],
+          outputs: [],
+          candidates: [],
+          output_metadata: {}
         };
 
-        if (window.AndroidBridge && window.AndroidBridge.startRender) {
-          try {
-            window.AndroidBridge.startRender(window._lastAndroidUri || '', 'viral', true);
-          } catch (_) {}
-        }
-
-        let rProg = 10;
-        const rTimer = setInterval(() => {
-          rProg += 18;
-          if (!window._activeMobileRenderJob) { clearInterval(rTimer); return; }
-          if (rProg < 100) {
-            window._activeMobileRenderJob.progress = rProg;
-            window._activeMobileRenderJob.stage = rProg < 50 ? `Smart subject tracking (${rProg}%)…` : `Compositing vertical frame (${rProg}%)…`;
-            window._activeMobileRenderJob.detail = `Processing on mobile hardware (${rProg}%)`;
-          } else {
-            clearInterval(rTimer);
-            window._activeMobileRenderJob.progress = 100;
-            window._activeMobileRenderJob.status = 'done';
-            window._activeMobileRenderJob.stage = 'Done! 9:16 Shorts saved to Gallery.';
-            window._activeMobileRenderJob.detail = 'Created 2 vertical Shorts.';
-            window._activeMobileRenderJob.outputs = ['short_1.mp4', 'short_2.mp4'];
-          }
-        }, 400);
-
-        if (window.AndroidBridge && window.AndroidBridge.showToast) {
-          window.AndroidBridge.showToast('Rendering 9:16 Short with MediaCodec hardware acceleration...');
+        if (window.AndroidBridge && window.AndroidBridge.startRenderWithCount) {
+          window.AndroidBridge.startRenderWithCount(window._lastAndroidUri, dur, layoutMode, captionsOn, count);
+        } else if (window.AndroidBridge && window.AndroidBridge.startRender) {
+          window.AndroidBridge.startRender(window._lastAndroidUri, dur, layoutMode, captionsOn);
         }
 
         return new Response(JSON.stringify({
           ok: true,
           job_id: rId,
-          message: 'Started clipping pipeline.'
+          message: 'Started real on-device MP4 render.'
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         });
       }
 
-      // 4. Instant Clipping Start
+      // 4. Instant Clipping Start -> Real RenderForegroundService MP4 processing
       if (endpoint.includes('/api/instant/start')) {
-        const iId = 'instant_mobile_' + Date.now();
-        window._activeInstantJob = {
-          job_id: iId,
-          status: 'running',
-          progress: 20,
-          detail: 'Hardware vertical encoding...',
-          clip_paths: ['short_1.mp4'],
-          clips: [{ path: 'short_1.mp4', title: 'Instant Clip 1' }]
-        };
+        let reqBody = {};
+        try {
+          reqBody = typeof options.body === 'string' ? JSON.parse(options.body) : (options.body || {});
+        } catch (_) {}
 
-        if (window.AndroidBridge && window.AndroidBridge.startRender) {
-          try {
-            window.AndroidBridge.startRender(window._lastAndroidUri || '', 'instant', true);
-          } catch (_) {}
+        const srcUri = (reqBody.youtube_url || '').trim() || window._lastAndroidUri || '';
+        if (!srcUri) {
+          return new Response(JSON.stringify({
+            ok: false,
+            error: 'Please choose a video from your gallery or paste a YouTube link first.'
+          }), { status: 400, headers: { 'Content-Type': 'application/json' } });
         }
 
-        let iprog = 20;
-        const itimer = setInterval(() => {
-          iprog += 25;
-          if (iprog < 100) {
-            window._activeInstantJob.progress = iprog;
-            window._activeInstantJob.detail = `Encoding 9:16 Short (${iprog}%)`;
-          } else {
-            clearInterval(itimer);
-            window._activeInstantJob.progress = 100;
-            window._activeInstantJob.status = 'done';
-            window._activeInstantJob.detail = 'Instant Short ready in /sdcard/Movies/ClipifyAI!';
-          }
-        }, 350);
-        return new Response(JSON.stringify({ ok: true, job_id: iId, message: 'Instant pipeline active.' }), {
+        const iId = 'instant_mobile_' + Date.now();
+        const dur = Math.max(5, Math.min(180, Number(reqBody.duration || 30)));
+        window._activeInstantJob = {
+          ok: true,
+          job_id: iId,
+          status: 'running',
+          progress: 5,
+          stage: 'Initializing MediaCodec 9:16 MP4 render...',
+          detail: 'Hardware vertical MP4 encoding...',
+          logs: ['⚡ Initializing mobile video engine...'],
+          outputs: [],
+          clip_paths: [],
+          clips: []
+        };
+
+        const count = Math.max(1, Math.min(5, Number(reqBody.clips || reqBody.clips_count || reqBody.num_clips || 1)));
+        if (window.AndroidBridge && window.AndroidBridge.startRenderWithCount) {
+          window.AndroidBridge.startRenderWithCount(srcUri, dur, reqBody.layout || 'center', reqBody.captions !== 'no', count);
+        } else if (window.AndroidBridge && window.AndroidBridge.startRender) {
+          window.AndroidBridge.startRender(srcUri, dur, reqBody.layout || 'center', reqBody.captions !== 'no');
+        }
+
+        return new Response(JSON.stringify({ ok: true, job_id: iId, message: 'Instant MP4 pipeline started.' }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         });
       }
 
       if (endpoint.includes('/api/instant/status/')) {
-        const cur = window._activeInstantJob || { status: 'done', progress: 100, clip_paths: ['short_1.mp4'] };
+        const cur = window._activeInstantJob || { ok: false, status: 'error', progress: 0, error: 'No active instant job' };
         return new Response(JSON.stringify(cur), {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         });
       }
+
+      // 4b. Live Stream Studio handled natively by MobileLiveManager via callApiAsync
 
       // 5. Upload Interceptor
       if (endpoint.includes('/api/upload')) {
@@ -307,7 +484,7 @@
         try {
           const b = JSON.parse(options.body || "{}");
           prompt = (b.message || "").toLowerCase();
-        } catch (_) {}
+        } catch (_) { }
 
         let reply = "I'm here to help you create viral Shorts! You can import local videos or YouTube links, use Instant 9:16 Clipping, or check the Campaigns tab for creator bounties.";
         if (prompt.includes("campaign") || prompt.includes("bount") || prompt.includes("earn")) {
@@ -329,16 +506,46 @@
         });
       }
 
-      // 7. Models Hub Mock
-      if (endpoint.includes('/api/models')) {
+      // 7. Models Hub & Ollama (Real schema, no "undefined (Downloaded)", no fake 1s Ollama download)
+      if (endpoint.includes('/api/models/ollama/details')) {
         return new Response(JSON.stringify({
           ok: true,
-          models: ['qwen3:4b (Fastest Local AI)', 'deepseek-r1:8b', 'MediaCodec Hardware Compositor'],
-          active_model: 'qwen3:4b (Fastest Local AI)'
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
+          models: [],
+          default: ''
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      if (endpoint.includes('/api/models/ollama/download-status')) {
+        return new Response(JSON.stringify({
+          ok: false,
+          active: false,
+          progress: 0,
+          status: 'Desktop Engine required',
+          error: 'Ollama requires Clipify Desktop Engine on your PC.'
+        }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      if (endpoint.includes('/api/models/ollama/download') || endpoint.includes('/api/models/ollama/pull') || endpoint.includes('/api/models/ollama/delete')) {
+        return new Response(JSON.stringify({
+          ok: false,
+          error: 'Ollama requires Clipify Desktop Engine on your PC. Connect your phone via USB or LAN to download and run Ollama models.'
+        }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      if (endpoint.includes('/api/models/scan')) {
+        return new Response(JSON.stringify({
+          ok: false,
+          models: [],
+          error: 'Ollama runs on Clipify Desktop Engine (PC).'
+        }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      if (endpoint.includes('/api/models') && !endpoint.includes('/api/models/config') && !endpoint.includes('/api/models/huggingface') && !endpoint.includes('/api/models/verify-hf')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          models: [{ id: 'mediacodec_hw', name: 'MediaCodec Hardware Engine', size: 'On-Device' }],
+          default: 'mediacodec_hw'
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
 
       // 8. General Health
@@ -348,6 +555,226 @@
           headers: { 'Content-Type': 'application/json' }
         });
       }
+
+      // 9. Standalone Mobile System GPUs
+      if (endpoint.includes('/api/system/gpus')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          active_gpu: 'mobile_mediacodec',
+          active: { id: 'mobile_mediacodec', name: 'MediaCodec Hardware GPU', vendor: 'android', active: true, recommended: true },
+          gpus: [{ id: 'mobile_mediacodec', name: 'MediaCodec Hardware GPU', vendor: 'android', active: true, recommended: true }]
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      // 10. Trending Fallback (Only reached if MobileTrendingFetcher + PC are both unreachable)
+      if (endpoint.includes('/api/trending/')) {
+        const plat = endpoint.split('/api/trending/')[1]?.split('?')[0] || 'youtube';
+        return new Response(JSON.stringify({
+          ok: false,
+          platform: plat,
+          error: 'Unable to fetch live trending feed. Check your internet connection.',
+          gameplay_videos: [],
+          live_streams: []
+        }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      // 11. Standalone Mobile Projects / Recent Clips (matches loadProjects() schema)
+      if (endpoint === '/api/projects' || endpoint.startsWith('/api/projects?')) {
+        let clips = [];
+        try {
+          if (window.AndroidBridge && window.AndroidBridge.getRecentProjectsJson) {
+            clips = JSON.parse(window.AndroidBridge.getRecentProjectsJson() || '[]');
+          }
+        } catch (_) { }
+        const projects = clips.map((c, idx) => {
+          const fileUrl = c.path && c.path.startsWith('file://') ? c.path : ('file://' + c.path);
+          return {
+            id: 'mobile_proj_' + idx + '_' + (c.dateModified || Date.now()),
+            name: c.name || ('Clipify Short ' + (idx + 1)),
+            source: c.name || 'Mobile Short',
+            status: 'done',
+            outputs: c.path ? [fileUrl] : [],
+            output_metadata: c.path ? {
+              [fileUrl]: {
+                title: (c.name || 'Clipify Short').replace(/\.mp4$/i, ''),
+                description: `${c.formattedSize || 'MP4'} · Saved in Movies/ClipifyAI`
+              }
+            } : {}
+          };
+        });
+        return new Response(JSON.stringify({ ok: true, projects }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      // 12. Standalone Live Transcript & Preferences
+      if (endpoint.includes('/api/live/transcript')) {
+        return new Response(JSON.stringify({ ok: true, transcript: [], segments: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      if (endpoint.includes('/api/live/preferences')) {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      // 13. Standalone Mobile Narrate Voices, Clips, Preview & Generate
+      if (endpoint.includes('/api/narrate/voices')) {
+        const voices = [
+          { id: 'android_en_us_male', name: 'Marcus (Deep Narrator)', category: 'Creator', language: 'English (US)', gender: 'Male', engine: 'Android TTS' },
+          { id: 'android_en_us_female', name: 'Aria (Crisp Storyteller)', category: 'Story', language: 'English (US)', gender: 'Female', engine: 'Android TTS' },
+          { id: 'android_en_gb_male', name: 'Oliver (Documentary)', category: 'Documentary', language: 'English (UK)', gender: 'Male', engine: 'Android TTS' },
+          { id: 'android_hi_in_male', name: 'Aarav (Hindi / Hinglish)', category: 'Regional', language: 'Hindi (IN)', gender: 'Male', engine: 'Android TTS' }
+        ];
+        return new Response(JSON.stringify({ ok: true, voices }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (endpoint.includes('/api/narrate/videos')) {
+        const videos = [];
+        try {
+          if (window.AndroidBridge && window.AndroidBridge.getRecentProjectsJson) {
+            const localClips = JSON.parse(window.AndroidBridge.getRecentProjectsJson() || '[]');
+            localClips.forEach((c, idx) => {
+              const fileUrl = c.path && c.path.startsWith('file://') ? c.path : ('file://' + c.path);
+              videos.push({
+                id: 'local_' + idx + '_' + (c.name || 'clip'),
+                name: (c.name || 'Mobile Short').replace(/\.mp4$/i, ''),
+                duration: 30,
+                duration_label: c.formattedSize || 'MP4 Short',
+                width: 720,
+                height: 1280,
+                generated: true,
+                path: fileUrl,
+                thumbnail_url: fileUrl + '#t=0.5'
+              });
+            });
+          }
+        } catch (_) {}
+        return new Response(JSON.stringify({ ok: true, videos }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (endpoint.includes('/api/narrate/history')) {
+        const history = [];
+        try {
+          if (window.AndroidBridge && window.AndroidBridge.getRecentProjectsJson) {
+            const localClips = JSON.parse(window.AndroidBridge.getRecentProjectsJson() || '[]');
+            localClips.forEach((c, idx) => {
+              const fileUrl = c.path && c.path.startsWith('file://') ? c.path : ('file://' + c.path);
+              history.push({
+                id: 'hist_' + idx + '_' + (c.dateModified || Date.now()),
+                title: (c.name || 'Clipify Short').replace(/\.mp4$/i, ''),
+                duration: 30,
+                voice: 'Mobile Studio',
+                url: fileUrl
+              });
+            });
+          }
+        } catch (_) {}
+        return new Response(JSON.stringify({ ok: true, history }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (endpoint.includes('/api/narrate/download-extra-status')) {
+        return new Response(JSON.stringify({ ok: true, available: false, downloading: false, count: 0 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (endpoint.includes('/api/narrate/preview-voice')) {
+        if (window.AndroidBridge && window.AndroidBridge.speakText) {
+          window.AndroidBridge.speakText('Welcome to Clipify AI Narrate Studio. Your story sounds crisp and ready.');
+        }
+        return new Response(JSON.stringify({ ok: true, use_native_tts: true, url: '' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (endpoint.includes('/api/narrate/generate')) {
+        let reqBody = {};
+        try {
+          reqBody = typeof options.body === 'string' ? JSON.parse(options.body) : (options.body || {});
+        } catch (_) {}
+        let targetPath = window._lastAndroidUri || '';
+        try {
+          if (window.AndroidBridge && window.AndroidBridge.getRecentProjectsJson) {
+            const localClips = JSON.parse(window.AndroidBridge.getRecentProjectsJson() || '[]');
+            const match = localClips.find((c, idx) => ('local_' + idx + '_' + (c.name || 'clip')) === reqBody.video);
+            if (match && match.path) targetPath = match.path;
+            else if (!targetPath && localClips[0]?.path) targetPath = localClips[0].path;
+          }
+        } catch (_) {}
+        const nId = 'mobile_narrate_' + Date.now();
+        window._activeNarrateJob = {
+          ok: true,
+          job_id: nId,
+          status: 'running',
+          progress: 8,
+          stage: 'Rendering narrated Short...',
+          detail: 'Hardware Media3 MP4 export',
+          output: '',
+          duration: 30,
+          metadata: { title: (reqBody.script || 'Narrated Short').slice(0, 48) }
+        };
+        if (window.AndroidBridge && window.AndroidBridge.startRenderWithCount) {
+          try { window.AndroidBridge.startRenderWithCount(targetPath, 30, 'center', true, 1); } catch (_) {}
+        } else if (window.AndroidBridge && window.AndroidBridge.startRender) {
+          try { window.AndroidBridge.startRender(targetPath, 30, 'center', true); } catch (_) {}
+        }
+        return new Response(JSON.stringify({ ok: true, job_id: nId }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (endpoint.includes('/api/narrate/status/')) {
+        const cur = window._activeNarrateJob || { ok: true, status: 'done', progress: 100, output: '' };
+        if (window._activeMobileRenderJob) {
+          cur.progress = window._activeMobileRenderJob.progress || cur.progress;
+          cur.stage = window._activeMobileRenderJob.stage || cur.stage;
+          if (window._activeMobileRenderJob.status === 'done') {
+            cur.status = 'done';
+            cur.output = window._activeMobileRenderJob.outputs?.[0] || '';
+            const pv = document.getElementById('narratePreview');
+            if (pv && cur.output) { pv.src = cur.output; pv.load(); }
+          }
+        }
+        return new Response(JSON.stringify(cur), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      // Catch-all for any other /api/* route on file:// so originalFetch never throws "URL scheme file is not supported"
+      if (endpoint.includes('/api/projects/trash')) {
+        return new Response(JSON.stringify({ ok: true, items: [], trash: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (endpoint.includes('/api/cache/status')) {
+        return new Response(JSON.stringify({ ok: true, size_bytes: 0, files: 0, human_size: '0 MB' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (endpoint.includes('/api/updater/check')) {
+        return new Response(JSON.stringify({ ok: true, update_available: false, latest_version: '5.0.6-beta' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ ok: false, error: 'Desktop Engine offline for ' + endpoint }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     // Default fetch for file:/// and local assets
@@ -421,7 +848,7 @@
   });
 
   // Global Callback called by Android Activity when video is chosen from gallery
-  window.onAndroidVideoSelected = function(uri, filename, duration) {
+  window.onAndroidVideoSelected = function (uri, filename, duration) {
     console.log('[ClipifyAI Android] Video selected from native storage:', filename);
     window._lastAndroidUri = uri;
     const jId = 'mobile_job_' + Date.now();
@@ -466,5 +893,188 @@
       window.AndroidBridge.showToast('Selected: ' + filename + '. Ready to generate!');
     }
   };
+
+  // Native Mobile More Bottom-Sheet Drawer
+  window.closeMobileMoreDrawer = function () {
+    const backdrop = document.getElementById('mobileDrawerBackdrop');
+    const sheet = document.getElementById('mobileDrawerSheet');
+    if (backdrop) backdrop.classList.remove('active');
+    if (sheet) sheet.classList.remove('active');
+    setTimeout(() => {
+      if (backdrop && !backdrop.classList.contains('active')) backdrop.style.display = 'none';
+      if (sheet && !sheet.classList.contains('active')) sheet.style.display = 'none';
+    }, 260);
+  };
+
+  window.toggleMobileMoreDrawer = function () {
+    let backdrop = document.getElementById('mobileDrawerBackdrop');
+    let sheet = document.getElementById('mobileDrawerSheet');
+    if (!backdrop || !sheet) {
+      backdrop = document.createElement('div');
+      backdrop.id = 'mobileDrawerBackdrop';
+      backdrop.className = 'mobile-drawer-backdrop';
+      backdrop.style.display = 'none';
+      backdrop.onclick = window.closeMobileMoreDrawer;
+
+      sheet = document.createElement('div');
+      sheet.id = 'mobileDrawerSheet';
+      sheet.className = 'mobile-drawer-sheet';
+      sheet.style.display = 'none';
+      sheet.innerHTML = `
+        <div class="mobile-drawer-pill"></div>
+        <div class="mobile-drawer-header">
+          <div><strong>Clipify AI Tools</strong><small>Studio &amp; Utilities</small></div>
+          <button type="button" class="mobile-drawer-close" aria-label="Close">✕</button>
+        </div>
+        <div class="mobile-drawer-grid">
+          <button type="button" class="mobile-drawer-item" data-drawer-nav="live">
+            <span class="drawer-icon">📡</span>
+            <span class="drawer-copy"><b>Live Studio</b><small>Stream clipping &amp; synced captions</small></span>
+            <span class="drawer-pill red">LIVE</span>
+          </button>
+          <button type="button" class="mobile-drawer-item" data-drawer-nav="narrate">
+            <span class="drawer-icon">🎙️</span>
+            <span class="drawer-copy"><b>Narrate Studio</b><small>Script to voiceover Short</small></span>
+            <span class="drawer-pill purple">VOICE</span>
+          </button>
+          <button type="button" class="mobile-drawer-item" data-drawer-nav="projects">
+            <span class="drawer-icon">📁</span>
+            <span class="drawer-copy"><b>Projects &amp; Clips</b><small>Browse exported 9:16 Shorts</small></span>
+          </button>
+          <button type="button" class="mobile-drawer-item" data-drawer-nav="beta">
+            <span class="drawer-icon">🧪</span>
+            <span class="drawer-copy"><b>Beta Testing</b><small>Experimental AI &amp; split-screen tools</small></span>
+            <span class="drawer-pill purple">BETA</span>
+          </button>
+          <button type="button" class="mobile-drawer-item" data-drawer-nav="models">
+            <span class="drawer-icon">⚡</span>
+            <span class="drawer-copy"><b>AI Models</b><small>Local WhisperX &amp; Qwen engines</small></span>
+          </button>
+          <button type="button" class="mobile-drawer-item" data-drawer-nav="guide">
+            <span class="drawer-icon">✨</span>
+            <span class="drawer-copy"><b>App Guide</b><small>Interactive Studio walkthrough</small></span>
+          </button>
+        </div>`;
+      document.body.appendChild(backdrop);
+      document.body.appendChild(sheet);
+
+      sheet.querySelector('.mobile-drawer-close').onclick = window.closeMobileMoreDrawer;
+      sheet.querySelectorAll('[data-drawer-nav]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const dest = btn.getAttribute('data-drawer-nav');
+          window.closeMobileMoreDrawer();
+          if (dest === 'live') {
+            window.location.href = 'live.html';
+          } else if (dest === 'narrate') {
+            window.location.href = 'narrate.html';
+          } else if (typeof window.navigateTo === 'function') {
+            window.navigateTo(dest);
+          } else {
+            window.location.href = 'index.html#' + dest;
+          }
+        });
+      });
+    }
+
+    const isOpen = sheet.classList.contains('active');
+    if (isOpen) {
+      window.closeMobileMoreDrawer();
+    } else {
+      backdrop.style.display = 'block';
+      sheet.style.display = 'block';
+      requestAnimationFrame(() => {
+        backdrop.classList.add('active');
+        sheet.classList.add('active');
+      });
+    }
+  };
+
+  // Mobile APK Update Checker (checks GitHub Releases API directly, never uses desktop update.zip or 90% loop)
+  window.openClipifyMobileUpdate = async function () {
+    const currentVer = (window.AndroidBridge && window.AndroidBridge.getAppVersionName)
+      ? window.AndroidBridge.getAppVersionName()
+      : '5.0.6';
+    if (window.AndroidBridge && window.AndroidBridge.showToast) {
+      window.AndroidBridge.showToast('Checking GitHub for latest mobile APK...');
+    }
+    try {
+      const resp = await originalFetch('https://api.github.com/repos/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/latest', {
+        headers: { 'Accept': 'application/vnd.github.v3+json' }
+      });
+      const rel = await resp.json();
+      const assets = Array.isArray(rel.assets) ? rel.assets : [];
+      const apkAsset = assets.find(a => (a.name || '').toLowerCase().includes('5.0.7') && (a.name || '').toLowerCase().endsWith('.apk'))
+        || assets.find(a => (a.name || '').toLowerCase().includes('5.0.6') && (a.name || '').toLowerCase().endsWith('.apk'))
+        || assets.find(a => (a.name || '').toLowerCase().endsWith('.apk'));
+      const latestTag = rel.tag_name || 'latest';
+      const targetUrl = (apkAsset && apkAsset.browser_download_url)
+        ? apkAsset.browser_download_url
+        : (rel.html_url || 'https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases');
+
+      if (window.AndroidBridge && window.AndroidBridge.showToast) {
+        window.AndroidBridge.showToast(`Installed: v${currentVer} · Latest: ${latestTag}`);
+      }
+      if (window.AndroidBridge && window.AndroidBridge.openBrowser) {
+        window.AndroidBridge.openBrowser(targetUrl);
+      } else {
+        window.open(targetUrl, '_blank');
+      }
+    } catch (e) {
+      if (window.AndroidBridge && window.AndroidBridge.openBrowser) {
+        window.AndroidBridge.openBrowser('https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases');
+      }
+    }
+  };
+  window.openClipifyUpdate = window.openClipifyMobileUpdate;
+
+  // Mobile-only anti-squeeze layout & Caption Playground spacing polish
+  (function injectMobileAntiSqueezeCss() {
+    if (document.getElementById('clipify-mobile-antisqueeze-css')) return;
+    const st = document.createElement('style');
+    st.id = 'clipify-mobile-antisqueeze-css';
+    st.textContent = `
+      .shell, .main-content, main, .workspace {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+        max-width: 100vw !important;
+        box-sizing: border-box !important;
+      }
+      .card, .panel, .beta-card, .caption-playground-card, .caption-studio-card {
+        padding: 14px 12px !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        box-sizing: border-box !important;
+      }
+      #captionStylesGrid, .caption-styles-grid {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+      }
+      .caption-style-card {
+        padding: 12px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      .caption-style-preview, .caption-preview-box {
+        padding: 10px 8px !important;
+        word-spacing: 0.18em !important;
+        letter-spacing: 0.02em !important;
+        line-height: 1.45 !important;
+        display: flex !important;
+        flex-wrap: wrap !important;
+        justify-content: center !important;
+        align-items: center !important;
+        gap: 6px !important;
+      }
+      .caption-style-preview span, .caption-preview-box span {
+        margin: 0 3px !important;
+      }
+      .caption-studio-header {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 8px !important;
+      }
+    `;
+    (document.head || document.documentElement).appendChild(st);
+  })();
 
 })();

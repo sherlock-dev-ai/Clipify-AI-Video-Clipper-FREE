@@ -19,8 +19,19 @@ class DesktopSyncClient(private var desktopHost: String = "http://127.0.0.1:5000
     @Volatile
     private var isDesktopAvailable: Boolean = false
 
+    @Volatile
+    private var lastFailedProbeMs: Long = 0L
+
+    private val PROBE_COOLDOWN_MS = 15_000L
+
+    private val fastClient = OkHttpClient.Builder()
+        .connectTimeout(450, TimeUnit.MILLISECONDS)
+        .readTimeout(4, TimeUnit.SECONDS)
+        .writeTimeout(4, TimeUnit.SECONDS)
+        .build()
+
     private val client = OkHttpClient.Builder()
-        .connectTimeout(4, TimeUnit.SECONDS)
+        .connectTimeout(1200, TimeUnit.MILLISECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
         .writeTimeout(120, TimeUnit.SECONDS)
         .build()
@@ -36,11 +47,13 @@ class DesktopSyncClient(private var desktopHost: String = "http://127.0.0.1:5000
     fun getActiveHost(): String = desktopHost
 
     fun isConnected(): Boolean {
+        val now = System.currentTimeMillis()
+        if (!isDesktopAvailable && (now - lastFailedProbeMs) < PROBE_COOLDOWN_MS) {
+            return false
+        }
         val hostsToTry = mutableListOf<String>()
         hostsToTry.add(desktopHost)
-        for (h in candidateHosts) {
-            if (!hostsToTry.contains(h)) hostsToTry.add(h)
-        }
+        if (!hostsToTry.contains("http://127.0.0.1:5000")) hostsToTry.add("http://127.0.0.1:5000")
 
         for (h in hostsToTry) {
             try {
@@ -48,10 +61,11 @@ class DesktopSyncClient(private var desktopHost: String = "http://127.0.0.1:5000
                     .url("$h/api/health")
                     .get()
                     .build()
-                client.newCall(req).execute().use { res ->
+                fastClient.newCall(req).execute().use { res ->
                     if (res.isSuccessful) {
                         desktopHost = h
                         isDesktopAvailable = true
+                        lastFailedProbeMs = 0L
                         return true
                     }
                 }
@@ -60,6 +74,7 @@ class DesktopSyncClient(private var desktopHost: String = "http://127.0.0.1:5000
             }
         }
         isDesktopAvailable = false
+        lastFailedProbeMs = System.currentTimeMillis()
         return false
     }
 
@@ -131,12 +146,20 @@ class DesktopSyncClient(private var desktopHost: String = "http://127.0.0.1:5000
     }
 
     fun executeApiCall(method: String, endpoint: String, bodyStr: String?, headersJson: String?): String {
-        val hostsToTry = mutableListOf<String>()
-        hostsToTry.add(desktopHost)
-        for (h in candidateHosts) {
-            if (!hostsToTry.contains(h)) hostsToTry.add(h)
+        val now = System.currentTimeMillis()
+        if (!isDesktopAvailable && (now - lastFailedProbeMs) < PROBE_COOLDOWN_MS) {
+            val errObj = JSONObject()
+            errObj.put("ok", false)
+            errObj.put("status", 503)
+            errObj.put("error", "Desktop server offline (cached)")
+            return errObj.toString()
         }
 
+        val hostsToTry = mutableListOf<String>()
+        hostsToTry.add(desktopHost)
+        if (!hostsToTry.contains("http://127.0.0.1:5000")) hostsToTry.add("http://127.0.0.1:5000")
+
+        val activeHttp = if (isDesktopAvailable) client else fastClient
         for (host in hostsToTry) {
             try {
                 val clean = if (endpoint.startsWith("/")) endpoint else "/$endpoint"
@@ -166,22 +189,26 @@ class DesktopSyncClient(private var desktopHost: String = "http://127.0.0.1:5000
                     else -> builder.get()
                 }
 
-                val response = client.newCall(builder.build()).execute()
-                val respBody = response.body?.string() ?: ""
-                if (response.isSuccessful || response.code in 200..499) {
-                    desktopHost = host
-                    isDesktopAvailable = true
-                    val resObj = JSONObject()
-                    resObj.put("ok", response.isSuccessful)
-                    resObj.put("status", response.code)
-                    resObj.put("body", respBody)
-                    return resObj.toString()
+                activeHttp.newCall(builder.build()).execute().use { response ->
+                    val respBody = response.body?.string() ?: ""
+                    if (response.isSuccessful || response.code in 200..499) {
+                        desktopHost = host
+                        isDesktopAvailable = true
+                        lastFailedProbeMs = 0L
+                        val resObj = JSONObject()
+                        resObj.put("ok", response.isSuccessful)
+                        resObj.put("status", response.code)
+                        resObj.put("body", respBody)
+                        return resObj.toString()
+                    }
                 }
             } catch (ex: Exception) {
                 Log.w(TAG, "Connection failed for host $host: ${ex.javaClass.simpleName} - ${ex.message}")
             }
         }
 
+        isDesktopAvailable = false
+        lastFailedProbeMs = System.currentTimeMillis()
         val errObj = JSONObject()
         errObj.put("ok", false)
         errObj.put("status", 503)

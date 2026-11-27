@@ -878,7 +878,34 @@ class Installer extends EventEmitter {
       if (!needsCopy) {
         this.bytesDone += size;
       } else {
-        await fs.promises.copyFile(file.full, destination);
+        try {
+          await retryFileOperation(
+            () => fs.promises.copyFile(file.full, destination),
+            { attempts: 5, delayMs: 220 }
+          );
+        } catch (copyErr) {
+          // On Windows, read-only or antivirus-locked files can throw EPERM/EBUSY on overwrite;
+          // unlink + retry once, and if a non-code media clip is still locked by another viewer, skip safely.
+          let recovered = false;
+          if (copyErr && (copyErr.code === 'EPERM' || copyErr.code === 'EBUSY' || copyErr.code === 'EACCES')) {
+            try {
+              await fs.promises.chmod(destination, 0o666).catch(() => {});
+              await fs.promises.unlink(destination).catch(() => {});
+              await retryFileOperation(
+                () => fs.promises.copyFile(file.full, destination),
+                { attempts: 3, delayMs: 300 }
+              );
+              recovered = true;
+            } catch (retryErr) {
+              const relNorm = String(file.relative || '').replace(/\\/g, '/').toLowerCase();
+              if ((relNorm.startsWith('narrate clips/') || relNorm.startsWith('assets/')) && fs.existsSync(destination)) {
+                this.log(`warning: skipped locked media file ${file.relative} (${retryErr.code || retryErr.message})`);
+                recovered = true;
+              }
+            }
+          }
+          if (!recovered) throw copyErr;
+        }
         this.bytesDone += size;
       }
       this.activeItem = file.relative;
@@ -2279,11 +2306,13 @@ class Installer extends EventEmitter {
     if (fs.existsSync(payloadClips) && fs.existsSync(targetClips)) {
       try {
         for (const file of fs.readdirSync(payloadClips)) {
-          const srcFile = path.join(payloadClips, file);
-          const dstFile = path.join(targetClips, file);
-          if (!fs.existsSync(dstFile) && fs.statSync(srcFile).isFile()) {
-            fs.copyFileSync(srcFile, dstFile);
-          }
+          try {
+            const srcFile = path.join(payloadClips, file);
+            const dstFile = path.join(targetClips, file);
+            if (!fs.existsSync(dstFile) && fs.statSync(srcFile).isFile()) {
+              fs.copyFileSync(srcFile, dstFile);
+            }
+          } catch (_) {}
         }
         this.log('seeded default narration clips');
       } catch (err) {

@@ -263,8 +263,36 @@ object YouTubeStreamDownloader {
                     var done = false
                     client.newCall(req).execute().use { resp ->
                         if (resp.code == 403 && offset == 0L) {
-                            Log.w(TAG, "$label Range download failed HTTP 403")
-                            return false
+                            Log.w(TAG, "$label Range download failed HTTP 403; retrying plain GET...")
+                            val plainReq = Request.Builder()
+                                .url(streamUrl)
+                                .header("User-Agent", userAgent)
+                                .get()
+                                .build()
+                            client.newCall(plainReq).execute().use { plainResp ->
+                                if (!plainResp.isSuccessful) {
+                                    Log.w(TAG, "$label plain GET failed HTTP ${plainResp.code}")
+                                    return false
+                                }
+                                val cl = plainResp.body?.contentLength() ?: -1L
+                                val pBody = plainResp.body ?: return false
+                                pBody.byteStream().use { input ->
+                                    while (true) {
+                                        val read = input.read(buf)
+                                        if (read == -1) break
+                                        output.write(buf, 0, read)
+                                        offset += read
+                                        if (cl > 0) {
+                                            val pct = pctStart + ((offset * pctSpan) / cl).toInt()
+                                            if (pct >= lastPct + 6) {
+                                                lastPct = pct
+                                                onProgress(pct.coerceAtMost(pctStart + pctSpan), "$label $pct%")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            return targetFile.exists() && targetFile.length() > 1024
                         }
                         if (!resp.isSuccessful && resp.code != 206) {
                             Log.w(TAG, "$label download failed HTTP ${resp.code}")
@@ -391,6 +419,7 @@ object YouTubeStreamDownloader {
     fun downloadYouTubeMp4(
         url: String,
         destFile: File,
+        maxHeight: Int = 4320,
         onProgress: (Int, String) -> Unit
     ): DownloadResult {
         val videoId = extractVideoId(url)
@@ -412,11 +441,12 @@ object YouTubeStreamDownloader {
         val streamingData = json.optJSONObject("streamingData")
         val captions = fetchCaptions(json, userAgent)
 
-        // 1. Try adaptive HD (1080p or 720p H.264 video/mp4 + AAC audio/mp4) across IOS -> ANDROID_VR -> ANDROID
+        // 1. Try adaptive HD/4K/8K (video/mp4 avc1/av01/hvc1 + AAC audio/mp4) across IOS -> ANDROID_VR -> ANDROID -> ANDROID_TESTSUITE
         val adaptiveClients = listOf(
             Triple("IOS", "20.10.4", "com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)"),
             Triple("ANDROID_VR", "1.60.19", "com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip"),
-            Triple("ANDROID", "20.10.38", "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip")
+            Triple("ANDROID", "20.10.38", "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip"),
+            Triple("ANDROID_TESTSUITE", "1.9", "com.google.android.youtube/1.9 (Linux; U; Android 14) gzip")
         )
         for ((cName, cVer, cUa) in adaptiveClients) {
             val (cJson, _) = if (cUa == userAgent) Pair(json, cUa) else fetchPlayerJsonForClient(videoId, cName, cVer, cUa)
@@ -425,6 +455,7 @@ object YouTubeStreamDownloader {
             var bestAdaptiveVideoUrl: String? = null
             var bestAdaptiveHeight = 0
             var bestAdaptiveWidth = 0
+            var bestIsAvc = false
             var bestAdaptiveAudioUrl: String? = null
             var bestAudioBitrate = -1
 
@@ -434,13 +465,19 @@ object YouTubeStreamDownloader {
                     val fUrl = f.optString("url", "")
                     if (fUrl.isEmpty()) continue
                     val mime = f.optString("mimeType", "")
-                    if (mime.contains("video/mp4") && mime.contains("avc1")) {
+                    val isSupportedMp4 = mime.contains("video/mp4") &&
+                        (mime.contains("avc1") || mime.contains("av01") || mime.contains("hvc1") || mime.contains("hev1"))
+                    if (isSupportedMp4) {
                         val h = f.optInt("height", 0)
                         val w = f.optInt("width", 0)
-                        if (h in (bestAdaptiveHeight + 1)..2160) {
-                            bestAdaptiveHeight = h
-                            bestAdaptiveWidth = w
-                            bestAdaptiveVideoUrl = fUrl
+                        val isAvc = mime.contains("avc1")
+                        if (h in 1..maxHeight) {
+                            if (h > bestAdaptiveHeight || (h == bestAdaptiveHeight && isAvc && !bestIsAvc)) {
+                                bestAdaptiveHeight = h
+                                bestAdaptiveWidth = w
+                                bestIsAvc = isAvc
+                                bestAdaptiveVideoUrl = fUrl
+                            }
                         }
                     } else if (mime.contains("audio/mp4")) {
                         val br = f.optInt("bitrate", 0)
@@ -452,7 +489,8 @@ object YouTubeStreamDownloader {
                 }
             }
 
-            if (bestAdaptiveVideoUrl != null && bestAdaptiveAudioUrl != null && bestAdaptiveHeight >= 720) {
+            val minAdaptiveH = if (maxHeight <= 480) 360 else 720
+            if (bestAdaptiveVideoUrl != null && bestAdaptiveAudioUrl != null && bestAdaptiveHeight >= minAdaptiveH) {
                 onProgress(15, "[YouTube HD] Downloading ${bestAdaptiveHeight}p ($cName) + AAC audio for '$videoTitle'...")
                 val tmpVid = File(destFile.parentFile, "${destFile.nameWithoutExtension}_v.mp4")
                 val tmpAud = File(destFile.parentFile, "${destFile.nameWithoutExtension}_a.m4a")

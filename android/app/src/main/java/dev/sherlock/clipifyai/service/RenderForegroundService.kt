@@ -53,6 +53,7 @@ class RenderForegroundService : Service() {
         val durationSec = intent?.getIntExtra("duration_sec", 30) ?: 30
         val layout = intent?.getStringExtra("layout") ?: "center"
         val captions = intent?.getBooleanExtra("captions", true) ?: true
+        val maxHeight = intent?.getIntExtra("max_height", 4320) ?: 4320
 
         val notification = createNotification("Preparing 9:16 vertical render...", 0)
         startForeground(NOTIFICATION_ID, notification)
@@ -142,7 +143,7 @@ class RenderForegroundService : Service() {
                         val sourceFile: File? = if (YouTubeStreamDownloader.isYouTubeUrl(videoUriStr)) {
                             updateNotification("Downloading YouTube HD video on mobile...", 10)
                             RenderState.listener?.invoke(10, "[YouTube] Resolving HD stream & captions...", null)
-                            val res = YouTubeStreamDownloader.downloadYouTubeMp4(videoUriStr, dlFile) { pct, msg ->
+                            val res = YouTubeStreamDownloader.downloadYouTubeMp4(videoUriStr, dlFile, maxHeight) { pct, msg ->
                                 val scaled = (pct * 0.45).toInt().coerceIn(10, 48)
                                 updateNotification(msg, scaled)
                                 RenderState.listener?.invoke(scaled, msg, null)

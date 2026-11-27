@@ -815,6 +815,11 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun startRenderWithCount(uriStr: String?, durationSec: Int, layout: String?, captionsEnabled: Boolean, clipsCount: Int) {
+            startRenderWithQuality(uriStr, durationSec, layout, captionsEnabled, clipsCount, 4320)
+        }
+
+        @JavascriptInterface
+        fun startRenderWithQuality(uriStr: String?, durationSec: Int, layout: String?, captionsEnabled: Boolean, clipsCount: Int, maxHeight: Int) {
             runOnUiThread {
                 val savedUserVideo = File(filesDir, "user_selected_video.mp4")
                 val extUserVideo = File(getExternalFilesDir(null), "user_selected_video.mp4")
@@ -835,8 +840,9 @@ class MainActivity : AppCompatActivity() {
 
                 val dur = if (durationSec in 5..180) durationSec else 30
                 val count = clipsCount.coerceIn(1, 5)
+                val qHeight = if (maxHeight in 360..4320) maxHeight else 4320
                 val projId = projectManager.createProject("Mobile Clip " + System.currentTimeMillis(), targetPath)
-                Toast.makeText(this@MainActivity, "Rendering $count 9:16 Short(s) with Media3 HD...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "Rendering $count 9:16 Short(s) (${if (qHeight >= 2160) "Best 4K/HD" else "${qHeight}p"})...", Toast.LENGTH_SHORT).show()
 
                 val serviceIntent = Intent(this@MainActivity, RenderForegroundService::class.java).apply {
                     action = RenderForegroundService.ACTION_START_RENDER
@@ -846,6 +852,7 @@ class MainActivity : AppCompatActivity() {
                     putExtra("layout", layout ?: "center")
                     putExtra("captions", captionsEnabled)
                     putExtra("clipsCount", count)
+                    putExtra("max_height", qHeight)
                 }
                 startForegroundService(serviceIntent)
             }

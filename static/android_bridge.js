@@ -384,7 +384,10 @@
           output_metadata: {}
         };
 
-        if (window.AndroidBridge && window.AndroidBridge.startRenderWithCount) {
+        const maxHeight = parseInt(document.getElementById('mobileImportQualitySelect')?.value || '4320', 10) || 4320;
+        if (window.AndroidBridge && window.AndroidBridge.startRenderWithQuality) {
+          window.AndroidBridge.startRenderWithQuality(window._lastAndroidUri, dur, layoutMode, captionsOn, count, maxHeight);
+        } else if (window.AndroidBridge && window.AndroidBridge.startRenderWithCount) {
           window.AndroidBridge.startRenderWithCount(window._lastAndroidUri, dur, layoutMode, captionsOn, count);
         } else if (window.AndroidBridge && window.AndroidBridge.startRender) {
           window.AndroidBridge.startRender(window._lastAndroidUri, dur, layoutMode, captionsOn);
@@ -1113,6 +1116,7 @@
   window.openClipifyUpdate = window.openClipifyMobileUpdate;
 
   // Ensure default mobile caption design in Create/Beta is White & Yellow (gold_yellow)
+  // and inject a Download Quality selector before YouTube importing
   document.addEventListener('DOMContentLoaded', () => {
     ['#captionAccentSelect', '#betaCaptionAccent'].forEach(sel => {
       const el = document.querySelector(sel);
@@ -1122,6 +1126,26 @@
     });
     if (window.captionPlaygroundState && !window.captionPlaygroundState.styleId) {
       window.captionPlaygroundState.styleId = 'gold_yellow';
+    }
+
+    const ytInput = document.getElementById('youtubeUrl');
+    if (ytInput && !document.getElementById('mobileImportQualityWrap')) {
+      const wrap = document.createElement('div');
+      wrap.id = 'mobileImportQualityWrap';
+      wrap.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);';
+      wrap.innerHTML = `
+        <span style="font-size:0.78rem;font-weight:700;color:rgba(255,255,255,0.85);">Import Quality</span>
+        <select id="mobileImportQualitySelect" style="background:#0e0f14;color:#fff;border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:6px 10px;font-size:0.78rem;font-weight:600;">
+          <option value="4320" selected>Best Available (4K / 1080p)</option>
+          <option value="1080">1080p Full HD</option>
+          <option value="720">720p HD</option>
+          <option value="480">360p / 480p Fast</option>
+        </select>
+      `;
+      const parentRow = ytInput.closest('.youtube-import-row, .url-row, .field-row') || ytInput.parentElement;
+      if (parentRow && parentRow.parentElement) {
+        parentRow.parentElement.insertBefore(wrap, parentRow.nextSibling);
+      }
     }
   });
 

@@ -35,7 +35,8 @@
 
 > [!TIP]
 > 💬 **Discord Community**: Join our server for more updates, campaigns and ways to make money and request for new features: [**Join Discord Community**](https://discord.gg/5ZBsasgryX)
- [**Join Instagram Community Chat**](https://ig.me/j/AQj1lYCWh_iV_S7J/)
+
+> [**Join Instagram Community Chat(early access**](https://ig.me/j/AQj1lYCWh_iV_S7J/) 
 
 
 

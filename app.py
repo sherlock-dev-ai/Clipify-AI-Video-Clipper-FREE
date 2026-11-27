@@ -3944,6 +3944,50 @@ def _instant_worker(
             size_kb = out_path.stat().st_size // 1024
             log(f"✔ Clip {c_idx + 1}/{num_clips} rendered successfully: {out_name} ({size_kb} KB)")
 
+            # Generate & save title + description JSON metadata so Projects/Editor never show "Short #1"
+            try:
+                src_clean = re.sub(r"[_-]+", " ", input_path.stem).strip() or "Viral Moment"
+                clip_title = f"{src_clean[:42]} · Highlight #{c_idx + 1} 🔥"
+                clip_desc = f"Auto-clipped viral highlight from {src_clean} ({int(start_sec)}s–{int(start_sec + clip_len)}s). #Shorts #ClipifyAI"
+                try:
+                    ollama_url = _ollama_base_url()
+                    cfg_ai = _load_ai_config()
+                    m_name = cfg_ai.get("ollama_model") or "qwen2.5:3b"
+                    prompt_txt = (
+                        f"Return JSON {{\"title\":\"...\",\"description\":\"...\"}} for a {int(clip_len)}s YouTube Short "
+                        f"from '{src_clean}' (segment {int(start_sec)}s-{int(start_sec + clip_len)}s). Keep title under 7 words with 1 emoji."
+                    )
+                    o_req = urllib.request.Request(
+                        f"{ollama_url}/api/generate",
+                        data=json.dumps({"model": m_name, "prompt": prompt_txt, "stream": False, "format": "json"}).encode("utf-8"),
+                        headers={"Content-Type": "application/json"},
+                    )
+                    with urllib.request.urlopen(o_req, timeout=8) as o_resp:
+                        o_data = json.loads(o_resp.read().decode("utf-8", errors="replace"))
+                        ai_raw = o_data.get("response", "")
+                        m_json = re.search(r"\{[\s\S]*\}", ai_raw)
+                        if m_json:
+                            ai_obj = json.loads(m_json.group(0))
+                            if str(ai_obj.get("title", "")).strip():
+                                clip_title = str(ai_obj["title"]).strip()[:90]
+                            if str(ai_obj.get("description", "")).strip():
+                                clip_desc = str(ai_obj["description"]).strip()[:500]
+                except Exception:
+                    pass
+                meta_file = out_path.with_suffix(".json")
+                meta_file.write_text(json.dumps({
+                    "title": clip_title,
+                    "description": clip_desc,
+                    "hashtags": ["#shorts", "#ClipifyAI", "#viral"],
+                    "tags": ["shorts", "clipify", src_clean[:30]],
+                    "source_video": input_path.name,
+                    "start_time": round(float(start_sec), 2),
+                    "end_time": round(float(start_sec + clip_len), 2),
+                    "duration": round(float(clip_len), 2),
+                }, ensure_ascii=False, indent=2), encoding="utf-8")
+            except Exception:
+                pass
+
         if not outputs:
             log("ERROR: All requested clips failed to render.")
             update_status("error", 0, "Render failed")

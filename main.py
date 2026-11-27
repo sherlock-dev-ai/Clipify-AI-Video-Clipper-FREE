@@ -7510,7 +7510,8 @@ def process_single_video(
             if clip_text.strip():
                 title = get_viral_title_locally(clip_text)
             if not title:
-                title = f"Short {short_num_str}"
+                clean_src = re.sub(r"[_-]+", " ", os.path.splitext(vname)[0]).strip() or "Viral Moment"
+                title = f"{clean_src[:38]} · Part {short_num_str} 🔥"
             cleaned = _clean_title(str(title)) if title else None
             title = cleaned or str(title)
             print(f"     [Title] → {title}")
@@ -7518,6 +7519,11 @@ def process_single_video(
             # Generate YouTube-facing description, hashtags and search tags locally.
             print(f"     [Metadata] Generating description + hashtags + tags via Qwen3...")
             metadata = generate_short_metadata_locally(clip_text, title)
+            if not str(metadata.get("description", "")).strip():
+                clean_src = re.sub(r"[_-]+", " ", os.path.splitext(vname)[0]).strip() or vname
+                metadata["description"] = (
+                    f"Highlight moment from {clean_src} ({int(clip.start_time)}s–{int(clip.end_time)}s). #Shorts #ClipifyAI"
+                )
             metadata_path = os.path.abspath(os.path.join(OUTPUT_DIR, f"short_{short_num_str}.json"))
             provenance = selection_provenance(ai_meta)
             try:

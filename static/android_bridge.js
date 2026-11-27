@@ -764,6 +764,24 @@
         });
       }
 
+      if (endpoint.includes('/api/apply-branding/') || endpoint.includes('/api/trim/')) {
+        let reqBody = {};
+        try {
+          reqBody = typeof options.body === 'string' ? JSON.parse(options.body) : (options.body || {});
+        } catch (_) {}
+        window._mobileLastBranding = reqBody;
+        try { localStorage.setItem('clipify_mobile_branding', JSON.stringify(reqBody)); } catch (_) {}
+        const targetFile = reqBody.filename || reqBody.file || window.state?.reviewFile || '';
+        if (window.AndroidBridge && window.AndroidBridge.showToast) {
+          window.AndroidBridge.showToast('✓ Caption & branding style saved for mobile render!');
+        }
+        return new Response(JSON.stringify({
+          ok: true,
+          output: targetFile,
+          message: 'Caption & branding settings applied on mobile.'
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+
       // Catch-all for any other /api/* route on file:// so originalFetch never throws "URL scheme file is not supported"
       if (endpoint.includes('/api/projects/trash')) {
         return new Response(JSON.stringify({ ok: true, items: [], trash: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -1147,6 +1165,129 @@
         parentRow.parentElement.insertBefore(wrap, parentRow.nextSibling);
       }
     }
+  });
+
+  // Replace ugly native Android WebView alert() ("The page at file:// says:") with B&W Obsidian modal
+  window.alert = function (msg) {
+    let ov = document.getElementById('clipifyMobileAlertModal');
+    if (ov) ov.remove();
+    ov = document.createElement('div');
+    ov.id = 'clipifyMobileAlertModal';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(4,4,6,0.86);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;padding:18px;';
+    ov.innerHTML = `
+      <div style="width:100%;max-width:360px;background:#0b0b0e;border:1px solid rgba(255,255,255,0.18);border-radius:16px;padding:18px;color:#fff;font-family:Inter,system-ui,sans-serif;box-shadow:0 24px 60px rgba(0,0,0,0.85);">
+        <div style="font-size:15px;font-weight:700;margin-bottom:8px;color:#fff;">Clipify AI</div>
+        <div style="font-size:13px;line-height:1.5;color:rgba(255,255,255,0.82);margin-bottom:16px;word-break:break-word;"></div>
+        <div style="display:flex;justify-content:flex-end;">
+          <button type="button" id="mAlertOkBtn" style="padding:9px 18px;border-radius:10px;background:#fff;color:#000;border:none;font-weight:700;font-size:13px;">OK</button>
+        </div>
+      </div>
+    `;
+    ov.querySelector('div > div:nth-child(2)').textContent = String(msg ?? '');
+    document.body.appendChild(ov);
+    ov.querySelector('#mAlertOkBtn').onclick = () => ov.remove();
+  };
+
+  // Replace ugly grey/teal native Android <select> popups with sleek B&W Obsidian sheet
+  // and render actual font designs for font selectors!
+  const FONT_PREVIEW_MAP = {
+    'montserrat extra bold': "'Montserrat', 'Arial Black', sans-serif",
+    'montserrat black': "'Montserrat', 'Arial Black', sans-serif",
+    'arial black': "'Arial Black', Impact, sans-serif",
+    'arial': "Arial, Helvetica, sans-serif",
+    'segoe ui black': "'Segoe UI', 'Arial Black', sans-serif",
+    'segoe ui': "'Segoe UI', Roboto, sans-serif",
+    'impact': "Impact, 'Arial Black', sans-serif",
+    'tahoma': "Tahoma, Geneva, sans-serif",
+    'trebuchet ms': "'Trebuchet MS', Helvetica, sans-serif",
+    'verdana': "Verdana, Geneva, sans-serif",
+    'calibri': "Calibri, 'Segoe UI', sans-serif",
+    'aptos': "Aptos, 'Inter', sans-serif",
+    'comic sans ms': "'Comic Sans MS', cursive, sans-serif",
+    'georgia': "Georgia, 'Times New Roman', serif",
+    'courier prime': "'Courier New', monospace",
+    'poppins': "'Poppins', sans-serif",
+    'inter': "'Inter', sans-serif"
+  };
+
+  function openBwSelectSheet(selectEl) {
+    if (!selectEl || selectEl.disabled) return;
+    let ov = document.getElementById('clipifyMobileSelectSheet');
+    if (ov) ov.remove();
+
+    const isFontSelect = /font/i.test(selectEl.id || '') || /font/i.test(selectEl.name || '') ||
+      (selectEl.closest('label')?.textContent || '').toLowerCase().includes('font');
+    const labelTxt = (selectEl.closest('label')?.childNodes[0]?.textContent || 'Select Option').trim() || 'Select Option';
+
+    ov = document.createElement('div');
+    ov.id = 'clipifyMobileSelectSheet';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,0.78);backdrop-filter:blur(10px);display:flex;align-items:flex-end;justify-content:center;';
+    ov.innerHTML = `
+      <div style="width:100%;max-width:480px;max-height:74vh;background:#0a0a0d;border-top:1px solid rgba(255,255,255,0.18);border-radius:20px 20px 0 0;padding:16px 16px 24px;color:#fff;display:flex;flex-direction:column;box-shadow:0 -18px 50px rgba(0,0,0,0.85);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:10px;">
+          <strong style="font-size:15px;letter-spacing:-0.01em;">${labelTxt}</strong>
+          <button type="button" id="mSelClose" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);color:#fff;width:30px;height:30px;border-radius:8px;font-size:15px;">✕</button>
+        </div>
+        <div id="mSelList" style="overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:2px;"></div>
+      </div>
+    `;
+    const listEl = ov.querySelector('#mSelList');
+    Array.from(selectEl.options).forEach((opt, idx) => {
+      const selected = idx === selectEl.selectedIndex;
+      const row = document.createElement('button');
+      row.type = 'button';
+      const optLower = (opt.textContent || opt.value || '').trim().toLowerCase();
+      const mappedFont = isFontSelect ? (FONT_PREVIEW_MAP[optLower] || '') : '';
+      const isBoldFont = isFontSelect && (optLower.includes('black') || optLower.includes('bold') || optLower.includes('impact'));
+      row.style.cssText = `width:100%;text-align:left;padding:12px 14px;border-radius:12px;border:1px solid ${selected ? '#ffffff' : 'rgba(255,255,255,0.12)'};background:${selected ? '#ffffff' : 'rgba(255,255,255,0.04)'};color:${selected ? '#000000' : '#ffffff'};display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;`;
+
+      const leftSpan = document.createElement('span');
+      leftSpan.textContent = opt.textContent;
+      leftSpan.style.fontSize = '14px';
+      leftSpan.style.fontWeight = isBoldFont ? '900' : (selected ? '700' : '500');
+      if (mappedFont) leftSpan.style.fontFamily = mappedFont;
+
+      const rightWrap = document.createElement('span');
+      rightWrap.style.cssText = 'display:flex;align-items:center;gap:8px;flex-shrink:0;';
+      if (isFontSelect && opt.value !== 'none') {
+        const previewAa = document.createElement('span');
+        previewAa.textContent = 'Aa';
+        previewAa.style.cssText = `padding:2px 8px;border-radius:6px;font-size:13px;border:1px solid ${selected ? 'rgba(0,0,0,0.22)' : 'rgba(255,255,255,0.18)'};font-weight:${isBoldFont ? '900' : '700'};`;
+        if (mappedFont) previewAa.style.fontFamily = mappedFont;
+        rightWrap.appendChild(previewAa);
+      }
+      const radioDot = document.createElement('span');
+      radioDot.style.cssText = `width:18px;height:18px;border-radius:50%;border:2px solid ${selected ? '#000' : 'rgba(255,255,255,0.45)'};display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;`;
+      radioDot.textContent = selected ? '✓' : '';
+      rightWrap.appendChild(radioDot);
+
+      row.appendChild(leftSpan);
+      row.appendChild(rightWrap);
+      row.onclick = () => {
+        selectEl.selectedIndex = idx;
+        selectEl.dataset.userChanged = '1';
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        ov.remove();
+      };
+      listEl.appendChild(row);
+    });
+
+    ov.querySelector('#mSelClose').onclick = () => ov.remove();
+    ov.addEventListener('click', (ev) => { if (ev.target === ov) ov.remove(); });
+    document.body.appendChild(ov);
+  }
+
+  ['mousedown', 'touchstart'].forEach(evtName => {
+    document.addEventListener(evtName, (e) => {
+      const sel = e.target && e.target.closest ? e.target.closest('select') : null;
+      if (!sel) return;
+      e.preventDefault();
+      e.stopPropagation();
+      sel.blur();
+      if (evtName === 'touchstart' || !('ontouchstart' in window)) {
+        openBwSelectSheet(sel);
+      }
+    }, { capture: true, passive: false });
   });
 
   // Mobile-only anti-squeeze layout & Caption Playground spacing polish

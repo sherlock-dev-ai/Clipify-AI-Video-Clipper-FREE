@@ -11,8 +11,8 @@ android {
         applicationId "dev.sherlock.clipifyai"
         minSdk 26
         targetSdk 34
-        versionCode 5007
-        versionName "5.0.7"
+        versionCode 6000
+        versionName "6.0.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

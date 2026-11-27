@@ -22,8 +22,8 @@
     let updateState = {
       checked: false,
       updateAvailable: false,
-      latestVersion: 'v5.0.3',
-      currentVersion: 'v5.0.3',
+      latestVersion: 'v6.0.0',
+      currentVersion: 'v6.0.0',
       releaseUrl: 'https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases',
       releaseName: '',
       notes: '',

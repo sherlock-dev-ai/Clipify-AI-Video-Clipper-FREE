@@ -6343,7 +6343,9 @@ Key In-App Features & Knowledge ({APP_VERSION}):
 11. Forest Runner Mascot & Mini-Game:
    - Interactive creature mascot card on the sidebar ("need help?") triggering the Instagram community link or the playable retro Forest Runner game.
 
-12. Support & Community ([NAVIGATE:support]):
+12. Support, Discord & Community ([NAVIGATE:support]):
+   - Official Discord Server:
+     👉 [**Join Official Clipify AI Discord Server**](https://discord.gg/5ZBsasgryX)
    - Official Instagram Creator Community group chat:
      👉 [**Join Official Instagram Creator Community**](https://ig.me/j/AQj1lYCWh_iV_S7J/)
    - Creator contact: `@sherlock.fy`.
@@ -6498,14 +6500,14 @@ def _clippy_builtin_fallback(user_query: str) -> str:
             "- **Install**: Run `ollama pull qwen2.5:3b` in your terminal to enable intelligent local chatting."
         )
 
-    # Community & Instagram Support
-    if any(k in q for k in ("instagram", "insta", "group", "community", "help", "support", "contact", "chat link", "need help", "star", "github")):
+    # Community, Discord & Instagram Support
+    if any(k in q for k in ("discord", "server", "instagram", "insta", "group", "community", "help", "support", "contact", "chat link", "need help", "star", "github")):
         return (
             "[NAVIGATE:support]\n"
-            "Here is the official Clipify AI Creator Community on Instagram! 💬\n\n"
-            "Join our group chat to get direct support, share your viral clips, and request features:\n"
-            "👉 [**Join Instagram Community Group Chat**](https://ig.me/j/AQj1lYCWh_iV_S7J/)\n\n"
-            "You can also reach out to the creator directly on Instagram: `@sherlock.fy`, or star the repository on GitHub!"
+            "Join the official **Clipify AI Community** on Discord & Instagram! 💬\n\n"
+            "- 🎮 **Discord Server**: [**Join Clipify AI Discord**](https://discord.gg/5ZBsasgryX) (live help, updates, presets & feedback)\n"
+            "- 📸 **Instagram Group Chat**: [**Join Instagram Creator Community**](https://ig.me/j/AQj1lYCWh_iV_S7J/)\n\n"
+            "You can also reach the creator on Instagram `@sherlock.fy` or star the repo on GitHub!"
         )
 
     # Forest Runner Mascot & Mini-Game

@@ -534,7 +534,7 @@ ipcMain.handle('setup:openLog', async () => {
 
 ipcMain.handle('setup:openExternal', async (_event, url) => {
   // Only ever open a real https URL in the user's browser.
-  if (typeof url !== 'string' || !/^https:\/\/github\.com\/sherlock-dev-ai/.test(url)) {
+  if (typeof url !== 'string' || !/^https:\/\/(github\.com\/sherlock-dev-ai|discord\.gg\/5ZBsasgryX)/.test(url)) {
     return { ok: false };
   }
   await shell.openExternal(url);

@@ -1704,6 +1704,7 @@ const $ = (id) => {
       renderSummary();
     });
     $('btn-github').addEventListener('click', () => api.openExternal('https://github.com/sherlock-dev-ai'));
+    $('btn-discord')?.addEventListener('click', () => api.openExternal('https://discord.gg/5ZBsasgryX'));
 
     // --- pre-download warning popup ---------------------------------------
     $('btn-warn-go').addEventListener('click', () => {

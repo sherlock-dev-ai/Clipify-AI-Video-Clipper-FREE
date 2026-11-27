@@ -1635,6 +1635,8 @@ function selectedBranding() {
 }
 
 async function start() {
+  if (state.starting || create.disabled) return;
+  state.starting = true;
   const origBtnHtml = create.innerHTML;
 
   // Adopt from betaState if user uploaded or imported video there
@@ -1657,6 +1659,7 @@ async function start() {
       if (youtubeUrl) youtubeUrl.value = rawUrl;
       await importYouTube();
       if (!state.source && !state.jobId) {
+        state.starting = false;
         create.disabled = false;
         create.innerHTML = origBtnHtml;
         return;
@@ -1665,6 +1668,7 @@ async function start() {
   }
 
   if (!state.source && !state.jobId) {
+    state.starting = false;
     create.disabled = false;
     create.innerHTML = origBtnHtml;
     alert('Please upload a video or paste a YouTube link to generate Shorts.');
@@ -1942,6 +1946,8 @@ async function start() {
     alert(error.message);
 
     create.disabled = false;
+  } finally {
+    state.starting = false;
   }
 }
 
@@ -3159,7 +3165,6 @@ $('#newBtn')
   };
 
 if (create) {
-  create.onclick = start;
   create.addEventListener('click', start);
 }
 

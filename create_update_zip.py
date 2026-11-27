@@ -3,7 +3,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(r"L:\ClipifyAI")
-ZIP_OUT = ROOT / "update-v5.0.5.zip"
+ZIP_OUT = ROOT / "update-v5.0.7.zip"
 
 files_to_pack = [
     "app.py",

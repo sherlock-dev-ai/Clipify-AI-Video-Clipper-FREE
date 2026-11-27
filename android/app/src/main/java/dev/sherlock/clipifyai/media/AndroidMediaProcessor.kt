@@ -811,7 +811,8 @@ class AndroidMediaProcessor(private val context: Context) {
             add(RenderTier(720, 1280, 5_000_000, "720p Safe", false))
         }
 
-        val camCoords = if (layout == "split") {
+        val isSplitLayout = layout.equals("split", ignoreCase = true) || layout.equals("gaming", ignoreCase = true)
+        val camCoords = if (isSplitLayout) {
             onProgress(20, "Detecting facecam & gameplay regions...")
             detectFacecamRegion(sourceFile, startMs, endMs)
         } else {
@@ -826,7 +827,7 @@ class AndroidMediaProcessor(private val context: Context) {
             var exportOk = false
 
             try {
-                val modeLabel = if (layout == "split") "Split-Screen ${tier.label} (${tier.w}x${tier.h})" else "Vertical ${tier.label} (${tier.w}x${tier.h})"
+                val modeLabel = if (isSplitLayout) "Split-Screen ${tier.label} (${tier.w}x${tier.h})" else "Vertical ${tier.label} (${tier.w}x${tier.h})"
                 onProgress(22, "Rendering $modeLabel MP4 (${startMs / 1000}s–${endMs / 1000}s)...")
                 val mediaItem = MediaItem.Builder()
                     .setUri(Uri.fromFile(sourceFile))
@@ -839,7 +840,7 @@ class AndroidMediaProcessor(private val context: Context) {
                     .build()
 
                 val videoEffects = mutableListOf<Effect>()
-                if (layout == "split") {
+                if (isSplitLayout) {
                     videoEffects.add(SplitScreenGlEffect(camCoords.first, camCoords.second, camCoords.third, tier.w, tier.h))
                 } else {
                     videoEffects.add(Presentation.createForWidthAndHeight(tier.w, tier.h, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP))
@@ -854,7 +855,7 @@ class AndroidMediaProcessor(private val context: Context) {
                                     fallbackTitle = videoTitle,
                                     outWidth = tier.w,
                                     outHeight = tier.h,
-                                    isSplitScreen = (layout == "split")
+                                    isSplitScreen = isSplitLayout
                                 )
                             )
                         )

@@ -98,7 +98,7 @@ class MobileLiveManager(private val context: Context) {
                     if (!info.isLive) {
                         val bufFile = File(liveDir, "live_vod_hd.mp4")
                         addLog("info", "Downloading 1080p HD stream buffer for Live Studio...")
-                        val dlRes = YouTubeStreamDownloader.downloadYouTubeMp4(sourceUrl, bufFile, 1080) { pct, msg ->
+                        val dlRes = YouTubeStreamDownloader.downloadYouTubeMp4(sourceUrl, bufFile, 1080, 45) { pct, msg ->
                             bufferChunks = (pct / 5).coerceAtLeast(1)
                             bufferDurationSec = (pct * 0.9)
                             if (pct % 20 == 0) addLog("info", msg)

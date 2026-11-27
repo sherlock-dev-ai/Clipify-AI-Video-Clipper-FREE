@@ -499,10 +499,259 @@ object YouTubeStreamDownloader {
         }
     }
 
+    private fun remuxTsToMp4(tsFile: File, outFile: File): Boolean {
+        val ext = MediaExtractor()
+        var muxer: MediaMuxer? = null
+        var muxerStarted = false
+        try {
+            ext.setDataSource(tsFile.absolutePath)
+            var vIdx = -1
+            var aIdx = -1
+            var vFmt: MediaFormat? = null
+            var aFmt: MediaFormat? = null
+            for (i in 0 until ext.trackCount) {
+                val fmt = ext.getTrackFormat(i)
+                val mime = fmt.getString(MediaFormat.KEY_MIME) ?: ""
+                if (mime.startsWith("video/") && vIdx < 0) {
+                    vIdx = i
+                    vFmt = fmt
+                } else if (mime.startsWith("audio/") && aIdx < 0) {
+                    aIdx = i
+                    aFmt = fmt
+                }
+            }
+            if (vIdx < 0 || vFmt == null) {
+                Log.w(TAG, "remuxTsToMp4: no video track in ${tsFile.name}")
+                return false
+            }
+            outFile.parentFile?.mkdirs()
+            if (outFile.exists()) outFile.delete()
+            muxer = MediaMuxer(outFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            val outV = muxer.addTrack(vFmt)
+            val outA = if (aIdx >= 0 && aFmt != null) muxer.addTrack(aFmt) else -1
+            muxer.start()
+            muxerStarted = true
+
+            ext.selectTrack(vIdx)
+            if (aIdx >= 0) ext.selectTrack(aIdx)
+
+            val buf = ByteBuffer.allocateDirect(2 * 1024 * 1024)
+            val info = MediaCodec.BufferInfo()
+            while (true) {
+                val trackIdx = ext.sampleTrackIndex
+                if (trackIdx < 0) break
+                val sz = ext.readSampleData(buf, 0)
+                if (sz < 0) break
+                info.offset = 0
+                info.size = sz
+                info.presentationTimeUs = ext.sampleTime.coerceAtLeast(0L)
+                info.flags = if ((ext.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC) != 0) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0
+                if (trackIdx == vIdx) {
+                    muxer.writeSampleData(outV, buf, info)
+                } else if (trackIdx == aIdx && outA >= 0) {
+                    muxer.writeSampleData(outA, buf, info)
+                }
+                ext.advance()
+            }
+            muxer.stop()
+            muxerStarted = false
+            return outFile.exists() && outFile.length() > 1024
+        } catch (e: Exception) {
+            Log.w(TAG, "remuxTsToMp4 failed: ${e.message}")
+            return false
+        } finally {
+            try { ext.release() } catch (_: Exception) {}
+            if (muxerStarted) {
+                try { muxer?.stop() } catch (_: Exception) {}
+            }
+            try { muxer?.release() } catch (_: Exception) {}
+        }
+    }
+
+    private fun downloadViaVisionOsHls(
+        videoId: String,
+        destFile: File,
+        maxHeight: Int,
+        maxSegments: Int,
+        onProgress: (Int, String) -> Unit
+    ): Triple<Boolean, Int, Int> {
+        return try {
+            val watchReq = Request.Builder()
+                .url("https://www.youtube.com/watch?v=$videoId")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+                .get()
+                .build()
+            val html = client.newCall(watchReq).execute().use { resp ->
+                if (!resp.isSuccessful) "" else (resp.body?.string() ?: "")
+            }
+            val vdMatch = Regex("\"visitorData\":\"([^\"]+)\"").find(html)
+            val keyMatch = Regex("\"INNERTUBE_API_KEY\":\"([^\"]+)\"").find(html)
+            val visitorData = vdMatch?.groupValues?.get(1) ?: ""
+            val apiKey = keyMatch?.groupValues?.get(1) ?: ""
+            if (visitorData.isEmpty() || apiKey.isEmpty()) {
+                Log.w(TAG, "VISIONOS: missing visitorData/apiKey")
+                return Triple(false, 0, 0)
+            }
+
+            val ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
+            val payload = JSONObject().apply {
+                put("videoId", videoId)
+                put("context", JSONObject().apply {
+                    put("client", JSONObject().apply {
+                        put("clientName", "VISIONOS")
+                        put("clientVersion", "1.02")
+                        put("deviceMake", "Apple")
+                        put("deviceModel", "RealityDevice17,1")
+                        put("osName", "visionOS")
+                        put("osVersion", "26.5.23O471")
+                        put("visitorData", visitorData)
+                        put("hl", "en")
+                        put("gl", "US")
+                    })
+                })
+                put("contentCheckOk", true)
+                put("racyCheckOk", true)
+            }
+            val playerReq = Request.Builder()
+                .url("https://www.youtube.com/youtubei/v1/player?key=$apiKey&prettyPrint=false")
+                .header("Content-Type", "application/json")
+                .header("User-Agent", ua)
+                .header("X-YouTube-Client-Name", "101")
+                .header("X-YouTube-Client-Version", "1.02")
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+            val playerJson = client.newCall(playerReq).execute().use { resp ->
+                val s = resp.body?.string() ?: ""
+                if (resp.isSuccessful && s.isNotEmpty()) JSONObject(s) else null
+            } ?: return Triple(false, 0, 0)
+
+            val hlsManifestUrl = playerJson.optJSONObject("streamingData")?.optString("hlsManifestUrl", "") ?: ""
+            if (hlsManifestUrl.isEmpty()) {
+                Log.w(TAG, "VISIONOS: no hlsManifestUrl")
+                return Triple(false, 0, 0)
+            }
+
+            val masterM3u8 = client.newCall(Request.Builder().url(hlsManifestUrl).header("User-Agent", ua).get().build()).execute().use { resp ->
+                if (resp.isSuccessful) (resp.body?.string() ?: "") else ""
+            }
+            if (masterM3u8.isEmpty()) return Triple(false, 0, 0)
+
+            val lines = masterM3u8.lines()
+            var bestAvcUrl = ""
+            var bestAvcH = 0
+            var bestAvcW = 0
+            var bestAnyUrl = ""
+            var bestAnyH = 0
+            var bestAnyW = 0
+            for (i in lines.indices) {
+                val line = lines[i].trim()
+                if (line.startsWith("#EXT-X-STREAM-INF:")) {
+                    val resMatch = Regex("RESOLUTION=(\\d+)x(\\d+)").find(line)
+                    val w = resMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                    val h = resMatch?.groupValues?.get(2)?.toIntOrNull() ?: 0
+                    val nextUrl = lines.drop(i + 1).firstOrNull { it.trim().isNotEmpty() && !it.trim().startsWith("#") }?.trim() ?: ""
+                    if (nextUrl.isNotEmpty() && h in 1..maxHeight) {
+                        val isAvc = line.contains("avc1", ignoreCase = true)
+                        if (isAvc && h >= bestAvcH) {
+                            bestAvcH = h; bestAvcW = w; bestAvcUrl = nextUrl
+                        }
+                        if (h >= bestAnyH) {
+                            bestAnyH = h; bestAnyW = w; bestAnyUrl = nextUrl
+                        }
+                    }
+                }
+            }
+
+            val chosenPlaylist = if (bestAvcUrl.isNotEmpty()) bestAvcUrl else bestAnyUrl
+            val chosenW = if (bestAvcUrl.isNotEmpty()) bestAvcW else bestAnyW
+            val chosenH = if (bestAvcUrl.isNotEmpty()) bestAvcH else bestAnyH
+            if (chosenPlaylist.isEmpty()) return Triple(false, 0, 0)
+
+            val variantM3u8 = client.newCall(Request.Builder().url(chosenPlaylist).header("User-Agent", ua).get().build()).execute().use { resp ->
+                if (resp.isSuccessful) (resp.body?.string() ?: "") else ""
+            }
+            val segments = variantM3u8.lines().map { it.trim() }.filter { it.startsWith("http") }
+            if (segments.isEmpty()) return Triple(false, 0, 0)
+
+            val takeCount = segments.size.coerceAtMost(maxSegments)
+            Log.i(TAG, "VISIONOS HLS ${chosenW}x${chosenH}: downloading $takeCount/${segments.size} segments")
+            onProgress(12, "[YouTube HD] Downloading ${chosenH}p HD stream ($takeCount segments)...")
+
+            val tmpTs = File(destFile.parentFile, "${destFile.nameWithoutExtension}_hls.ts")
+            if (tmpTs.exists()) tmpTs.delete()
+            tmpTs.parentFile?.mkdirs()
+
+            var totalBytes = 0L
+            var lastEmit = 0L
+            var consecutiveFails = 0
+            FileOutputStream(tmpTs).use { out ->
+                val buf = ByteArray(64 * 1024)
+                for (idx in 0 until takeCount) {
+                    val segUrl = segments[idx]
+                    var segOk = false
+                    for (attempt in 0 until 3) {
+                        try {
+                            val sReq = Request.Builder().url(segUrl).header("User-Agent", ua).get().build()
+                            client.newCall(sReq).execute().use { resp ->
+                                if (resp.isSuccessful && resp.body != null) {
+                                    resp.body!!.byteStream().use { inp ->
+                                        while (true) {
+                                            val r = inp.read(buf)
+                                            if (r == -1) break
+                                            out.write(buf, 0, r)
+                                            totalBytes += r
+                                        }
+                                    }
+                                    segOk = true
+                                }
+                            }
+                        } catch (_: Exception) {}
+                        if (segOk) break
+                        Thread.sleep(300L * (attempt + 1))
+                    }
+                    if (!segOk) {
+                        consecutiveFails++
+                        Log.w(TAG, "VISIONOS HLS segment $idx failed after 3 retries (consecutive=$consecutiveFails)")
+                        if (consecutiveFails >= 5) break
+                        continue
+                    }
+                    consecutiveFails = 0
+                    val now = System.currentTimeMillis()
+                    if (now - lastEmit >= 450L || idx == takeCount - 1) {
+                        lastEmit = now
+                        val pct = 12 + (((idx + 1) * 76) / takeCount)
+                        val mb = String.format("%.1f", totalBytes / (1024.0 * 1024.0))
+                        onProgress(pct.coerceAtMost(88), "[YouTube ${chosenH}p] Segment ${idx + 1}/$takeCount ($mb MB)")
+                    }
+                }
+            }
+
+            if (!tmpTs.exists() || tmpTs.length() < 1024) {
+                tmpTs.delete()
+                return Triple(false, 0, 0)
+            }
+
+            onProgress(90, "[Muxer] Finalizing ${chosenH}p HD MP4...")
+            val remuxed = remuxTsToMp4(tmpTs, destFile)
+            if (remuxed) {
+                tmpTs.delete()
+                return Triple(true, chosenW, chosenH)
+            }
+            // Fallback: Media3/MediaExtractor supports MPEG-TS directly even with .mp4/.ts
+            tmpTs.copyTo(destFile, overwrite = true)
+            tmpTs.delete()
+            Triple(destFile.exists() && destFile.length() > 1024, chosenW, chosenH)
+        } catch (e: Exception) {
+            Log.w(TAG, "VISIONOS HLS failed: ${e.message}")
+            Triple(false, 0, 0)
+        }
+    }
+
     fun downloadYouTubeMp4(
         url: String,
         destFile: File,
         maxHeight: Int = 4320,
+        maxSegments: Int = Int.MAX_VALUE,
         onProgress: (Int, String) -> Unit
     ): DownloadResult {
         val videoId = extractVideoId(url)
@@ -523,6 +772,24 @@ object YouTubeStreamDownloader {
         val videoTitle = vd?.optString("title", "YouTube_$videoId")?.takeIf { it.isNotEmpty() } ?: "YouTube_$videoId"
         val streamingData = json.optJSONObject("streamingData")
         val captions = fetchCaptions(json, userAgent)
+
+        // 0. Primary: VISIONOS HLS (1080p60 / 720p60 avc1+AAC MPEG-TS segments with ZERO 40 MB Range cap)
+        if (maxHeight >= 720) {
+            val (hlsOk, hlsW, hlsH) = downloadViaVisionOsHls(videoId, destFile, maxHeight, maxSegments, onProgress)
+            if (hlsOk && destFile.exists() && destFile.length() > 1024) {
+                val mb = String.format("%.1f", destFile.length() / (1024.0 * 1024.0))
+                Log.i(TAG, "Downloaded ${hlsH}p HD via VISIONOS HLS ($mb MB) + ${captions.size} captions")
+                onProgress(98, "[Download] ${hlsH}p HD ready ($mb MB)!")
+                return DownloadResult(
+                    ok = true,
+                    title = videoTitle,
+                    file = destFile,
+                    captions = captions,
+                    width = hlsW,
+                    height = hlsH
+                )
+            }
+        }
 
         // 1. Try adaptive HD/4K/8K (video/mp4 avc1/av01/hvc1 + AAC audio/mp4) across IOS -> ANDROID_VR -> ANDROID -> ANDROID_TESTSUITE
         val adaptiveClients = listOf(

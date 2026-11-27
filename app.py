@@ -5703,20 +5703,20 @@ def updater_apply():
     """Performs a fast, in-place update from GitHub without requiring a full re-install."""
     def _delayed_restart():
         import time
-        time.sleep(1.2)
+        time.sleep(0.35)
         try:
             creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
             app_exe = ROOT / "Clipify AI.exe"
             target_args = [str(app_exe)] if app_exe.is_file() else [sys.executable, str(ROOT / "app.py")]
             helper_code = (
                 "import os, socket, subprocess, time\n"
-                "time.sleep(1.0)\n"
+                "time.sleep(0.25)\n"
                 "for _ in range(25):\n"
                 "    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:\n"
                 "        s.settimeout(0.2)\n"
                 "        if s.connect_ex(('127.0.0.1', 5000)) != 0:\n"
                 "            break\n"
-                "    time.sleep(0.3)\n"
+                "    time.sleep(0.2)\n"
                 "env = os.environ.copy()\n"
                 "env['CLIPPEDAI_NO_BROWSER'] = '1'\n"
                 f"subprocess.Popen({repr(target_args)}, cwd={repr(str(ROOT))}, env=env, "
@@ -5734,7 +5734,7 @@ def updater_apply():
         except Exception:
             pass
         finally:
-            time.sleep(0.5)
+            time.sleep(0.15)
             os._exit(0)
 
     # 1. Prioritize dedicated fast update release asset (update-v*.zip)
@@ -5858,6 +5858,8 @@ def health():
     installed, error = _discover_ollama_models()
     return jsonify({
         "ok": True,
+        "pid": os.getpid(),
+        "version": APP_VERSION,
         "ollama": bool(installed),
         "models": installed,
         "model": _default_model(installed),

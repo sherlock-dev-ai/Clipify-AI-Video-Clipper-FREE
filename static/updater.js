@@ -379,8 +379,12 @@
       let startTime = Date.now();
       let serverWentDown = false;
       let pingCount = 0;
+      let initialPid = null;
+      let inFlight = false;
 
       const pollInterval = setInterval(async () => {
+        if (inFlight) return;
+        inFlight = true;
         pingCount++;
         const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
 
@@ -401,18 +405,29 @@
           updateProg(90, 'Finalizing server warmup...');
         }
 
-        // After 6 seconds, reveal force reload button
-        if (elapsedSec >= 6 && actionRow) {
+        // After 5 seconds, reveal force reload button
+        if (elapsedSec >= 5 && actionRow) {
           actionRow.style.display = 'block';
           if (pingCount === 12) {
             addConsoleLog(`[Notice] Almost ready — click 'Force Reload Clipify' anytime to refresh.`, 'warn');
           }
         }
 
+        const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timer = ac ? setTimeout(() => ac.abort(), 1500) : null;
         try {
-          const res = await fetch('/api/health?t=' + Date.now(), { cache: 'no-store' });
+          const res = await fetch('/api/health?t=' + Date.now(), {
+            cache: 'no-store',
+            signal: ac ? ac.signal : undefined
+          });
           if (res.ok) {
-            if (serverWentDown) {
+            let data = null;
+            try { data = await res.json(); } catch (_) {}
+            if (initialPid === null && data && data.pid && elapsedSec < 2) {
+              initialPid = data.pid;
+            }
+            const pidChanged = Boolean(initialPid && data && data.pid && data.pid !== initialPid);
+            if (serverWentDown || pidChanged || elapsedSec >= 6) {
               clearInterval(pollInterval);
               updateProg(100, 'Update Complete!');
               if (consoleBadge) {
@@ -424,7 +439,7 @@
               if (statusLabel) statusLabel.textContent = '✓ RESTART COMPLETE — RELOADING…';
               setTimeout(() => {
                 window.location.reload();
-              }, 450);
+              }, 350);
             }
           } else {
             serverWentDown = true;
@@ -432,8 +447,11 @@
         } catch (err) {
           // Expected while server shuts down and rebinds
           serverWentDown = true;
+        } finally {
+          if (timer) clearTimeout(timer);
+          inFlight = false;
         }
-      }, 400);
+      }, 450);
     }
 
     let modalAsciiCtrl = null;

@@ -5705,13 +5705,19 @@ def updater_apply():
         import time
         time.sleep(0.35)
         try:
-            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+            detached_flags = (
+                getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
+                | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+                | getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+            )
+            runtime_py = ROOT / "runtime" / "Scripts" / "python.exe"
+            py_exe = str(runtime_py) if runtime_py.is_file() else sys.executable
             app_exe = ROOT / "Clipify AI.exe"
-            target_args = [str(app_exe)] if app_exe.is_file() else [sys.executable, str(ROOT / "app.py")]
+            target_args = [str(app_exe)] if app_exe.is_file() else [py_exe, str(ROOT / "app.py")]
             helper_code = (
                 "import os, socket, subprocess, time\n"
                 "time.sleep(0.25)\n"
-                "for _ in range(25):\n"
+                "for _ in range(30):\n"
                 "    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:\n"
                 "        s.settimeout(0.2)\n"
                 "        if s.connect_ex(('127.0.0.1', 5000)) != 0:\n"
@@ -5721,15 +5727,16 @@ def updater_apply():
                 "env['CLIPPEDAI_NO_BROWSER'] = '1'\n"
                 f"subprocess.Popen({repr(target_args)}, cwd={repr(str(ROOT))}, env=env, "
                 "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, "
-                f"creationflags={creationflags})\n"
+                f"close_fds=True, creationflags={detached_flags})\n"
             )
             subprocess.Popen(
-                [sys.executable, "-c", helper_code],
+                [py_exe, "-c", helper_code],
                 cwd=str(ROOT),
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                creationflags=creationflags,
+                close_fds=True,
+                creationflags=detached_flags,
             )
         except Exception:
             pass

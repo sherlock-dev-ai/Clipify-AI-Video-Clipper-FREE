@@ -310,8 +310,8 @@
               <div class="restart-progress-track">
                 <div class="restart-progress-bar" id="restartProgressBar" style="width: 15%;"></div>
               </div>
-              <div class="restart-action-row" id="restartActionRow" style="display:none;margin-top:10px;">
-                <button type="button" class="btn-restart-retry" id="btnRestartForceReload">Force Reload Clipify</button>
+              <div class="restart-wait-note" id="restartWaitNote" style="margin-top:10px;font-size:12px;color:rgba(255,255,255,0.68);text-align:center;">
+                Please keep waiting — applying changes and restarting Clipify AI automatically…
               </div>
             </div>
           </div>
@@ -343,12 +343,7 @@
       const progressDetail = document.getElementById('restartProgressDetail');
       const progressPct = document.getElementById('restartProgressPct');
       const consoleBadge = document.getElementById('restartConsoleBadge');
-      const actionRow = document.getElementById('restartActionRow');
-      const forceReloadBtn = document.getElementById('btnRestartForceReload');
-
-      if (forceReloadBtn) {
-        forceReloadBtn.onclick = () => window.location.reload();
-      }
+      const waitNote = document.getElementById('restartWaitNote');
 
       let progress = 18;
       const updateProg = (p, text) => {
@@ -398,19 +393,18 @@
           addConsoleLog(`[Sync] Probing http://127.0.0.1:5000/api/health (${elapsedSec}s)...`, 'info');
         }
 
-        // Progressively advance progress so it never looks dead at 75%
+        // Progressively advance progress while waiting for server restart
         if (elapsedSec >= 2 && progress < 82) {
-          updateProg(82, 'Awaiting daemon port rebind...');
-        } else if (elapsedSec >= 4 && progress < 90) {
-          updateProg(90, 'Finalizing server warmup...');
+          updateProg(82, 'Please keep waiting — applying changes…');
+        } else if (elapsedSec >= 4 && progress < 92) {
+          updateProg(92, 'Please keep waiting — applying changes & restarting server…');
         }
 
-        // After 5 seconds, reveal force reload button
-        if (elapsedSec >= 5 && actionRow) {
-          actionRow.style.display = 'block';
-          if (pingCount === 12) {
-            addConsoleLog(`[Notice] Almost ready — click 'Force Reload Clipify' anytime to refresh.`, 'warn');
-          }
+        if (elapsedSec >= 6 && pingCount === 14) {
+          addConsoleLog(`[Wait] Please keep waiting — applying changes & waiting for Clipify AI to come back online…`, 'info');
+        }
+        if (waitNote && elapsedSec >= 5) {
+          waitNote.textContent = `Please keep waiting (${elapsedSec}s) — applying changes, page will reload automatically…`;
         }
 
         const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;

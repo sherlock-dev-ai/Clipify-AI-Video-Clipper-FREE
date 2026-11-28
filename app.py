@@ -3008,10 +3008,10 @@ def import_youtube():
             command = [*yt_dlp_cmd, "--no-playlist", "--no-warnings", "--newline", "--progress",
                        "--format-sort", f"res:{min(max_height, 2160)},fps,vbr",
                        "--progress-template", "download:[clip-prog] %(progress._percent_str)s|%(progress.downloaded_bytes)s|%(progress.total_bytes|progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s",
-                       "--restrict-filenames", "--merge-output-format", "mp4", "--max-filesize", "8G",
-                       "--socket-timeout", "30", "--retries", "5", "--fragment-retries", "5",
-                       "--concurrent-fragments", "4",
-                       "-f", f"bestvideo[height<={max_height}]+bestaudio/bestvideo[height<={max_height}]/best[height<={max_height}]/best",
+                       "--restrict-filenames", "--merge-output-format", "mp4/mkv", "--max-filesize", "8G",
+                       "--socket-timeout", "30", "--retries", "10", "--fragment-retries", "10",
+                       "--extractor-retries", "5", "--concurrent-fragments", "4",
+                       "-f", f"bestvideo[height<={max_height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={max_height}]+bestaudio/bestvideo[height<={max_height}]/best[height<={max_height}]/best",
                        "--ffmpeg-location", str(Path(ffmpeg_path).parent)]
             cookie_candidates = [
                 ROOT / "cookies.txt",
@@ -3043,6 +3043,7 @@ def import_youtube():
                     return ""
 
             stream_count = 0
+            est_total_by_stream: dict[int, float] = {}
             for raw in proc.stdout:
                 line = raw.strip()
                 if not line:
@@ -3060,40 +3061,58 @@ def import_youtube():
                         if pct_m:
                             pct = float(pct_m.group(1))
 
+                        def _parse_num(raw_val: str) -> float | None:
+                            cleaned = raw_val.strip().lstrip("~").strip()
+                            if not cleaned or cleaned.upper() in ("NA", "N/A", "NONE", "UNKNOWN"):
+                                return None
+                            try:
+                                return float(cleaned)
+                            except (TypeError, ValueError):
+                                return None
+
                         info_items: list[str] = []
-                        if len(parts) >= 3:
-                            try:
-                                dl_bytes = int(parts[1])
-                                tot_bytes = int(parts[2])
-                                if tot_bytes > 0:
-                                    pct = (dl_bytes * 100.0) / tot_bytes
-                                    info_items.append(f"{_fmt_size(dl_bytes)} / {_fmt_size(tot_bytes)}")
-                                elif dl_bytes > 0:
-                                    info_items.append(_fmt_size(dl_bytes))
-                            except (TypeError, ValueError):
-                                pass
-                        if len(parts) >= 4 and parts[3] not in ("NA", ""):
-                            try:
-                                spd = float(parts[3])
-                                info_items.append(f"{_fmt_size(spd)}/s")
-                            except (TypeError, ValueError):
-                                pass
-                        if len(parts) >= 5 and parts[4] not in ("NA", ""):
-                            try:
-                                eta_val = int(float(parts[4]))
-                                m, s = divmod(eta_val, 60)
-                                info_items.append(f"ETA {m:02d}:{s:02d}")
-                            except (TypeError, ValueError):
-                                pass
+                        dl_bytes = _parse_num(parts[1]) if len(parts) >= 2 else None
+                        tot_bytes = _parse_num(parts[2]) if len(parts) >= 3 else None
+                        spd = _parse_num(parts[3]) if len(parts) >= 4 else None
+                        eta_raw = _parse_num(parts[4]) if len(parts) >= 5 else None
+
+                        if (tot_bytes is None or tot_bytes <= 0) and dl_bytes is not None and dl_bytes > 0 and spd is not None and spd > 0 and eta_raw is not None and eta_raw > 0:
+                            calc_tot = dl_bytes + spd * eta_raw
+                            prev_est = est_total_by_stream.get(stream_count)
+                            est_total = (prev_est * 0.7 + calc_tot * 0.3) if prev_est else calc_tot
+                            est_total = max(est_total, dl_bytes * 1.02)
+                            est_total_by_stream[stream_count] = est_total
+                            tot_bytes = est_total
+
+                        if dl_bytes is not None and dl_bytes > 0 and tot_bytes is not None and tot_bytes > 0:
+                            pct = min(99.5, (dl_bytes * 100.0) / tot_bytes)
+                            info_items.append(f"{_fmt_size(dl_bytes)} / {_fmt_size(tot_bytes)}")
+                        elif dl_bytes is not None and dl_bytes > 0:
+                            info_items.append(_fmt_size(dl_bytes))
+                            # Fragmented HLS streams often report 100% per fragment when total size is unknown
+                            if pct >= 99.0:
+                                pct = min(84.0, max(2.0, (dl_bytes / (1024 * 1024)) * 0.5))
+                            elif eta_raw is not None and eta_raw > 2:
+                                pct = min(pct, 95.0)
+
+                        if spd is not None and spd > 0:
+                            info_items.append(f"{_fmt_size(spd)}/s")
+
+                        if eta_raw is not None and eta_raw >= 0:
+                            eta_val = int(eta_raw)
+                            h, rem = divmod(eta_val, 3600)
+                            m, s = divmod(rem, 60)
+                            info_items.append(f"ETA {h}:{m:02d}:{s:02d}" if h > 0 else f"ETA {m:02d}:{s:02d}")
 
                         if stream_count <= 1:
                             scaled = int(min(85, max(1, pct * 0.85)))
                             stage_lbl = "Downloading video"
+                            job["progress"] = scaled if tot_bytes else max(job["progress"], scaled)
                         else:
-                            scaled = int(min(96, max(85, 85 + pct * 0.11)))
+                            scaled = int(min(96, max(86, 85 + pct * 0.11)))
                             stage_lbl = "Downloading audio"
+                            job["progress"] = max(job["progress"], scaled)
 
-                        job["progress"] = max(job["progress"], scaled)
                         job["stage"] = stage_lbl
                         summary_info = " · ".join(info_items)
                         extra = f" ({summary_info})" if info_items else f" ({pct:.1f}%)"
@@ -3132,9 +3151,12 @@ def import_youtube():
             return_code = proc.wait()
             videos = []
             video_only_candidates = []
+            audio_only_candidates = []
             ffprobe = Path(ffmpeg_path).with_name("ffprobe.exe")
             for candidate in input_dir.iterdir():
-                if not candidate.is_file() or not is_allowed(candidate.name):
+                if not candidate.is_file() or candidate.stat().st_size < 1024:
+                    continue
+                if candidate.suffix.lower() in {".part", ".ytdl", ".tmp"}:
                     continue
                 probe = _run_hidden(
                     [str(ffprobe), "-v", "error", "-show_entries", "stream=codec_type",
@@ -3143,10 +3165,28 @@ def import_youtube():
                     timeout=30, check=False,
                 )
                 streams_out = (probe.stdout or "").lower()
-                if probe.returncode == 0 and "video" in streams_out and "audio" in streams_out:
+                if probe.returncode == 0 and "video" in streams_out and "audio" in streams_out and is_allowed(candidate.name):
                     videos.append(candidate)
                 elif probe.returncode == 0 and "video" in streams_out:
                     video_only_candidates.append(candidate)
+                elif probe.returncode == 0 and "audio" in streams_out:
+                    audio_only_candidates.append(candidate)
+
+            # Recover if yt-dlp downloaded both video & audio separately and failed during [Merger] (97%)
+            if not videos and video_only_candidates and audio_only_candidates:
+                v_only = max(video_only_candidates, key=lambda p: p.stat().st_size)
+                a_only = max(audio_only_candidates, key=lambda p: p.stat().st_size)
+                mux_out = input_dir / f"{v_only.stem}_merged.mp4"
+                with jobs_lock:
+                    if job_id in jobs:
+                        jobs[job_id].update(progress=97, stage="Finalizing download", detail="Muxing video and audio streams…")
+                _run_hidden(
+                    [ffmpeg_path, "-y", "-i", str(v_only), "-i", str(a_only),
+                     "-c:v", "copy", "-c:a", "aac", "-shortest", "-movflags", "+faststart", str(mux_out)],
+                    capture_output=True, text=True, timeout=300, check=False,
+                )
+                if mux_out.is_file() and mux_out.stat().st_size > 1024:
+                    videos.append(mux_out)
 
             # If high-quality video was downloaded without an audio track, download audio separately & mux
             if not videos and video_only_candidates:
@@ -3182,7 +3222,7 @@ def import_youtube():
                         except OSError:
                             pass
             last_error = ""
-            if return_code != 0 or not videos:
+            if not videos:
                 with jobs_lock:
                     for event in reversed(jobs[job_id].get("events", [])):
                         message = str(event.get("message", ""))

@@ -3708,17 +3708,42 @@ def _fast_generate_captions(audio_path: Path, ass_path: Path, clip_dur: float, l
         except Exception:
             # Automatic fallback to CPU if CUDA initialization fails
             model = WhisperModel("tiny", device="cpu", compute_type="int8")
-        segments, _ = model.transcribe(str(audio_path), word_timestamps=True, beam_size=1, vad_filter=True)
-        words = []
-        for segment in segments:
-            for w in (getattr(segment, "words", None) or []):
-                word_text = w.word.strip()
-                if word_text:
-                    words.append({
-                        "word": word_text,
-                        "start": max(0.0, float(w.start)),
-                        "end": min(clip_dur, float(w.end))
-                    })
+        def _collect_words(seg_iter) -> list[dict]:
+            collected = []
+            for segment in seg_iter:
+                seg_words = list(getattr(segment, "words", None) or [])
+                if seg_words:
+                    for w in seg_words:
+                        word_text = w.word.strip()
+                        if word_text:
+                            collected.append({
+                                "word": word_text,
+                                "start": max(0.0, float(w.start)),
+                                "end": min(clip_dur, float(w.end))
+                            })
+                else:
+                    raw_text = (getattr(segment, "text", "") or "").strip()
+                    parts = [p for p in raw_text.split() if p]
+                    if parts:
+                        s_t = max(0.0, float(getattr(segment, "start", 0.0)))
+                        e_t = min(clip_dur, float(getattr(segment, "end", s_t + 0.5)))
+                        step_t = max(0.05, (e_t - s_t) / len(parts))
+                        for idx, part in enumerate(parts):
+                            w_s = min(clip_dur, s_t + idx * step_t)
+                            w_e = min(clip_dur, max(w_s + 0.05, w_s + step_t))
+                            collected.append({"word": part, "start": w_s, "end": w_e})
+            return collected
+
+        try:
+            segments, _ = model.transcribe(str(audio_path), word_timestamps=True, beam_size=1, vad_filter=True)
+            words = _collect_words(segments)
+        except Exception:
+            words = []
+
+        if not words:
+            # Fallback without VAD filter (handles onnxruntime/silero VAD issues or noisy gaming audio)
+            segments, _ = model.transcribe(str(audio_path), word_timestamps=True, beam_size=1, vad_filter=False)
+            words = _collect_words(segments)
         try:
             del model
             import gc
@@ -3977,7 +4002,7 @@ def _instant_worker(
                         "-vn", "-ac", "1", "-ar", "16000",
                         str(chunk_wav)
                     ]
-                    _run_hidden(audio_cmd, timeout=30)
+                    _run_hidden(audio_cmd, timeout=90)
                     if chunk_wav.exists() and chunk_wav.stat().st_size > 1000:
                         candidate_ass = job_dir / f"subs_{job_id[:8]}_{c_idx}.ass"
                         if _fast_generate_captions(chunk_wav, candidate_ass, c_dur, layout):

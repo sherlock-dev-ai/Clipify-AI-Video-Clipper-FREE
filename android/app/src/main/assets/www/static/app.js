@@ -2008,6 +2008,12 @@ function renderPipelineSteps(progress, failed = false) {
 }
 
 function setPipelineFailure(message) {
+  state.running = false;
+  state.starting = false;
+  if (typeof create !== 'undefined' && create) {
+    create.disabled = false;
+    create.textContent = 'Generate Shorts';
+  }
   if (progressPanel.dataset.state === 'error' || progressPanel.dataset.state === 'complete') return;
   const pct = Math.max(0, Math.min(100, Number(progressPanel.dataset.progress) || 0));
   const detail = window.ClipifyPipelineStatus
@@ -4090,10 +4096,11 @@ function initBetaTestingSection() {
         runBtn.textContent = `⏳ Downloading ${platLabel} video…`;
       }
       try {
+        const qualityVal = parseInt($('#betaYtQuality')?.value || '4320', 10) || 4320;
         const res = await fetch('/api/import-youtube', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url, platform: plat })
+          body: JSON.stringify({ url, platform: plat, quality: qualityVal })
         });
         const data = await res.json();
         if (!res.ok || (!data.ok && !data.job_id)) throw new Error(data.error || `Failed to import ${platLabel} video`);
@@ -5990,3 +5997,17 @@ async function saveStorageLocation(key, resetDefault) {
     }
   }
 }
+
+// Sequential Studio Workflow Stepper Animation (01 Source -> 02 Edit -> 03 Generate -> 04 Review)
+(function initStudioStepperCycle() {
+  const stepper = document.getElementById('studioWorkflowStepper');
+  if (!stepper) return;
+  const steps = Array.from(stepper.querySelectorAll('.workflow-step'));
+  if (!steps.length) return;
+  let activeIdx = 0;
+  setInterval(() => {
+    if (window.state && (window.state.starting || window.state.running)) return;
+    activeIdx = (activeIdx + 1) % steps.length;
+    steps.forEach((s, i) => s.classList.toggle('active', i === activeIdx));
+  }, 2600);
+})();

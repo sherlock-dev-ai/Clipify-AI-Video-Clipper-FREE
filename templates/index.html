@@ -424,17 +424,17 @@
           <div class="status-pill" id="statusPill"><span></span> Checking local services</div>
         </div>
       </header>
-      <div class="workflow">
-        <div class="workflow-step active"><b>01</b>
+      <div class="workflow" id="studioWorkflowStepper">
+        <div class="workflow-step active" data-step="0"><b>01</b>
           <div><strong>Source</strong><small>Upload</small></div>
         </div>
-        <div class="workflow-step active"><b>02</b>
+        <div class="workflow-step" data-step="1"><b>02</b>
           <div><strong>Edit</strong><small>Mode + crop</small></div>
         </div>
-        <div class="workflow-step"><b>03</b>
+        <div class="workflow-step" data-step="2"><b>03</b>
           <div><strong>Generate</strong><small>Render</small></div>
         </div>
-        <div class="workflow-step"><b>04</b>
+        <div class="workflow-step" data-step="3"><b>04</b>
           <div><strong>Review</strong><small>Publish</small></div>
         </div>
       </div>
@@ -1506,13 +1506,20 @@
                 style="padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,0.16);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.82);font-size:0.78rem;font-weight:600;cursor:pointer;">Kick</button>
             </div>
 
-            <div style="display:flex;gap:8px;margin-top:8px;">
+            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center;">
               <input type="url" id="betaYtUrl" name="beta_youtube_url_no_autofill"
                 placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" autocorrect="off"
                 autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true"
                 data-form-type="other"
-                style="flex:1;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.14);background:rgba(0,0,0,0.3);color:#fff;font-size:0.88rem;">
-              <button type="button" class="ghost" id="betaYtImportBtn" style="white-space:nowrap;padding:0 16px;">Fetch
+                style="flex:1;min-width:220px;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.14);background:rgba(0,0,0,0.3);color:#fff;font-size:0.88rem;">
+              <select id="betaYtQuality" aria-label="Import Video Quality"
+                style="padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.14);background:#0c0c0f;color:#fff;font-size:0.84rem;cursor:pointer;">
+                <option value="4320" selected>Best Available (4K / 1080p)</option>
+                <option value="1080">1080p Full HD</option>
+                <option value="720">720p HD</option>
+                <option value="480">480p / 360p Fast</option>
+              </select>
+              <button type="button" class="ghost" id="betaYtImportBtn" style="white-space:nowrap;padding:10px 16px;">Fetch
                 Link</button>
             </div>
 
@@ -2379,9 +2386,9 @@
       </div>
     </div>
 
-    <!-- Model Hub & Engine Manager Modal -->
-    <div id="modelHubModal" class="model-hub-modal-overlay" style="display:none;" role="dialog" aria-modal="true"
-      aria-labelledby="modelHubTitle">
+    <!-- Model Hub & Engine Manager (Inline Black & White Section) -->
+    <section id="models" class="page-section secondary-section model-hub-inline-section">
+    <div id="modelHubModal" class="model-hub-inline-wrap" aria-labelledby="modelHubTitle">
       <div class="model-hub-container">
         <!-- Header -->
         <div class="model-hub-header">
@@ -2483,6 +2490,7 @@
         </div>
       </div>
     </div>
+    </section>
 
     <!-- Sub-window Update & Restarting Modal (Blurred background, app logo, live console) -->
     <div id="clipifyRestartOverlay" class="clipify-restart-overlay" style="display:none;">
@@ -2531,6 +2539,7 @@
         </div>
       </div>
     </div>
+    </section>
 
     <!-- Sub-window Update & Restarting Modal (Blurred background, app logo, live console) -->
     <div id="clipifyRestartOverlay" class="clipify-restart-overlay" style="display:none;">
@@ -2598,7 +2607,8 @@
   <script src="{{ url_for('static', filename='gpu_selector.js', v='5.0.4') }}"></script>
   <script>
     if (window.location.search.includes('open_support=1') || window.location.hash.includes('support')) {
-      window.addEventListener('load', () => setTimeout(() => window.showSupportModal && window.showSupportModal(), 0))
+      window.addEventListener('load', () => setTimeout(() => window.showSupportModal && window.showSupportModal(), 0));
+    }
   </script>
 </body>
 

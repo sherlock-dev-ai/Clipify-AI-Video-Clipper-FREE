@@ -129,10 +129,11 @@ button { color: inherit; }
 .step.done .step-dot { color: #0b1a11; background: var(--forest-success); }
 .step-name { font-size: 12px; font-weight: 590; }
 
-#screens { z-index: 2; padding: 0 34px; }
+#screens { z-index: 2; padding: 8px 34px 4px; overflow: hidden; min-height: 0; }
 .screen {
-  gap: 15px;
+  gap: 14px;
   max-width: 1100px;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-color: rgba(146,180,154,.38) transparent;
@@ -160,7 +161,19 @@ button { color: inherit; }
 .card h3 { margin: 0 0 10px; color: #b9c9b7; font-size: 12px; font-weight: 650; letter-spacing: .045em; text-transform: none; }
 .mono { color: #d8e0d5; font-size: 12.5px; }
 
-.hero { gap: 12px; max-width: 560px; padding: 20px; background: rgba(16,37,27,.72); animation: screen-in .3s var(--ease-forest); }
+.hero {
+  gap: 12px;
+  max-width: 580px;
+  width: 100%;
+  margin: auto;
+  padding: 28px 32px;
+  background: rgba(11, 26, 19, 0.88);
+  border: 1px solid rgba(196, 206, 194, 0.18);
+  border-radius: 22px;
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(12px);
+  animation: screen-in .3s var(--ease-forest);
+}
 .hero-logo-wrap { margin-bottom: 2px; position: relative; }
 .hero-logo { width: 90px; height: 90px; border: 1px solid rgba(244,241,232,.18); border-radius: 25px; box-shadow: 0 12px 36px rgba(0,0,0,.24); }
 .hero-title { color: var(--forest-cream); font-size: clamp(27px, 3vw, 34px); font-weight: 680; letter-spacing: -.035em; line-height: 1.18; }
@@ -232,17 +245,17 @@ button { color: inherit; }
 .space-meta { color: #9dad9c; font-size: 11.5px; }
 .bar { height: 7px; background: #0b1b12; border: 1px solid rgba(146,180,154,.1); border-radius: 999px; }
 .bar-fill { background: linear-gradient(90deg, #638c6a, #92b49a); border-radius: inherit; transition: width .28s var(--ease-forest); }
-.notice-good { color: var(--forest-success); background: rgba(133,204,145,.1); }
-.notice-warn { color: var(--forest-amber); background: rgba(232,191,120,.1); }
-.notice-bad { color: var(--forest-error); background: rgba(230,141,133,.1); }
-.notice-soft { color: var(--forest-cream); background: rgba(146,180,154,.07); border: 1px solid rgba(146,180,154,.13); }
+.notice-good { color: #d9f99d; background: rgba(10, 26, 18, 0.90); border: 1px solid rgba(133, 204, 145, 0.34); backdrop-filter: blur(8px); }
+.notice-warn { color: var(--forest-amber); background: rgba(18, 22, 14, 0.90); border: 1px solid rgba(232, 191, 120, 0.32); }
+.notice-bad { color: var(--forest-error); background: rgba(28, 16, 16, 0.90); border: 1px solid rgba(230, 141, 133, 0.32); }
+.notice-soft { color: var(--forest-cream); background: rgba(12, 29, 21, 0.88); border: 1px solid rgba(146,180,154,.22); backdrop-filter: blur(8px); }
 .switch-row { min-height: 40px; color: #d6dfd4; border-top-color: rgba(196,206,194,.1); font-size: 12.5px; }
 .switch-box { background: #091510; border: 1px solid #47634d; }
 .switch-row input:checked + .switch-box { background: #6e9a76; border-color: #6e9a76; }
 
-.models-layout { min-height: 0; grid-template-columns: minmax(0,1fr) 272px; gap: 14px; }
-.models-main { gap: 10px; }
-.model-grid { gap: 9px; scrollbar-color: rgba(146,180,154,.38) transparent; }
+.models-layout { min-height: 0; flex: 1 1 auto; grid-template-columns: minmax(0,1fr) 280px; gap: 14px; overflow: hidden; }
+.models-main { gap: 10px; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.model-grid { gap: 9px; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 4px; scrollbar-color: rgba(146,180,154,.38) transparent; }
 .model-card { min-height: 147px; padding: 14px; color: var(--forest-cream); background: rgba(16,37,27,.78); border-color: rgba(196,206,194,.14); border-radius: 14px; box-shadow: none; }
 .model-card:hover { border-color: rgba(146,180,154,.5); box-shadow: 0 7px 20px rgba(0,0,0,.16); }
 .model-card.selected { background: rgba(54,93,67,.3); border-color: var(--forest-sage); box-shadow: 0 0 0 1px rgba(146,180,154,.14); }
@@ -529,16 +542,19 @@ button { color: inherit; }
 .launch-error[hidden] { display: none; }
 
 .music {
-  margin: 0 24px 8px;
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 6;
+  margin: 4px 26px 6px;
   padding: 8px 14px;
-  background: rgba(16, 37, 27, 0.88);
-  border: 1px solid rgba(196, 206, 194, 0.16);
+  background: rgba(10, 24, 17, 0.94);
+  border: 1px solid rgba(196, 206, 194, 0.22);
   border-radius: 14px;
-  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.32);
-  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(10px);
   max-width: 680px;
-  width: calc(100% - 40px);
-  opacity: .95;
+  width: calc(100% - 52px);
+  opacity: .98;
 }
 .music-panel {
   min-width: 0;

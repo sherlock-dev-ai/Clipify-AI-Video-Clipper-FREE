@@ -474,6 +474,87 @@
     }
   ];
 
+  const TRENDING_STEPS = [
+    {
+      title: 'Trending & Live Radar',
+      badge: 'LIVE DISCOVERY',
+      description: 'Discover trending streams and gameplay broadcasts across YouTube, Twitch, and Kick in real time.',
+      target: '#trending .trending-header, #trending',
+      position: 'bottom'
+    },
+    {
+      title: 'Search & Filter Streams',
+      badge: 'FILTERING',
+      description: 'Search by creator, game, or topic, or switch platforms and refresh the live feed instantly.',
+      target: '#trendingSearchInput',
+      position: 'bottom'
+    },
+    {
+      title: 'One-Click Import',
+      badge: 'SEND TO STUDIO',
+      description: 'Click any trending stream or video card to send it straight into Clipify AI for instant clipping.',
+      target: '#trendingYtLiveGrid, #trendingGenericStreamsGrid, #trending',
+      position: 'top'
+    }
+  ];
+
+  const MODELS_STEPS = [
+    {
+      title: 'AI Models & Engine Hub',
+      badge: 'LOCAL & CLOUD',
+      description: 'Manage local Ollama models, Hugging Face Cloud inference, and WhisperX transcription weights in one place.',
+      target: '#models .mh-header, #models',
+      position: 'bottom'
+    },
+    {
+      title: 'Search & Install Models',
+      badge: 'ONE-CLICK PULL',
+      description: 'Filter or search recommended models by speed, RAM, or vision capability and pull them directly into Clipify AI.',
+      target: '#mhGrid, #models',
+      position: 'top'
+    }
+  ];
+
+  const STORAGE_STEPS = [
+    {
+      title: 'Storage & Disk Manager',
+      badge: 'WORKSPACE PATH',
+      description: 'Inspect disk usage across generated shorts, cached transcripts, and imported source videos, or move your storage folder.',
+      target: '#storageCardsGrid, #storage',
+      position: 'bottom'
+    }
+  ];
+
+  const SUPPORT_STEPS = [
+    {
+      title: 'Support Clipify AI',
+      badge: '100% FREE & LOCAL',
+      description: 'Support development via Ko-fi, GitHub Sponsors, or community sharing so Clipify AI stays free and open.',
+      target: '#support',
+      position: 'bottom'
+    }
+  ];
+
+  const PROMOTERS_STEPS = [
+    {
+      title: 'Promote Us & Earn',
+      badge: 'CREATOR PROGRAM',
+      description: 'Share Clipify AI tutorials, shorts, or showcases and join the Discord creator community.',
+      target: '#promoters',
+      position: 'bottom'
+    }
+  ];
+
+  const CAMPAIGNS_STEPS = [
+    {
+      title: 'Clipping Campaigns',
+      badge: 'BOUNTIES',
+      description: 'Browse active creator campaigns, clipping bounties, and featured rewards.',
+      target: '#campaigns',
+      position: 'bottom'
+    }
+  ];
+
   // Distinct section theming colors (designed for aesthetic, non-AI craft look)
   const CONTEXT_THEMES = {
     instant: {
@@ -495,6 +576,66 @@
       accentGlow: 'rgba(34, 197, 94, 0.45)',
       badgeBg: 'rgba(34, 197, 94, 0.12)',
       badgeBorder: 'rgba(34, 197, 94, 0.35)',
+    },
+    trending: {
+      name: 'Trending Radar',
+      label: '🔥 Trending',
+      steps: TRENDING_STEPS,
+      accent: '#ef4444',
+      accentLight: '#f87171',
+      accentGlow: 'rgba(239, 68, 68, 0.45)',
+      badgeBg: 'rgba(239, 68, 68, 0.12)',
+      badgeBorder: 'rgba(239, 68, 68, 0.35)',
+    },
+    models: {
+      name: 'AI Models Hub',
+      label: '🧠 Models',
+      steps: MODELS_STEPS,
+      accent: '#ffffff',
+      accentLight: '#e4e4e7',
+      accentGlow: 'rgba(255, 255, 255, 0.4)',
+      badgeBg: 'rgba(255, 255, 255, 0.12)',
+      badgeBorder: 'rgba(255, 255, 255, 0.35)',
+    },
+    storage: {
+      name: 'Storage Manager',
+      label: '💾 Storage',
+      steps: STORAGE_STEPS,
+      accent: '#38bdf8',
+      accentLight: '#7dd3fc',
+      accentGlow: 'rgba(56, 189, 248, 0.45)',
+      badgeBg: 'rgba(56, 189, 248, 0.12)',
+      badgeBorder: 'rgba(56, 189, 248, 0.35)',
+    },
+    support: {
+      name: 'Support Us',
+      label: '🤍 Support Us',
+      steps: SUPPORT_STEPS,
+      accent: '#ffffff',
+      accentLight: '#e4e4e7',
+      accentGlow: 'rgba(255, 255, 255, 0.4)',
+      badgeBg: 'rgba(255, 255, 255, 0.12)',
+      badgeBorder: 'rgba(255, 255, 255, 0.35)',
+    },
+    promoters: {
+      name: 'Promote Us',
+      label: '📣 Promote Us',
+      steps: PROMOTERS_STEPS,
+      accent: '#ffffff',
+      accentLight: '#e4e4e7',
+      accentGlow: 'rgba(255, 255, 255, 0.4)',
+      badgeBg: 'rgba(255, 255, 255, 0.12)',
+      badgeBorder: 'rgba(255, 255, 255, 0.35)',
+    },
+    campaigns: {
+      name: 'Campaigns',
+      label: '🎯 Campaigns',
+      steps: CAMPAIGNS_STEPS,
+      accent: '#ffffff',
+      accentLight: '#e4e4e7',
+      accentGlow: 'rgba(255, 255, 255, 0.4)',
+      badgeBg: 'rgba(255, 255, 255, 0.12)',
+      badgeBorder: 'rgba(255, 255, 255, 0.35)',
     },
     create: {
       name: 'Create a Short',
@@ -554,7 +695,7 @@
     if (p.includes('/live')) return 'live';
     if (p.includes('/narrate')) return 'narrate';
 
-    const sections = ['instant', 'beta', 'projects', 'editor', 'create'];
+    const sections = ['instant', 'beta', 'trending', 'models', 'storage', 'support', 'promoters', 'campaigns', 'projects', 'editor', 'create'];
 
     // 1. Check hash first
     const h = (window.location.hash || '').replace('#', '').split('?')[0].toLowerCase();
@@ -1453,10 +1594,43 @@
     }
   }
 
+  function mountOrShowInlineSection(sectionId, navId, overlayEl) {
+    const mainEl = document.querySelector('main.main');
+    if (!mainEl) return false;
+    let sec = document.getElementById(sectionId);
+    if (!sec) {
+      sec = document.createElement('section');
+      sec.id = sectionId;
+      sec.className = 'page-section secondary-section inline-bw-section';
+      const footerEl = mainEl.querySelector('footer');
+      if (footerEl) mainEl.insertBefore(sec, footerEl);
+      else mainEl.appendChild(sec);
+    }
+    if (overlayEl && overlayEl.parentElement !== sec) {
+      sec.appendChild(overlayEl);
+    }
+    document.querySelectorAll('.page-section').forEach(s => {
+      s.classList.remove('visible');
+      s.style.display = 'none';
+    });
+    sec.classList.add('visible');
+    sec.style.display = 'block';
+    document.querySelectorAll('.sidebar nav a').forEach(a => a.classList.remove('active'));
+    const navEl = document.getElementById(navId);
+    if (navEl) navEl.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return true;
+  }
+
   function showSupportModal() {
     initSupportModal();
-    supportModalOverlayEl.style.display = 'flex';
-    supportModalOverlayEl.classList.add('active');
+    if (!mountOrShowInlineSection('support', 'navSupportLink', supportModalOverlayEl)) {
+      supportModalOverlayEl.style.display = 'flex';
+      supportModalOverlayEl.classList.add('active');
+    } else {
+      supportModalOverlayEl.style.display = 'block';
+      supportModalOverlayEl.classList.add('active');
+    }
     if (galaxyStarsCleanup) galaxyStarsCleanup();
     galaxyStarsCleanup = initStarfieldCanvas('galaxyStarsCanvas', 140);
     loadAndRenderStargazers();
@@ -1565,8 +1739,13 @@
 
   function showPromotersModal() {
     initPromotersModal();
-    promotersModalOverlayEl.style.display = 'flex';
-    promotersModalOverlayEl.classList.add('active');
+    if (!mountOrShowInlineSection('promoters', 'navPromotersLink', promotersModalOverlayEl)) {
+      promotersModalOverlayEl.style.display = 'flex';
+      promotersModalOverlayEl.classList.add('active');
+    } else {
+      promotersModalOverlayEl.style.display = 'block';
+      promotersModalOverlayEl.classList.add('active');
+    }
     if (promotersStarsCleanup) promotersStarsCleanup();
     promotersStarsCleanup = initStarfieldCanvas('promotersStarsCanvas', 100);
   }
@@ -1873,8 +2052,13 @@
   function showCampaignsModal() {
     initCampaignsModal();
     renderCampaignTableRows();
-    campaignsModalOverlayEl.style.display = 'flex';
-    campaignsModalOverlayEl.classList.add('active');
+    if (!mountOrShowInlineSection('campaigns', 'navCampaignsLink', campaignsModalOverlayEl)) {
+      campaignsModalOverlayEl.style.display = 'flex';
+      campaignsModalOverlayEl.classList.add('active');
+    } else {
+      campaignsModalOverlayEl.style.display = 'block';
+      campaignsModalOverlayEl.classList.add('active');
+    }
     if (campaignsStarsCleanup) campaignsStarsCleanup();
     campaignsStarsCleanup = initStarfieldCanvas('campaignsStarsCanvas', 100);
 

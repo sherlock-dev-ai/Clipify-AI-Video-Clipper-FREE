@@ -561,8 +561,23 @@
     renderGrid();
   }
 
-  // Open Modal
+  // Open Inline Section (fallback to modal on standalone pages)
   function openModal() {
+    const inlineSec = document.getElementById('models');
+    if (inlineSec) {
+      document.querySelectorAll('.page-section').forEach(s => {
+        s.classList.remove('visible');
+        s.style.display = 'none';
+      });
+      inlineSec.classList.add('visible');
+      inlineSec.style.display = 'block';
+      document.querySelectorAll('.sidebar nav a').forEach(a => a.classList.remove('active'));
+      const navLink = document.getElementById('navModelsLink');
+      if (navLink) navLink.classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      fetchInstalledModels();
+      return;
+    }
     if (modalOverlay) {
       modalOverlay.classList.add('active');
       modalOverlay.style.display = 'flex';
@@ -571,8 +586,22 @@
     }
   }
 
-  // Close Modal
+  // Close Section -> back to Create
   function closeModal() {
+    const inlineSec = document.getElementById('models');
+    if (inlineSec) {
+      inlineSec.classList.remove('visible');
+      inlineSec.style.display = 'none';
+      const createSec = document.getElementById('create');
+      if (createSec) {
+        createSec.classList.add('visible');
+        createSec.style.display = 'block';
+      }
+      document.querySelectorAll('.sidebar nav a').forEach(a => a.classList.remove('active'));
+      const createNav = document.querySelector('.sidebar nav a[data-nav="create"]');
+      if (createNav) createNav.classList.add('active');
+      return;
+    }
     if (modalOverlay) {
       modalOverlay.classList.remove('active');
       modalOverlay.style.display = 'none';

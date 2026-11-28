@@ -1216,3 +1216,41 @@
     padding: 10px 12px;
   }
 }
+
+/* Inline Black & White Sections for Support Us, Promoters, and Campaigns */
+.inline-bw-section {
+  width: 100%;
+  max-width: none;
+}
+.inline-bw-section .galaxy-overlay,
+.inline-bw-section .promoters-modal-overlay,
+.inline-bw-section .campaigns-modal-overlay {
+  position: relative !important;
+  inset: auto !important;
+  z-index: 1 !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  padding: 0 !important;
+  display: block !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+.inline-bw-section .galaxy-bw-card,
+.inline-bw-section .galaxy-modal-container,
+.inline-bw-section .promoters-bw-container,
+.inline-bw-section .campaigns-bw-container {
+  width: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  min-height: calc(100vh - 110px);
+  height: auto !important;
+  background: #060608 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+  transform: none !important;
+  margin: 0 !important;
+}
+.inline-bw-section .galaxy-modal-close {
+  display: none !important;
+}

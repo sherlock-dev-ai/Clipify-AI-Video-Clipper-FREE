@@ -1165,6 +1165,37 @@ def _is_youtube_url(value: str) -> bool:
     return _normalize_youtube_url(value) is not None
 
 
+def _normalize_import_url(value: str, platform: str = "") -> tuple[str, str] | None:
+    """Validate YouTube, Twitch, or Kick video/clip URLs and return (url, platform)."""
+    yt_url = _normalize_youtube_url(value)
+    if yt_url is not None:
+        return yt_url, "youtube"
+    if not isinstance(value, str):
+        return None
+    raw = value.strip()
+    if not raw:
+        return None
+    try:
+        parsed = urlsplit(raw)
+        host = (parsed.hostname or "").lower()
+        port = parsed.port
+    except ValueError:
+        return None
+
+    if (parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc
+            or parsed.username is not None or parsed.password is not None or port is not None):
+        return None
+
+    twitch_hosts = {"twitch.tv", "www.twitch.tv", "m.twitch.tv", "clips.twitch.tv"}
+    kick_hosts = {"kick.com", "www.kick.com"}
+    path_parts = [p for p in parsed.path.split("/") if p]
+    if host in twitch_hosts and path_parts:
+        return raw, "twitch"
+    if host in kick_hosts and path_parts:
+        return raw, "kick"
+    return None
+
+
 def _yt_dlp_command() -> list[str] | None:
     """Locate yt-dlp without tying the video pipeline to a global Python."""
     runtime = runtime_python()
@@ -2940,12 +2971,20 @@ def upload():
 def import_youtube():
     """Start a background yt-dlp download and expose real progress through /api/status."""
     data = request.get_json(silent=True) or {}
-    source_url = _normalize_youtube_url(data.get("url", ""))
-    if source_url is None:
-        return jsonify({"error": "Paste a valid YouTube or youtu.be video link."}), 400
+    req_platform = str(data.get("platform") or "").strip().lower()
+    normalized = _normalize_import_url(data.get("url", ""), req_platform)
+    if normalized is None:
+        return jsonify({"error": "Paste a valid YouTube, Twitch, or Kick video/clip link."}), 400
+    source_url, detected_platform = normalized
+    plat_label = {"youtube": "YouTube", "twitch": "Twitch", "kick": "Kick"}.get(detected_platform, "Video")
+    try:
+        max_height = int(data.get("quality") or 4320)
+    except (TypeError, ValueError):
+        max_height = 4320
+    max_height = max(360, min(4320, max_height))
     yt_dlp_cmd = _yt_dlp_command()
     if not yt_dlp_cmd:
-        return jsonify({"error": "YouTube import requires yt-dlp. Install the web requirements, then restart Clipify AI."}), 503
+        return jsonify({"error": "Video import requires yt-dlp. Install the web requirements, then restart Clipify AI."}), 503
 
     job_id = uuid.uuid4().hex[:12]
     job_dir = JOBS / job_id
@@ -2956,7 +2995,7 @@ def import_youtube():
     with jobs_lock:
         jobs[job_id] = {
             "id": job_id, "filename": "", "source_url": source_url,
-            "status": "downloading", "progress": 0, "stage": "Connecting to YouTube",
+            "status": "downloading", "progress": 0, "stage": f"Connecting to {plat_label}",
             "detail": "Starting yt-dlp…", "events": [], "outputs": [],
         }
 
@@ -2967,12 +3006,12 @@ def import_youtube():
             ffmpeg_path = _ffmpeg_path()
             output_template = str(input_dir / "youtube.%(ext)s")
             command = [*yt_dlp_cmd, "--no-playlist", "--no-warnings", "--newline", "--progress",
-                       "--format-sort", "res:1080,fps,vbr",
+                       "--format-sort", f"res:{min(max_height, 2160)},fps,vbr",
                        "--progress-template", "download:[clip-prog] %(progress._percent_str)s|%(progress.downloaded_bytes)s|%(progress.total_bytes|progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s",
                        "--restrict-filenames", "--merge-output-format", "mp4", "--max-filesize", "8G",
                        "--socket-timeout", "30", "--retries", "5", "--fragment-retries", "5",
                        "--concurrent-fragments", "4",
-                       "-f", "bestvideo[height<=1080]+bestaudio/bestvideo+bestaudio/best",
+                       "-f", f"bestvideo[height<={max_height}]+bestaudio/bestvideo[height<={max_height}]/best[height<={max_height}]/best",
                        "--ffmpeg-location", str(Path(ffmpeg_path).parent)]
             cookie_candidates = [
                 ROOT / "cookies.txt",
@@ -3092,6 +3131,7 @@ def import_youtube():
                     job["events"].append({"kind": "log", "message": line})
             return_code = proc.wait()
             videos = []
+            video_only_candidates = []
             ffprobe = Path(ffmpeg_path).with_name("ffprobe.exe")
             for candidate in input_dir.iterdir():
                 if not candidate.is_file() or not is_allowed(candidate.name):
@@ -3102,8 +3142,45 @@ def import_youtube():
                     capture_output=True, text=True, encoding="utf-8", errors="replace",
                     timeout=30, check=False,
                 )
-                if probe.returncode == 0 and "video" in probe.stdout.lower() and "audio" in probe.stdout.lower():
+                streams_out = (probe.stdout or "").lower()
+                if probe.returncode == 0 and "video" in streams_out and "audio" in streams_out:
                     videos.append(candidate)
+                elif probe.returncode == 0 and "video" in streams_out:
+                    video_only_candidates.append(candidate)
+
+            # If high-quality video was downloaded without an audio track, download audio separately & mux
+            if not videos and video_only_candidates:
+                v_only = max(video_only_candidates, key=lambda p: p.stat().st_mtime)
+                with jobs_lock:
+                    if job_id in jobs:
+                        jobs[job_id].update(progress=88, stage="Downloading separate audio", detail="High-quality video had no audio; fetching audio track separately…")
+                aud_tpl = str(input_dir / "audio_sep.%(ext)s")
+                aud_cmd = [*yt_dlp_cmd, "--no-playlist", "--no-warnings",
+                           "-f", "bestaudio[ext=m4a]/bestaudio",
+                           "--ffmpeg-location", str(Path(ffmpeg_path).parent),
+                           "-o", aud_tpl, source_url]
+                if cookie_file:
+                    aud_cmd.extend(["--cookies", cookie_file])
+                if node_binary:
+                    aud_cmd.extend(["--js-runtimes", f"node:{node_binary}", "--remote-components", "ejs:github"])
+                _run_hidden(aud_cmd, capture_output=True, text=True, timeout=300, check=False)
+                aud_file = next((p for p in input_dir.iterdir() if p.is_file() and p.name.startswith("audio_sep.") and p.stat().st_size > 1024), None)
+                if aud_file is not None:
+                    mux_out = input_dir / f"{v_only.stem}_muxed.mp4"
+                    with jobs_lock:
+                        if job_id in jobs:
+                            jobs[job_id].update(progress=95, stage="Muxing audio + video", detail="Combining high-quality video & audio…")
+                    _run_hidden(
+                        [ffmpeg_path, "-y", "-i", str(v_only), "-i", str(aud_file),
+                         "-c:v", "copy", "-c:a", "aac", "-shortest", str(mux_out)],
+                        capture_output=True, text=True, timeout=300, check=False,
+                    )
+                    if mux_out.is_file() and mux_out.stat().st_size > 1024:
+                        videos.append(mux_out)
+                        try:
+                            aud_file.unlink()
+                        except OSError:
+                            pass
             last_error = ""
             if return_code != 0 or not videos:
                 with jobs_lock:

@@ -6190,7 +6190,8 @@ def _compose_dual_person_split(source_path: str, output_path: str,
     # per-frame tracking. That difference is what makes the top look locked.
     top_kf = _locked_follow_series(top_info.get("keyframes", []),
                                    sample_fps=5.0, window_s=2.0, hold_px=8.0)
-    bottom_kf = bottom_info.get("keyframes", [])
+    bottom_kf = _locked_follow_series(bottom_info.get("keyframes", []),
+                                      sample_fps=5.0, window_s=2.0, hold_px=12.0)
 
     max_x = max(0.0, scaled_w - target_w)
     max_y = max(0.0, scaled_h - panel_h)
@@ -6249,7 +6250,9 @@ def _compose_solo_split_layout(source_path: str, output_path: str,
         points, info = _detect_person_trajectory(source_path, target_w, panel_h, zoom=1.6)
         scaled_w = int(round(info.get("scaled_w") or target_w))
         scaled_h = int(round(info.get("scaled_h") or panel_h))
-        keyframes = info.get("keyframes", [])
+        keyframes = _locked_follow_series(
+            info.get("keyframes", []), sample_fps=4.0, window_s=2.5, hold_px=16.0
+        )
         if not keyframes:
             top_x = "(in_w-out_w)/2"
             top_y = "(in_h-out_h)/3"
@@ -6349,12 +6352,22 @@ def _compose_gaming_split_layout(source_path: str, output_path: str,
                 cam_x = "(in_w-out_w)/2"
                 cam_y = "(in_h-out_h)/3"
             else:
-                raw_cx = _camera_expression(keyframes, "x", max_kf=30)
-                raw_cy = _camera_expression(keyframes, "y", max_kf=30)
-                cam_x = f"min(max(0\\,{raw_cx})\\,in_w-out_w)"
-                cam_y = f"min(max(0\\,{raw_cy})\\,in_h-out_h)"
+                xs = sorted(float(k["x"]) for k in keyframes)
+                ys = sorted(float(k["y"]) for k in keyframes)
+                if xs[-1] - xs[0] <= max(80.0, scaled_w * 0.25) and ys[-1] - ys[0] <= max(80.0, scaled_h * 0.25):
+                    # Stationary streamer webcam: lock to median position so cam never shakes
+                    med_x = max(0.0, min(float(max(0, scaled_w - target_w)), xs[len(xs) // 2]))
+                    med_y = max(0.0, min(float(max(0, scaled_h - cam_h)), ys[len(ys) // 2]))
+                    cam_x = f"{med_x:.1f}"
+                    cam_y = f"{med_y:.1f}"
+                else:
+                    locked_kf = _locked_follow_series(keyframes, sample_fps=3.0, window_s=3.0, hold_px=24.0)
+                    raw_cx = _camera_expression(locked_kf, "x", max_kf=30)
+                    raw_cy = _camera_expression(locked_kf, "y", max_kf=30)
+                    cam_x = f"min(max(0\\,{raw_cx})\\,in_w-out_w)"
+                    cam_y = f"min(max(0\\,{raw_cy})\\,in_h-out_h)"
             prof = get_upscale_profile()
-            flags = prof["flags"]
+            flags = prof.get("scale_flags", "lanczos")
             unsharp_str = f",{prof['unsharp']}" if prof.get("unsharp") else ""
             cam_crop = (
                 f"scale={scaled_w}:{scaled_h}:force_original_aspect_ratio=increase:flags={flags}{unsharp_str},setsar=1,"

@@ -223,6 +223,7 @@ async function importYouTube() {
   const bar = $('#youtubeProgressBar');
 
   if (track) track.hidden = false;
+  if (track) track.querySelector('.youtube-progress-track')?.classList.remove('indeterminate');
   if (bar) bar.style.width = '0%';
 
   try {
@@ -264,13 +265,31 @@ async function waitForYouTubeDownload(jobId) {
   const bar = $('#youtubeProgressBar');
 
   let finished = false;
+  let pollInFlight = false;
+  let statusFetchFailedAt = 0;
+  const progressTrack = track?.querySelector('.youtube-progress-track');
 
   const tick = async () => {
+    if (finished || pollInFlight) return;
+    pollInFlight = true;
 
     try {
 
-      const r = await fetch(`/api/status/${jobId}`, { cache: 'no-store' });
-      const d = await safeJson(r, 'Could not read YouTube download status.');
+      let r;
+      let d;
+      try {
+        r = await fetch(`/api/status/${jobId}`, { cache: 'no-store' });
+        d = await safeJson(r, 'Could not read YouTube download status.');
+      } catch (error) {
+        if (!(error instanceof TypeError)) throw error;
+        if (!statusFetchFailedAt) statusFetchFailedAt = Date.now();
+        if (Date.now() - statusFetchFailedAt < 60_000) {
+          youtubeStatus.textContent = 'Connection interrupted; reconnecting to download status…';
+          return;
+        }
+        throw new Error('Could not reconnect to Clipify after 60 seconds. The download may still be running; check the job before retrying.');
+      }
+      statusFetchFailedAt = 0;
 
       if (!r.ok) throw Error(d.error || 'Could not read YouTube download status.');
 
@@ -279,10 +298,11 @@ async function waitForYouTubeDownload(jobId) {
         Math.min(100, Number(d.progress) || 0)
       );
 
-      if (bar) bar.style.width = pct + '%';
+      if (progressTrack) progressTrack.classList.toggle('indeterminate', Boolean(d.progress_indeterminate));
+      if (bar) bar.style.width = d.progress_indeterminate ? '' : pct + '%';
 
       youtubeStatus.textContent =
-        `${pct}% · ${d.detail || d.stage || 'Downloading video…'}`;
+        `${d.progress_indeterminate ? '…' : `${pct}%`} · ${d.detail || d.stage || 'Downloading video…'}`;
 
       if (d.status === 'uploaded') {
 
@@ -386,10 +406,13 @@ async function waitForYouTubeDownload(jobId) {
       youtubeStatus.textContent = error.message;
 
       if (track) track.hidden = true;
+      if (progressTrack) progressTrack.classList.remove('indeterminate');
 
       state.jobId = null;
       state.source = null;
       create.disabled = true;
+    } finally {
+      pollInFlight = false;
     }
 
     if (finished) return;
@@ -399,7 +422,7 @@ async function waitForYouTubeDownload(jobId) {
 
   if (finished) return;
 
-  state.youtubePoll = setInterval(tick, 500);
+  state.youtubePoll = setInterval(tick, 1000);
 }
 
 youtubeImport?.addEventListener(
@@ -4178,7 +4201,7 @@ function initBetaTestingSection() {
                 reject(new Error(sd.detail || sd.error || 'YouTube download failed'));
               } else {
                 sourceName.textContent = sd.stage || 'Downloading YouTube video...';
-                sourceMeta.textContent = `${sd.progress || 0}% · ${sd.detail || 'Connecting...'}`;
+                sourceMeta.textContent = `${sd.progress_indeterminate ? '…' : `${sd.progress || 0}%`} · ${sd.detail || 'Connecting...'}`;
               }
             } catch (err) {
               if (pollCount > 180) {

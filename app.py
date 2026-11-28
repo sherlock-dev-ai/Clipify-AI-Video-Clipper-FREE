@@ -2996,7 +2996,8 @@ def import_youtube():
         jobs[job_id] = {
             "id": job_id, "filename": "", "source_url": source_url,
             "status": "downloading", "progress": 0, "stage": f"Connecting to {plat_label}",
-            "detail": "Starting yt-dlp…", "events": [], "outputs": [],
+            "detail": "Starting yt-dlp…", "progress_indeterminate": False,
+            "events": [], "outputs": [],
         }
 
     def worker() -> None:
@@ -3006,7 +3007,7 @@ def import_youtube():
             ffmpeg_path = _ffmpeg_path()
             output_template = str(input_dir / "youtube.%(ext)s")
             command = [*yt_dlp_cmd, "--no-playlist", "--no-warnings", "--no-simulate", "--newline", "--progress",
-                       "--print", "before_dl:[clip-meta] %(filesize,filesize_approx)s",
+                       "--print", "before_dl:[clip-meta] %(requested_formats.0.filesize,requested_formats.0.filesize_approx)s|%(requested_formats.1.filesize,requested_formats.1.filesize_approx)s",
                        "--format-sort", f"res:{min(max_height, 2160)},fps,vbr",
                        "--progress-template", "download:[clip-prog] %(progress._percent_str)s|%(progress.downloaded_bytes)s|%(progress.total_bytes|progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s",
                        "--restrict-filenames", "--merge-output-format", "mp4/mkv", "--max-filesize", "8G",
@@ -3056,17 +3057,19 @@ def import_youtube():
                         return
                     lower = line.lower()
                     if "[clip-meta]" in line:
-                        meta_raw = line.split("[clip-meta]", 1)[1].strip().lstrip("~").strip()
-                        try:
-                            meta_val = float(meta_raw)
-                            if meta_val > 0:
-                                meta_total_by_stream[max(1, stream_count)] = meta_val
-                        except (TypeError, ValueError):
-                            pass
+                        meta_parts = [p.strip().lstrip("~").strip() for p in line.split("[clip-meta]", 1)[1].split("|")]
+                        for idx, mp in enumerate(meta_parts, start=1):
+                            try:
+                                mv = float(mp)
+                                if mv > 0:
+                                    meta_total_by_stream[idx] = mv
+                            except (TypeError, ValueError):
+                                pass
                     elif "[clip-prog]" in line:
                         payload = line.split("[clip-prog]", 1)[1].strip()
                         parts = [p.strip() for p in payload.split("|")]
                         pct = 0.0
+                        progress_indeterminate = False
                         pct_m = re.search(r"(\d+(?:\.\d+)?)%", parts[0]) if parts else None
                         if pct_m:
                             pct = float(pct_m.group(1))
@@ -3091,17 +3094,24 @@ def import_youtube():
                             tot_bytes = meta_total_by_stream[max(1, stream_count)]
                         if tot_bytes is not None and dl_bytes is not None and dl_bytes > tot_bytes * 1.05:
                             tot_bytes = None
+                            meta_total_by_stream.pop(max(1, stream_count), None)
+                            if stream_count <= 1 and job["progress"] >= 80:
+                                job["progress"] = 1
+                        if tot_bytes is not None and dl_bytes is not None and tot_bytes > 0:
+                            pct = min(99.5, (dl_bytes * 100.0) / tot_bytes)
                         spd = _parse_num(parts[3]) if len(parts) >= 4 else None
                         eta_raw = _parse_num(parts[4]) if len(parts) >= 5 else None
 
                         if dl_bytes is not None and dl_bytes > 0 and tot_bytes is not None and tot_bytes > 0:
-                            pct = min(99.5, (dl_bytes * 100.0) / tot_bytes)
                             info_items.append(f"{_fmt_size(dl_bytes)} / {_fmt_size(tot_bytes)}")
                         elif dl_bytes is not None and dl_bytes > 0:
                             info_items.append(_fmt_size(dl_bytes))
-                            # Fragmented HLS streams often report 100% per fragment when total size is unknown
-                            if pct >= 99.0:
-                                pct = min(84.0, max(2.0, (dl_bytes / (1024 * 1024)) * 0.5))
+                            if spd is not None and spd > 0 and eta_raw is not None and eta_raw > 0:
+                                pct = min(98.0, max(1.0, (dl_bytes * 100.0) / max(dl_bytes * 1.02, dl_bytes + spd * eta_raw)))
+                                progress_indeterminate = False
+                            elif pct >= 99.0:
+                                pct = 0.0
+                                progress_indeterminate = True
                             elif eta_raw is not None and eta_raw > 2:
                                 pct = min(pct, 95.0)
 
@@ -3123,6 +3133,7 @@ def import_youtube():
                             stage_lbl = "Downloading audio"
                             job["progress"] = max(job["progress"], scaled)
 
+                        job["progress_indeterminate"] = progress_indeterminate
                         job["stage"] = stage_lbl
                         summary_info = " · ".join(info_items)
                         extra = f" ({summary_info})" if info_items else f" ({pct:.1f}%)"
@@ -3143,6 +3154,7 @@ def import_youtube():
 
                     elif "[merger]" in lower or "merging" in lower:
                         job["progress"] = max(job["progress"], 97)
+                        job["progress_indeterminate"] = False
                         job["stage"] = "Finalizing download"
                         job["detail"] = "Merging video and audio streams…"
 
@@ -3159,6 +3171,31 @@ def import_youtube():
 
                     job["events"].append({"kind": "log", "message": line})
             return_code = proc.wait()
+
+            # If YouTube triggered bot verification and no cookies.txt was provided, retry with browser cookies / android_vr client
+            bot_hit = False
+            with jobs_lock:
+                for ev in reversed(jobs.get(job_id, {}).get("events", [])[-25:]):
+                    msg_low = str(ev.get("message", "")).lower()
+                    if "not a bot" in msg_low or "sign in to confirm" in msg_low:
+                        bot_hit = True
+                        break
+            if return_code != 0 and bot_hit and not cookie_file:
+                retry_profiles = [
+                    (["--cookies-from-browser", "edge"], "Retrying with Edge session…"),
+                    (["--cookies-from-browser", "chrome"], "Retrying with Chrome session…"),
+                    (["--extractor-args", "youtube:player_client=android_vr,tv_embedded"], "Retrying with alternate YouTube client…"),
+                ]
+                for extra_flags, status_msg in retry_profiles:
+                    with jobs_lock:
+                        if job_id in jobs:
+                            jobs[job_id].update(stage="Bypassing bot check", detail=status_msg)
+                    retry_cmd = [*command[:-1], *extra_flags, source_url]
+                    r_proc = _run_hidden(retry_cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900, check=False)
+                    if r_proc.returncode == 0:
+                        return_code = 0
+                        break
+
             videos = []
             video_only_candidates = []
             audio_only_candidates = []
@@ -3258,6 +3295,7 @@ def import_youtube():
             safe_name = secure_filename(target.name) or f"youtube_{job_id}.mp4"
             with jobs_lock:
                 jobs[job_id].update(filename=safe_name, status="uploaded", progress=100,
+                                    progress_indeterminate=False,
                                     stage="Video ready", detail="YouTube download complete.")
                 jobs[job_id]["events"].append({"kind":"download_complete","message":"YouTube download complete.","progress":100})
         except Exception as exc:
@@ -4707,6 +4745,7 @@ def status(job_id: str):
                 "filename": job["filename"],
                 "status": job["status"],
                 "progress": job["progress"],
+                "progress_indeterminate": bool(job.get("progress_indeterminate", False)),
                 "stage": job["stage"],
                 "outputs": outputs,
                 "min_duration": job.get("min_duration", 25),

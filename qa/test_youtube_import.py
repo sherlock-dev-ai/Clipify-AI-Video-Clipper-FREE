@@ -144,6 +144,36 @@ class YouTubeImportRouteTests(unittest.TestCase):
         self.assertEqual(status["status"], "error")
         self.assertIn("FFmpeg was not found", status["detail"])
 
+    def test_unknown_stream_size_uses_indeterminate_progress_instead_of_stalling_at_84_percent(self):
+        observed = {}
+        progress_line = "[clip-prog] 100.0%|1073741824|NA|3460300|579\n"
+
+        class CapturingDownloader(FakeDownloader):
+            def wait(self, timeout=None):
+                observed["during_download"] = next(iter(app.jobs.values())).copy()
+                return super().wait(timeout)
+
+        def popen(command, **kwargs):
+            downloader = CapturingDownloader(command, output=False, line_output=progress_line, **kwargs)
+            output_template = command[command.index("-o") + 1]
+            Path(output_template.replace("%(ext)s", "mp4")).write_bytes(b"x" * 2048)
+            return downloader
+
+        with patch.object(app.subprocess, "Popen", side_effect=popen), patch.object(
+            app.subprocess, "run", return_value=SimpleNamespace(stdout="video\naudio\n", returncode=0)
+        ):
+            response = self.open_local("/api/import-youtube", method="POST", json={"url": CANONICAL})
+
+        self.assertEqual(response.status_code, 202)
+        during_download = observed["during_download"]
+        self.assertTrue(during_download["progress_indeterminate"])
+        self.assertLess(during_download["progress"], 84)
+        self.assertIn("1.0 GB", during_download["detail"])
+
+        status = self.open_local(f"/api/status/{response.get_json()['job_id']}").get_json()
+        self.assertEqual(status["status"], "uploaded")
+        self.assertFalse(status["progress_indeterminate"])
+
     def test_failed_download_can_be_retried_as_a_new_job(self):
         calls = 0
 

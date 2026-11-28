@@ -3005,7 +3005,8 @@ def import_youtube():
         try:
             ffmpeg_path = _ffmpeg_path()
             output_template = str(input_dir / "youtube.%(ext)s")
-            command = [*yt_dlp_cmd, "--no-playlist", "--no-warnings", "--newline", "--progress",
+            command = [*yt_dlp_cmd, "--no-playlist", "--no-warnings", "--no-simulate", "--newline", "--progress",
+                       "--print", "before_dl:[clip-meta] %(filesize,filesize_approx)s",
                        "--format-sort", f"res:{min(max_height, 2160)},fps,vbr",
                        "--progress-template", "download:[clip-prog] %(progress._percent_str)s|%(progress.downloaded_bytes)s|%(progress.total_bytes|progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s",
                        "--restrict-filenames", "--merge-output-format", "mp4/mkv", "--max-filesize", "8G",
@@ -3043,7 +3044,8 @@ def import_youtube():
                     return ""
 
             stream_count = 0
-            est_total_by_stream: dict[int, float] = {}
+            last_dl_bytes = 0.0
+            meta_total_by_stream: dict[int, float] = {}
             for raw in proc.stdout:
                 line = raw.strip()
                 if not line:
@@ -3053,7 +3055,15 @@ def import_youtube():
                     if not job:
                         return
                     lower = line.lower()
-                    if "[clip-prog]" in line:
+                    if "[clip-meta]" in line:
+                        meta_raw = line.split("[clip-meta]", 1)[1].strip().lstrip("~").strip()
+                        try:
+                            meta_val = float(meta_raw)
+                            if meta_val > 0:
+                                meta_total_by_stream[max(1, stream_count)] = meta_val
+                        except (TypeError, ValueError):
+                            pass
+                    elif "[clip-prog]" in line:
                         payload = line.split("[clip-prog]", 1)[1].strip()
                         parts = [p.strip() for p in payload.split("|")]
                         pct = 0.0
@@ -3072,17 +3082,17 @@ def import_youtube():
 
                         info_items: list[str] = []
                         dl_bytes = _parse_num(parts[1]) if len(parts) >= 2 else None
+                        if dl_bytes is not None and last_dl_bytes > 1024 * 1024 and dl_bytes < last_dl_bytes * 0.4:
+                            stream_count = max(stream_count + 1, 2)
+                        if dl_bytes is not None:
+                            last_dl_bytes = dl_bytes
                         tot_bytes = _parse_num(parts[2]) if len(parts) >= 3 else None
+                        if (tot_bytes is None or tot_bytes <= 0) and meta_total_by_stream.get(max(1, stream_count)):
+                            tot_bytes = meta_total_by_stream[max(1, stream_count)]
+                        if tot_bytes is not None and dl_bytes is not None and dl_bytes > tot_bytes * 1.05:
+                            tot_bytes = None
                         spd = _parse_num(parts[3]) if len(parts) >= 4 else None
                         eta_raw = _parse_num(parts[4]) if len(parts) >= 5 else None
-
-                        if (tot_bytes is None or tot_bytes <= 0) and dl_bytes is not None and dl_bytes > 0 and spd is not None and spd > 0 and eta_raw is not None and eta_raw > 0:
-                            calc_tot = dl_bytes + spd * eta_raw
-                            prev_est = est_total_by_stream.get(stream_count)
-                            est_total = (prev_est * 0.7 + calc_tot * 0.3) if prev_est else calc_tot
-                            est_total = max(est_total, dl_bytes * 1.02)
-                            est_total_by_stream[stream_count] = est_total
-                            tot_bytes = est_total
 
                         if dl_bytes is not None and dl_bytes > 0 and tot_bytes is not None and tot_bytes > 0:
                             pct = min(99.5, (dl_bytes * 100.0) / tot_bytes)
@@ -3107,7 +3117,7 @@ def import_youtube():
                         if stream_count <= 1:
                             scaled = int(min(85, max(1, pct * 0.85)))
                             stage_lbl = "Downloading video"
-                            job["progress"] = scaled if tot_bytes else max(job["progress"], scaled)
+                            job["progress"] = max(job["progress"], scaled)
                         else:
                             scaled = int(min(96, max(86, 85 + pct * 0.11)))
                             stage_lbl = "Downloading audio"

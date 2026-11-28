@@ -8,7 +8,7 @@
 **100% Free · 100% Private & Local · Zero Subscriptions · Zero Watermarks · Unlimited Video Length**
 
 <p align="center">
-  <a href="https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/tag/v6.0.12"><strong>🚀 Download v6.0.12 Unified Release (Windows x64 &amp; Android APK) »</strong></a>
+  <a href="https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/tag/v6.0.13"><strong>🚀 Download v6.0.13 Unified Release (Windows x64 &amp; Android APK) »</strong></a>
   <br><br>
   <a href="https://discord.gg/5ZBsasgryX"><strong>💬 Join Official Discord Server</strong></a> ·
   <a href="#-whys-clipify-the-best">🏆 Why's Clipify the Best?</a> ·
@@ -19,9 +19,9 @@
   <a href="#-quick-start">⚡ Quick Start</a>
 </p>
 
-[![Release](https://img.shields.io/badge/Release-v6.0.12-10b981?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/tag/v6.0.12)
+[![Release](https://img.shields.io/badge/Release-v6.0.13-10b981?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/tag/v6.0.13)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5ZBsasgryX)
-[![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%20%2B%20Android-0078d4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/tag/v6.0.12)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%20%2B%20Android-0078d4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/tag/v6.0.13)
 [![License](https://img.shields.io/badge/License-CC%20BY--NC%204.0-6366f1?style=for-the-badge)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776ab?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Local AI](https://img.shields.io/badge/AI%20Engine-Ollama%20%2F%20Qwen-000000?style=for-the-badge&logo=ollama&logoColor=white)](https://ollama.ai)
@@ -30,11 +30,11 @@
 </div>
 
 <p align="center">
-  <img src="docs/screenshots/dashboard.png" alt="Clipify AI v6.0.12 Create Studio Dashboard" width="100%">
+  <img src="docs/screenshots/dashboard.png" alt="Clipify AI v6.0.13 Create Studio Dashboard" width="100%">
 </p>
 
 <details>
-<summary><b>📸 View v6.0.12 Desktop &amp; Mobile Screenshots (Click to Expand)</b></summary>
+<summary><b>📸 View v6.0.13 Desktop &amp; Mobile Screenshots (Click to Expand)</b></summary>
 <br>
 <table>
   <tr>
@@ -55,9 +55,9 @@
 
 ---
 
-## 📥 Download Clipify AI (v6.0.12 Unified Release)
+## 📥 Download Clipify AI (v6.0.13 Unified Release)
 
-### ✨ What's New in v6.0.12 (and v5.0.4 → v6.0.12)
+### ✨ What's New in v6.0.13 (and v5.0.4 → v6.0.13)
 - **📦 Unlimited Chunked Video Uploads (18.8 GB+ Fixed)**: Replaced single-request upload limits with resilient 8 MB `arrayBuffer()` chunked streaming (`/api/upload-chunk`) with 10 automatic retries and zero `%TEMP%` spooling, fixing `Failed to fetch` / `Network error uploading video` at 25% on huge multi-hour recordings.
 - **📱 Mobile HD Quality, Split-Screen & Live Clips Overhaul**:
   - **1080p+ Adaptive YouTube Downloads + Chunked Retries**: H.264 `avc1` adaptive download with 4-attempt Range retry and video-only mux fallback — no more 360p fallback or `"Downloaded file was empty or interrupted"`.
@@ -87,13 +87,13 @@
 
 | Package | Platform | Version | Download Link | Notes |
 | :--- | :---: | :---: | :--- | :--- |
-| **`Clipify.AI.Setup.6.0.12.exe`** | Windows 10/11 (64-bit) | `v6.0.12` | [**📥 Download Windows Installer (v6.0.12)**](https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/download/v6.0.12/Clipify.AI.Setup.6.0.12.exe) | Full offline desktop installer |
-| **`update-v6.0.12.zip`** | In-Place Hot Patch | `v6.0.12` | [**⚡ Download Fast Update ZIP (v6.0.12)**](https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/download/v6.0.12/update-v6.0.12.zip) | 1-click in-app updater package |
-| **`Clipify.AI.v6.0.12.apk`** | Android 8.0+ | `v6.0.12` | [**📱 Download Android APK (v6.0.12)**](https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/download/v6.0.12/Clipify.AI.v6.0.12.apk) | Standalone mobile studio |
+| **`Clipify.AI.Setup.6.0.13.exe`** | Windows 10/11 (64-bit) | `v6.0.13` | [**📥 Download Windows Installer (v6.0.13)**](https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/download/v6.0.13/Clipify.AI.Setup.6.0.13.exe) | Full offline desktop installer |
+| **`update-v6.0.13.zip`** | In-Place Hot Patch | `v6.0.13` | [**⚡ Download Fast Update ZIP (v6.0.13)**](https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/download/v6.0.13/update-v6.0.13.zip) | 1-click in-app updater package |
+| **`Clipify.AI.v6.0.13.apk`** | Android 8.0+ | `v6.0.13` | [**📱 Download Android APK (v6.0.13)**](https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases/download/v6.0.13/Clipify.AI.v6.0.13.apk) | Standalone mobile studio |
 
 #### Verify Installer SHA-256 Integrity:
 ```powershell
-Get-FileHash ".\Clipify.AI.Setup.6.0.12.exe" -Algorithm SHA256
+Get-FileHash ".\Clipify.AI.Setup.6.0.13.exe" -Algorithm SHA256
 ```
 
 ---

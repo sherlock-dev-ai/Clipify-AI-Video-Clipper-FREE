@@ -22,8 +22,8 @@
     let updateState = {
       checked: false,
       updateAvailable: false,
-      latestVersion: 'v6.0.12',
-      currentVersion: 'v6.0.12',
+      latestVersion: 'v6.0.13',
+      currentVersion: 'v6.0.13',
       releaseUrl: 'https://github.com/sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE/releases',
       releaseName: '',
       notes: '',
@@ -51,8 +51,8 @@
         updateState = {
           checked: true,
           updateAvailable: !!data.update_available,
-          latestVersion: data.latest_version || 'v6.0.12',
-          currentVersion: data.current_version || 'v6.0.12',
+          latestVersion: data.latest_version || 'v6.0.13',
+          currentVersion: data.current_version || 'v6.0.13',
           releaseUrl: data.release_url || updateState.releaseUrl,
           releaseName: data.release_name || '',
           notes: data.body || '',
@@ -60,7 +60,7 @@
           gitBehind: !!data.git_behind
         };
 
-        const currVerLabel = data.current_version || 'v6.0.12';
+        const currVerLabel = data.current_version || 'v6.0.13';
         if (badge) badge.textContent = currVerLabel;
         if (navVersionTag) navVersionTag.textContent = currVerLabel;
         const topBadgeEl = document.getElementById('topBrandVersionBadge');

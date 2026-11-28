@@ -568,6 +568,96 @@ object YouTubeStreamDownloader {
         }
     }
 
+    private fun stripLeadingId3(data: ByteArray): ByteArray {
+        if (data.size >= 10 && data[0] == 0x49.toByte() && data[1] == 0x44.toByte() && data[2] == 0x33.toByte()) {
+            val sz = ((data[6].toInt() and 0x7F) shl 21) or
+                ((data[7].toInt() and 0x7F) shl 14) or
+                ((data[8].toInt() and 0x7F) shl 7) or
+                (data[9].toInt() and 0x7F)
+            val start = 10 + sz
+            if (start in 10 until data.size) {
+                return data.copyOfRange(start, data.size)
+            }
+        }
+        return data
+    }
+
+    private fun downloadHlsSegments(
+        playlistUrl: String,
+        ua: String,
+        destTsFile: File,
+        maxSegments: Int,
+        pctStart: Int,
+        pctSpan: Int,
+        label: String,
+        onProgress: (Int, String) -> Unit,
+        stripId3: Boolean = false
+    ): Int {
+        val variantM3u8 = client.newCall(Request.Builder().url(playlistUrl).header("User-Agent", ua).get().build()).execute().use { resp ->
+            if (resp.isSuccessful) (resp.body?.string() ?: "") else ""
+        }
+        val segments = variantM3u8.lines().map { it.trim() }.filter { it.startsWith("http") }
+        if (segments.isEmpty()) return 0
+
+        val takeCount = segments.size.coerceAtMost(maxSegments)
+        Log.i(TAG, "$label: downloading $takeCount/${segments.size} segments")
+        destTsFile.parentFile?.mkdirs()
+        if (destTsFile.exists()) destTsFile.delete()
+
+        var totalBytes = 0L
+        var lastEmit = 0L
+        var consecutiveFails = 0
+        FileOutputStream(destTsFile).use { out ->
+            val buf = ByteArray(64 * 1024)
+            for (idx in 0 until takeCount) {
+                val segUrl = segments[idx]
+                var segOk = false
+                for (attempt in 0 until 3) {
+                    try {
+                        val sReq = Request.Builder().url(segUrl).header("User-Agent", ua).get().build()
+                        client.newCall(sReq).execute().use { resp ->
+                            if (resp.isSuccessful && resp.body != null) {
+                                if (stripId3) {
+                                    val rawBytes = resp.body!!.bytes()
+                                    val clean = stripLeadingId3(rawBytes)
+                                    out.write(clean)
+                                    totalBytes += clean.size
+                                } else {
+                                    resp.body!!.byteStream().use { inp ->
+                                        while (true) {
+                                            val r = inp.read(buf)
+                                            if (r == -1) break
+                                            out.write(buf, 0, r)
+                                            totalBytes += r
+                                        }
+                                    }
+                                }
+                                segOk = true
+                            }
+                        }
+                    } catch (_: Exception) {}
+                    if (segOk) break
+                    Thread.sleep(300L * (attempt + 1))
+                }
+                if (!segOk) {
+                    consecutiveFails++
+                    Log.w(TAG, "$label segment $idx failed after 3 retries (consecutive=$consecutiveFails)")
+                    if (consecutiveFails >= 5) break
+                    continue
+                }
+                consecutiveFails = 0
+                val now = System.currentTimeMillis()
+                if (now - lastEmit >= 450L || idx == takeCount - 1) {
+                    lastEmit = now
+                    val pct = pctStart + (((idx + 1) * pctSpan) / takeCount)
+                    val mb = String.format("%.1f", totalBytes / (1024.0 * 1024.0))
+                    onProgress(pct.coerceAtMost(pctStart + pctSpan), "$label ${idx + 1}/$takeCount ($mb MB)")
+                }
+            }
+        }
+        return if (destTsFile.exists() && destTsFile.length() > 1024) takeCount else 0
+    }
+
     private fun downloadViaVisionOsHls(
         videoId: String,
         destFile: File,
@@ -575,6 +665,8 @@ object YouTubeStreamDownloader {
         maxSegments: Int,
         onProgress: (Int, String) -> Unit
     ): Triple<Boolean, Int, Int> {
+        val tmpTs = File(destFile.parentFile, "${destFile.nameWithoutExtension}_hls_v.ts")
+        val tmpAudTs = File(destFile.parentFile, "${destFile.nameWithoutExtension}_hls_a.ts")
         return try {
             val watchReq = Request.Builder()
                 .url("https://www.youtube.com/watch?v=$videoId")
@@ -640,23 +732,26 @@ object YouTubeStreamDownloader {
             var bestAvcUrl = ""
             var bestAvcH = 0
             var bestAvcW = 0
+            var bestAvcAudioGroup = ""
             var bestAnyUrl = ""
             var bestAnyH = 0
             var bestAnyW = 0
+            var bestAnyAudioGroup = ""
             for (i in lines.indices) {
                 val line = lines[i].trim()
                 if (line.startsWith("#EXT-X-STREAM-INF:")) {
                     val resMatch = Regex("RESOLUTION=(\\d+)x(\\d+)").find(line)
                     val w = resMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
                     val h = resMatch?.groupValues?.get(2)?.toIntOrNull() ?: 0
+                    val audGrp = Regex("AUDIO=\"([^\"]+)\"").find(line)?.groupValues?.get(1) ?: ""
                     val nextUrl = lines.drop(i + 1).firstOrNull { it.trim().isNotEmpty() && !it.trim().startsWith("#") }?.trim() ?: ""
                     if (nextUrl.isNotEmpty() && h in 1..maxHeight) {
                         val isAvc = line.contains("avc1", ignoreCase = true)
                         if (isAvc && h >= bestAvcH) {
-                            bestAvcH = h; bestAvcW = w; bestAvcUrl = nextUrl
+                            bestAvcH = h; bestAvcW = w; bestAvcUrl = nextUrl; bestAvcAudioGroup = audGrp
                         }
                         if (h >= bestAnyH) {
-                            bestAnyH = h; bestAnyW = w; bestAnyUrl = nextUrl
+                            bestAnyH = h; bestAnyW = w; bestAnyUrl = nextUrl; bestAnyAudioGroup = audGrp
                         }
                     }
                 }
@@ -665,85 +760,47 @@ object YouTubeStreamDownloader {
             val chosenPlaylist = if (bestAvcUrl.isNotEmpty()) bestAvcUrl else bestAnyUrl
             val chosenW = if (bestAvcUrl.isNotEmpty()) bestAvcW else bestAnyW
             val chosenH = if (bestAvcUrl.isNotEmpty()) bestAvcH else bestAnyH
+            val audioGroup = if (bestAvcUrl.isNotEmpty()) bestAvcAudioGroup else bestAnyAudioGroup
             if (chosenPlaylist.isEmpty()) return Triple(false, 0, 0)
 
-            val variantM3u8 = client.newCall(Request.Builder().url(chosenPlaylist).header("User-Agent", ua).get().build()).execute().use { resp ->
-                if (resp.isSuccessful) (resp.body?.string() ?: "") else ""
-            }
-            val segments = variantM3u8.lines().map { it.trim() }.filter { it.startsWith("http") }
-            if (segments.isEmpty()) return Triple(false, 0, 0)
+            // Find matching AAC audio playlist (prefer original audio -> DEFAULT=YES -> first in group)
+            val audioMediaLines = lines.map { it.trim() }.filter { it.startsWith("#EXT-X-MEDIA:") && it.contains("TYPE=AUDIO") }
+            val chosenAudioLine =
+                audioMediaLines.firstOrNull { (audioGroup.isEmpty() || it.contains("GROUP-ID=\"$audioGroup\"")) && it.contains("original", ignoreCase = true) }
+                    ?: audioMediaLines.firstOrNull { (audioGroup.isEmpty() || it.contains("GROUP-ID=\"$audioGroup\"")) && it.contains("DEFAULT=YES") }
+                    ?: audioMediaLines.firstOrNull { audioGroup.isNotEmpty() && it.contains("GROUP-ID=\"$audioGroup\"") }
+                    ?: audioMediaLines.firstOrNull { it.contains("original", ignoreCase = true) || it.contains("DEFAULT=YES") }
+                    ?: audioMediaLines.firstOrNull()
+            val chosenAudioUrl = chosenAudioLine?.let { Regex("URI=\"([^\"]+)\"").find(it)?.groupValues?.get(1) } ?: ""
 
-            val takeCount = segments.size.coerceAtMost(maxSegments)
-            Log.i(TAG, "VISIONOS HLS ${chosenW}x${chosenH}: downloading $takeCount/${segments.size} segments")
-            onProgress(12, "[YouTube HD] Downloading ${chosenH}p HD stream ($takeCount segments)...")
+            onProgress(12, "[YouTube HD] Downloading ${chosenH}p video stream...")
+            val vCount = downloadHlsSegments(chosenPlaylist, ua, tmpTs, maxSegments, 12, 56, "[YouTube ${chosenH}p]", onProgress)
+            if (vCount <= 0) return Triple(false, 0, 0)
 
-            val tmpTs = File(destFile.parentFile, "${destFile.nameWithoutExtension}_hls.ts")
-            if (tmpTs.exists()) tmpTs.delete()
-            tmpTs.parentFile?.mkdirs()
-
-            var totalBytes = 0L
-            var lastEmit = 0L
-            var consecutiveFails = 0
-            FileOutputStream(tmpTs).use { out ->
-                val buf = ByteArray(64 * 1024)
-                for (idx in 0 until takeCount) {
-                    val segUrl = segments[idx]
-                    var segOk = false
-                    for (attempt in 0 until 3) {
-                        try {
-                            val sReq = Request.Builder().url(segUrl).header("User-Agent", ua).get().build()
-                            client.newCall(sReq).execute().use { resp ->
-                                if (resp.isSuccessful && resp.body != null) {
-                                    resp.body!!.byteStream().use { inp ->
-                                        while (true) {
-                                            val r = inp.read(buf)
-                                            if (r == -1) break
-                                            out.write(buf, 0, r)
-                                            totalBytes += r
-                                        }
-                                    }
-                                    segOk = true
-                                }
-                            }
-                        } catch (_: Exception) {}
-                        if (segOk) break
-                        Thread.sleep(300L * (attempt + 1))
-                    }
-                    if (!segOk) {
-                        consecutiveFails++
-                        Log.w(TAG, "VISIONOS HLS segment $idx failed after 3 retries (consecutive=$consecutiveFails)")
-                        if (consecutiveFails >= 5) break
-                        continue
-                    }
-                    consecutiveFails = 0
-                    val now = System.currentTimeMillis()
-                    if (now - lastEmit >= 450L || idx == takeCount - 1) {
-                        lastEmit = now
-                        val pct = 12 + (((idx + 1) * 76) / takeCount)
-                        val mb = String.format("%.1f", totalBytes / (1024.0 * 1024.0))
-                        onProgress(pct.coerceAtMost(88), "[YouTube ${chosenH}p] Segment ${idx + 1}/$takeCount ($mb MB)")
-                    }
-                }
+            var hasAudio = false
+            if (chosenAudioUrl.isNotEmpty()) {
+                onProgress(68, "[YouTube HD] Downloading AAC audio track...")
+                val aCount = downloadHlsSegments(chosenAudioUrl, ua, tmpAudTs, maxSegments, 68, 20, "[YouTube Audio]", onProgress, stripId3 = true)
+                hasAudio = aCount > 0 && tmpAudTs.exists() && tmpAudTs.length() > 1024
             }
 
-            if (!tmpTs.exists() || tmpTs.length() < 1024) {
-                tmpTs.delete()
-                return Triple(false, 0, 0)
-            }
-
-            onProgress(90, "[Muxer] Finalizing ${chosenH}p HD MP4...")
-            val remuxed = remuxTsToMp4(tmpTs, destFile)
-            if (remuxed) {
-                tmpTs.delete()
+            onProgress(90, "[Muxer] Combining ${chosenH}p HD video & AAC audio...")
+            val muxed = if (hasAudio) muxVideoAndAudio(tmpTs, tmpAudTs, destFile) else false
+            if (muxed) {
                 return Triple(true, chosenW, chosenH)
             }
-            // Fallback: Media3/MediaExtractor supports MPEG-TS directly even with .mp4/.ts
+            val remuxed = remuxTsToMp4(tmpTs, destFile)
+            if (remuxed) {
+                return Triple(true, chosenW, chosenH)
+            }
             tmpTs.copyTo(destFile, overwrite = true)
-            tmpTs.delete()
             Triple(destFile.exists() && destFile.length() > 1024, chosenW, chosenH)
         } catch (e: Exception) {
             Log.w(TAG, "VISIONOS HLS failed: ${e.message}")
             Triple(false, 0, 0)
+        } finally {
+            tmpTs.delete()
+            tmpAudTs.delete()
         }
     }
 

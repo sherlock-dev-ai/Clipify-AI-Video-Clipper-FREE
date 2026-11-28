@@ -816,11 +816,16 @@
   window.addEventListener('DOMContentLoaded', () => {
     console.log('[ClipifyAI Android] Wiring native controls...');
 
-    // Wire file dropzones & pickers to Android gallery picker
+    // Wire video file dropzones & pickers to Android gallery picker (never hijack image/logo inputs)
     const pickers = document.querySelectorAll(
       'input[type="file"], .dropzone, .upload-box, .drop-area, #videoInput, [data-picker="video"], .upload-custom, #betaDropZone, .file-chip-change, #instantDropzone, #instantFileInput'
     );
     pickers.forEach(el => {
+      const acceptAttr = (el.getAttribute('accept') || '').toLowerCase();
+      const idAttr = (el.id || '').toLowerCase();
+      if (acceptAttr.includes('image') || idAttr.includes('logo') || idAttr.includes('image')) {
+        return;
+      }
       el.addEventListener('click', (e) => {
         if (window.AndroidBridge && window.AndroidBridge.pickVideo) {
           e.preventDefault();

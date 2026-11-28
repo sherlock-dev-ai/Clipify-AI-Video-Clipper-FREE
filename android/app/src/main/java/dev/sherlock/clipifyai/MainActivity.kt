@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.util.Log
 import android.speech.tts.TextToSpeech
 import android.webkit.JavascriptInterface
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -56,6 +57,30 @@ class MainActivity : AppCompatActivity() {
     private val commandReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             handleCustomIntent(intent)
+        }
+    }
+
+    private var filePathCallback: ValueCallback<Array<Uri>>? = null
+
+    private val fileChooserLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val callback = filePathCallback
+        filePathCallback = null
+        if (callback == null) return@registerForActivityResult
+        val data = result.data
+        if (result.resultCode == RESULT_OK && data != null) {
+            val clipData = data.clipData
+            if (clipData != null && clipData.itemCount > 0) {
+                val uris = Array(clipData.itemCount) { i -> clipData.getItemAt(i).uri }
+                callback.onReceiveValue(uris)
+            } else if (data.data != null) {
+                callback.onReceiveValue(arrayOf(data.data!!))
+            } else {
+                callback.onReceiveValue(null)
+            }
+        } else {
+            callback.onReceiveValue(null)
         }
     }
 
@@ -213,6 +238,42 @@ class MainActivity : AppCompatActivity() {
                     Log.d("ClipifyWebConsole", "[${consoleMessage.messageLevel()}] ${consoleMessage.message()} (${consoleMessage.sourceId()}:${consoleMessage.lineNumber()})")
                 }
                 return super.onConsoleMessage(consoleMessage)
+            }
+
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+                this@MainActivity.filePathCallback?.onReceiveValue(null)
+                this@MainActivity.filePathCallback = filePathCallback
+
+                val accepts = fileChooserParams?.acceptTypes
+                    ?.joinToString(",") { it.trim().lowercase() }
+                    ?: ""
+                val wantsImage = accepts.contains("image") || accepts.contains(".png") ||
+                    accepts.contains(".jpg") || accepts.contains(".jpeg") || accepts.contains(".webp")
+                val wantsVideo = accepts.contains("video")
+
+                val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = when {
+                        wantsImage && !wantsVideo -> "image/*"
+                        wantsVideo && !wantsImage -> "video/*"
+                        else -> "*/*"
+                    }
+                    if (fileChooserParams?.mode == FileChooserParams.MODE_OPEN_MULTIPLE) {
+                        putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                    }
+                }
+                return try {
+                    fileChooserLauncher.launch(Intent.createChooser(intent, if (wantsImage) "Select Image / Logo" else "Select File"))
+                    true
+                } catch (e: Exception) {
+                    this@MainActivity.filePathCallback = null
+                    filePathCallback?.onReceiveValue(null)
+                    false
+                }
             }
         }
 

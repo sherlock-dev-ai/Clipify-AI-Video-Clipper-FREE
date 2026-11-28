@@ -11,7 +11,7 @@ android {
         applicationId "dev.sherlock.clipifyai"
         minSdk 26
         targetSdk 34
-        versionCode 6013
+        versionCode 6014
         versionName "6.0.13"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"

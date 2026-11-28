@@ -8,6 +8,7 @@ ZIP_OUT = ROOT / "update-v6.0.13.zip"
 files_to_pack = [
     "app.py",
     "main.py",
+    "uninstall_app.py",
     "trending_service.py",
     "hindi_transliterator.py",
     "version.json",

@@ -341,7 +341,9 @@ function registerUninstallEntry(installDir) {
   try {
     const { execFile } = require('child_process');
     const psQuote = (value) => String(value).replace(/'/g, "''");
-    const cleanCmd = `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \\"Remove-Item -LiteralPath '${psQuote(installDir)}' -Recurse -Force; Remove-Item -LiteralPath '${UNINSTALL_KEY}' -Recurse -Force; [System.Windows.Forms.MessageBox]::Show('Clipify AI has been successfully uninstalled.', 'Clipify AI')\\"`;
+    const pyw = path.join(installDir, 'runtime', 'Scripts', 'pythonw.exe');
+    const uninstScript = path.join(installDir, 'uninstall_app.py');
+    const uninstallCmd = `"${pyw}" "${uninstScript}"`;
     const ps =
       `$ErrorActionPreference='Stop';` +
       `$k='${UNINSTALL_KEY}';` +
@@ -353,8 +355,8 @@ function registerUninstallEntry(installDir) {
       `Set-ItemProperty $k -Name InstallLocation -Value '${psQuote(installDir)}';` +
       `New-ItemProperty -Path $k -Name NoModify -Value 1 -PropertyType DWord -Force | Out-Null;` +
       `New-ItemProperty -Path $k -Name NoRepair -Value 1 -PropertyType DWord -Force | Out-Null;` +
-      `Set-ItemProperty $k -Name UninstallString -Value '${cleanCmd}';` +
-      `Set-ItemProperty $k -Name QuietUninstallString -Value '${cleanCmd}';` +
+      `Set-ItemProperty $k -Name UninstallString -Value '${psQuote(uninstallCmd)}';` +
+      `Set-ItemProperty $k -Name QuietUninstallString -Value '${psQuote(uninstallCmd)}';` +
       `$registeredPath=Get-ItemPropertyValue -Path $k -Name InstallLocation;` +
       `if ($registeredPath -ne '${psQuote(installDir)}') { throw 'InstallLocation registry verification failed'; }`;
     return new Promise((resolve) => {

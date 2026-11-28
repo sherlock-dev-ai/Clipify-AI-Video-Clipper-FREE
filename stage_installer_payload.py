@@ -11,6 +11,7 @@ targets = [PAYLOAD, UNPACKED]
 files_to_sync = [
     "app.py",
     "main.py",
+    "uninstall_app.py",
     "trending_service.py",
     "hindi_transliterator.py",
     "version.json",

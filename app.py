@@ -5767,6 +5767,45 @@ except Exception:
 GITHUB_REPO = "sherlock-dev-ai/Clipify-AI-Video-Clipper-FREE"
 
 
+def _sync_windows_uninstall_registry(version_str: str | None = None) -> None:
+    """Keep Windows Installed Apps version and UninstallString up to date."""
+    if sys.platform != "win32":
+        return
+    try:
+        import winreg
+        ver_clean = (version_str or APP_VERSION).lstrip("v").strip() or "6.0.13"
+        uninstall_script = ROOT / "uninstall_app.py"
+        if not uninstall_script.is_file():
+            return
+        pyw_candidates = [
+            ROOT / "runtime" / "Scripts" / "pythonw.exe",
+            Path(sys.executable).with_name("pythonw.exe"),
+            Path(sys.executable),
+        ]
+        pyw_exe = next((p for p in pyw_candidates if p.is_file()), Path(sys.executable))
+        uninstall_cmd = f'"{pyw_exe}" "{uninstall_script}"'
+        icon_path = ROOT / "icon.ico"
+        if not icon_path.is_file():
+            icon_path = ROOT / "static" / "icon.png"
+
+        key_path = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\ClipifyAI"
+        with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE) as key:
+            winreg.SetValueEx(key, "DisplayName", 0, winreg.REG_SZ, "Clipify AI")
+            winreg.SetValueEx(key, "DisplayVersion", 0, winreg.REG_SZ, ver_clean)
+            winreg.SetValueEx(key, "Publisher", 0, winreg.REG_SZ, "sherlock-dev-ai")
+            winreg.SetValueEx(key, "DisplayIcon", 0, winreg.REG_SZ, str(icon_path))
+            winreg.SetValueEx(key, "InstallLocation", 0, winreg.REG_SZ, str(ROOT))
+            winreg.SetValueEx(key, "UninstallString", 0, winreg.REG_SZ, uninstall_cmd)
+            winreg.SetValueEx(key, "QuietUninstallString", 0, winreg.REG_SZ, uninstall_cmd)
+            winreg.SetValueEx(key, "NoModify", 0, winreg.REG_DWORD, 1)
+            winreg.SetValueEx(key, "NoRepair", 0, winreg.REG_DWORD, 1)
+    except Exception:
+        pass
+
+
+_sync_windows_uninstall_registry()
+
+
 def _urlopen_with_ssl_fallback(req: urllib.request.Request | str, timeout: float = 30.0):
     """Safely open an HTTPS URL with certifi, system trust, unverified SSL, and curl fallback."""
     import ssl

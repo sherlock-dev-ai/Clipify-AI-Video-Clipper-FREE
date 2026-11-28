@@ -3795,6 +3795,14 @@ def _fast_generate_captions(audio_path: Path, ass_path: Path, clip_dur: float, l
             segments, _ = model.transcribe(str(audio_path), word_timestamps=True, beam_size=1, vad_filter=False)
             words = _collect_words(segments)
         try:
+            from hindi_transliterator import has_devanagari, transliterate_devanagari_to_hinglish
+            for w in words:
+                txt = str(w.get("word", ""))
+                if has_devanagari(txt):
+                    w["word"] = transliterate_devanagari_to_hinglish(txt)
+        except Exception:
+            pass
+        try:
             del model
             import gc
             gc.collect()

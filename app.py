@@ -2978,9 +2978,9 @@ def import_youtube():
     source_url, detected_platform = normalized
     plat_label = {"youtube": "YouTube", "twitch": "Twitch", "kick": "Kick"}.get(detected_platform, "Video")
     try:
-        max_height = int(data.get("quality") or 4320)
+        max_height = int(data.get("quality") or 1080)
     except (TypeError, ValueError):
-        max_height = 4320
+        max_height = 1080
     max_height = max(360, min(4320, max_height))
     yt_dlp_cmd = _yt_dlp_command()
     if not yt_dlp_cmd:
